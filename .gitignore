@@ -10,6 +10,18 @@ data/
 *.db-shm
 !data/.gitkeep
 
+# ── ข้อมูลย้อนหลังขนาดใหญ่ (dev/backtest เท่านั้น — ไม่ใช้ตอนรันจริง) ─────
+# ตัวเทรนโมเดล (train_live_models.py) ดึงข้อมูลสดจาก Deriv API เอง
+# ไฟล์ 90 วัน/1 นาที พวกนี้แค่ cache บนเครื่อง — ห้ามขึ้น git (จะพัง repo)
+XAU-USD_1Minute_BID_*.csv
+deriv_*_60s_90d.csv
+deriv_*_300s_90d.csv
+deriv_*_60s.csv
+deriv_*_300s.csv
+
+# ── โมเดล — เก็บเฉพาะที่ระบบใช้จริง (m1/m5/v2) ตัวเก่า/ไม่ใช้ไม่เก็บ ──────
+backend/ml_forecaster/model.joblib
+
 # ── Python ───────────────────────────────────────────────────────────────
 venv/
 .venv/

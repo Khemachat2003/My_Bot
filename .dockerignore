@@ -9,6 +9,13 @@ data/*.db-wal
 data/*.db-shm
 data/*.csv
 !data/.gitkeep
+# ข้อมูลย้อนหลัง dev (90วัน ฯลฯ) — ไม่พาเข้า image
+XAU-USD_1Minute_BID_*.csv
+deriv_*_60s_90d.csv
+deriv_*_300s_90d.csv
+deriv_*_60s.csv
+deriv_*_300s.csv
+backend/ml_forecaster/model.joblib
 notebooks
 logs
 .env.local
