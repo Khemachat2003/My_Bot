@@ -1,0 +1,42 @@
+{
+  "comment": "ตั้งค่า Rule-Based Checklist — ปรับได้เลย ไม่ต้องแตะโค้ด (system reloads อัตโนมัติทุก 15 วิ)",
+  "max_score": 15,
+  "fire_score": 10,
+  "watch_score": 7,
+  "fade": {
+    "enabled": true,
+    "rsi_extreme": 25,
+    "sma5_atr": 1.5,
+    "min_score": 4
+  },
+  "rejection_lookback": 2,
+  "ema_pullback_pct": 0.20,
+  "rsi_zone": 30,
+  "adx_min": 20,
+  "sma5_atr_min": 1.0,
+  "bb": { "period": 20, "std": 2.0 },
+  "sr": {
+    "lookback": 200,
+    "tolerance_pct": 0.20,
+    "major_tests": 3,
+    "minor_tests": 2,
+    "zone_pct": 0.35
+  },
+  "grip": {
+    "auto_scale": true,
+    "scale_divisor": 800,
+    "tolerance_pct": 0.05
+  },
+  "weights": {
+    "structure": 1,
+    "adx": 1,
+    "rsi_zone": 1,
+    "rsi_div": 2,
+    "ema": 2,
+    "bb": 2,
+    "sma5": 1,
+    "sr": 2,
+    "pullback": 1,
+    "rejection": 2
+  }
+}

@@ -1,0 +1,50 @@
+version: "3.9"
+
+# ── XAUUSD Bot — deployment บน VPS ───────────────────────────────────────────
+# ใช้งาน:
+#   1. ตั้ง .env ให้ครบ (คัดลอกจาก .env.example)
+#   2. docker compose up -d --build
+#   3. เข้า http://<vps-ip>:8000 (หรือผ่าน nginx ด้วย profile=with-nginx)
+#
+# บริการ:
+#   - bot: รัน 3 ระบบ (api + setup_feed + notifier) ด้วย supervisor ภายในตัว
+#   - api-only: รันเฉพาะ dashboard (ใช้คู่กับ worker แยก ถ้าอยาก scale)
+#
+# หมายเหตุ: ใช้ SQLite (data/bot.db) — เหมาะกับ single instance
+# ถ้าอยาก scale หลาย instance ต้องย้ายไป PostgreSQL ก่อน
+
+services:
+  bot:
+    build: .
+    container_name: xauusd-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PYTHONIOENCODING=utf-8
+      - TZ=UTC
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ตัวเลือก: รัน API กับ worker แยก (สำหรับ scale ในอนาคต)
+  # api-only:
+  #   build: .
+  #   container_name: xauusd-api
+  #   command: ["uvicorn", "backend.api:app", "--host", "0.0.0.0", "--port", "8000"]
+  #   restart: unless-stopped
+  #   env_file: [.env]
+  #   ports: ["8000:8000"]
+  #   volumes: ["./data:/app/data"]

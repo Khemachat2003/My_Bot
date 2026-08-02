@@ -1,0 +1,34 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# xauusd-bot.service — ตัว supervisor หลัก (api + setup_feed + notifier)
+# วิธีใช้บน VPS (Debian/Ubuntu, ไม่ใช้ Docker):
+#   sudo cp deploy/systemd/xauusd-bot.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now xauusd-bot
+#
+# หลังแก้ไฟล์โค้ด:  sudo systemctl restart xauusd-bot
+# ดู log:           sudo journalctl -u xauusd-bot -f
+# ─────────────────────────────────────────────────────────────────────────────
+[Unit]
+Description=XAUUSD Bot — api + feed + notifier supervisor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=xauusd                # ← สร้าง user ก่อน:  sudo adduser --disabled-login xauusd
+WorkingDirectory=/opt/xauusd-bot
+ExecStart=/opt/xauusd-bot/venv/bin/python -X utf8 run_live.py
+Restart=always
+RestartSec=10
+Environment=PYTHONIOENCODING=utf-8
+Environment=TZ=UTC
+
+# สุดท้ายของหน่วยความจำ/CPU กัน runaway
+MemoryMax=1G
+
+# log ผ่าน journald
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

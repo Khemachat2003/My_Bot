@@ -1,0 +1,17 @@
+# .dockerignore — ไม่ส่งไฟล์ที่ไม่จำเป็นเข้า image
+.git
+.venv
+venv
+__pycache__
+*.pyc
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/*.csv
+!data/.gitkeep
+notebooks
+logs
+.env.local
+.env.production
+*.log
+test_*.py

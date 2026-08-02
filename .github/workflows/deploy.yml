@@ -1,0 +1,54 @@
+# ── GitHub Actions: auto build + deploy ขึ้น VPS ─────────────────────────────
+# ทุกครั้งที่ push เข้า main → SSH เข้า VPS → docker compose up -d --build
+#
+# ตั้งค่าใน GitHub repo → Settings → Secrets and variables → Actions:
+#   VPS_HOST      = IP หรือ domain ของ VPS
+#   VPS_USER      = user ที่มีสิทธิ์ docker (เช่น bot)
+#   SSH_KEY       = private key (ed25519) ที่ใช้ SSH เข้า VPS (paste ทั้งก้อน)
+#
+# วิธีใช้:
+#   - push โค้ดขึ้น GitHub ก่อน (ครั้งแรก)
+#   - เตรียมไฟล์ .env บน VPS ไว้ที่ /opt/xauusd-bot/.env (ไม่ commit ขึ้น git)
+#   - จากนั้น push โค้ดใหม่ทุกครั้ง → deploy อัตโนมัติ
+#
+# วิธีแรกบน VPS (ทำครั้งเดียว):
+#   sudo mkdir -p /opt/xauusd-bot && cd /opt/xauusd-bot
+#   sudo git clone <repo-url> .
+#   sudo cp .env.example .env && sudo nano .env
+#   sudo mkdir -p data
+#   docker compose up -d --build
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:      # ให้กด deploy ด้วยมือได้จากหน้า Actions
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    if: github.repository != ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy over SSH
+        run: |
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} '
+            set -e
+            cd /opt/xauusd-bot || exit 1
+            git pull --ff-only
+            sudo docker compose up -d --build --pull always
+            echo "--- ตรวจ healthcheck ---"
+            sleep 8
+            curl -s -f http://127.0.0.1:8000/api/health || echo "WARNING: health ยังไม่ตอบ (อาจยัง boot) — ดู logs ด้วย docker compose logs -f"
+            sudo docker compose ps
+          '

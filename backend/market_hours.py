@@ -1,0 +1,54 @@
+"""
+market_hours.py — เลือก Symbol ให้ระบบรันได้ตลอด (แม้ตลาดทองจริงปิดเสาร์-อาทิตย์)
+=====================================================================================
+ราคาทองจริง (frxXAUUSD) เป็นสินค้า Forex/Commodity → ตลาดปิดวันเสาร์-อาทิตย์ (UTC)
+และช่วงปิดรายวัน ~21:00-22:00 UTC ทำให้ Deriv ไม่ส่ง tick สดในช่วงนั้น
+
+วิธีรับมือ: สลับไปใช้ Synthetic Index ของ Deriv ที่เทรดได้ 24/7 (ค่า default: R_100
+Volatility 100 Index) เพื่อให้ pipeline ยังทำงาน/เก็บ log/ยิง Telegram ตลอดเวลา
+เมื่อตลาดเปิดอีกครั้ง ระบบจะกลับมาใช้ symbol หลักเองอัตโนมัติ (เพราะเลือกใหม่ทุกครั้ง)
+
+ตั้งค่าใน .env:
+    DERIV_SYMBOL=frxXAUUSD           # ตัวหลัก ราคาทองจริง
+    DERIV_SYMBOL_BACKUP=R_100        # ตัวสำรอง ตลาดเปิด 24/7
+    SYMBOL_AUTO_FALLBACK=true        # false = ปิดการสลับอัตโนมัติ
+"""
+from __future__ import annotations
+
+import os
+from datetime import datetime, timezone
+
+DEFAULT_SYMBOL = "frxXAUUSD"
+DEFAULT_BACKUP = "R_100"
+
+
+def is_forex_like(symbol: str) -> bool:
+    """สัญลักษณ์ forex/commodity ของ Deriv ขึ้นต้นด้วย frx (เช่น frxXAUUSD, frxEURUSD)"""
+    return (symbol or "").startswith("frx")
+
+
+def market_open_now(now: datetime | None = None) -> bool:
+    """ตลาด Forex เปิดหรือไม่ (อิงเวลา UTC) — เสาร์/อาทิตย์และช่วงปิดรายวัน = ปิด"""
+    now = now or datetime.now(timezone.utc)
+    if now.weekday() >= 5:        # 5=เสาร์, 6=อาทิตย์
+        return False
+    if now.hour == 21:            # ปิดรายวัน ~21:00-22:00 UTC
+        return False
+    return True
+
+
+def choose_symbol(now: datetime | None = None) -> str:
+    """คืน symbol ที่ควรใช้ตอนนี้: ถ้า symbol หลักเป็น forex และตลาดปิด → ใช้ตัวสำรอง"""
+    auto = os.getenv("SYMBOL_AUTO_FALLBACK", "true").strip().lower() != "false"
+    primary = os.getenv("DERIV_SYMBOL", DEFAULT_SYMBOL)
+    backup = os.getenv("DERIV_SYMBOL_BACKUP", DEFAULT_BACKUP)
+    if auto and backup and is_forex_like(primary) and not market_open_now(now):
+        return backup
+    return primary
+
+
+def symbol_label(symbol: str) -> str:
+    """ชื่อที่ใช้ใน Telegram message — XAUUSD สำหรับทองจริง, R100 สำหรับตัวสำรอง"""
+    if symbol == "frxXAUUSD":
+        return "XAUUSD"
+    return symbol

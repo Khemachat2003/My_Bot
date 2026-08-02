@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XAUUSD Pro Trading Terminal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  /* ═══ DESIGN TOKENS ═══ */
+  :root{
+    --bg:#06090f; --panel:#0c1220; --panel2:#111a2c; --card:#0a0f1a;
+    --border:#1a2440; --border2:#263259;
+    --text:#e8eefb; --muted:#74809c; --dim:#4a5775;
+    --green:#22c98a; --red:#f6465d; --yellow:#f0b90b;
+    --blue:#4da3ff; --cyan:#38e1c4; --purple:#a78bfa;
+    --grid:#131c30;
+    --num:'Cascadia Mono','SF Mono','Consolas',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:
+      radial-gradient(1200px 500px at 80% -10%, rgba(56,225,196,.05), transparent 60%),
+      radial-gradient(900px 400px at 10% 110%, rgba(77,163,255,.06), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Segoe UI',Roboto,system-ui,Arial,sans-serif;
+    font-size:13.5px; display:flex; flex-direction:column; overflow:hidden;
+  }
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:#24304f; border-radius:6px; border:2px solid transparent; background-clip:content-box;}
+  ::-webkit-scrollbar-thumb:hover{background:#34446c;}
+  .mono{font-family:var(--num); font-variant-numeric:tabular-nums;}
+
+  /* ═══ TOP BAR ═══ */
+  .topbar{
+    display:flex; align-items:center; gap:18px; padding:8px 18px;
+    background:rgba(12,18,32,.85); backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--border); flex-shrink:0;
+    box-shadow:0 2px 18px rgba(0,0,0,.35);
+  }
+  .brand{display:flex; align-items:center; gap:9px; white-space:nowrap;}
+  .brand .logo{
+    width:30px; height:30px; border-radius:8px; display:grid; place-items:center;
+    background:linear-gradient(135deg,#22c98a,#4da3ff); font-weight:900; color:#04121a; font-size:14px;
+    box-shadow:0 0 14px rgba(34,201,138,.35);
+  }
+  .brand .name{font-size:14px; font-weight:800; letter-spacing:.6px;}
+  .brand .name span{color:var(--cyan);}
+  .brand .ver{font-size:9.5px; color:var(--dim); letter-spacing:1.5px; font-weight:700;}
+
+  .pricebox{
+    display:flex; align-items:center; gap:12px; padding:4px 14px; border-radius:10px;
+    background:var(--card); border:1px solid var(--border);
+  }
+  .pricebox .sym{font-size:11px; font-weight:800; color:var(--muted); letter-spacing:.4px;}
+  .pricebox .price{font-family:var(--num); font-size:30px; font-weight:800; line-height:1; letter-spacing:.5px;}
+  .pricebox .price.up{color:var(--green);} .pricebox .price.down{color:var(--red);}
+  .pricebox .chg{font-family:var(--num); font-size:12.5px; font-weight:700; padding:2px 7px; border-radius:6px;}
+  .chg.up{color:var(--green); background:rgba(34,201,138,.1);}
+  .chg.down{color:var(--red); background:rgba(246,70,93,.1);}
+  .live-badge{
+    font-size:10px; font-weight:800; letter-spacing:1px; color:var(--green);
+    border:1px solid rgba(34,201,138,.4); border-radius:99px; padding:3px 9px;
+    display:inline-flex; align-items:center; gap:5px;
+  }
+  .live-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.6s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.2;}}
+
+  .spacer{flex:1;}
+  .topstat{display:flex; gap:14px; align-items:center;}
+  .ts{font-size:10.5px; color:var(--muted); text-align:right; line-height:1.25;}
+  .ts b{display:block; color:var(--text); font-family:var(--num); font-size:13px; font-weight:700;}
+  .logout{
+    font-size:11.5px; color:var(--muted); text-decoration:none;
+    border:1px solid var(--border); border-radius:8px; padding:6px 11px; transition:.15s;
+  }
+  .logout:hover{color:var(--red); border-color:var(--red);}
+
+  /* ═══ NAV ═══ */
+  .nav{
+    display:flex; gap:4px; padding:10px 18px 0; flex-shrink:0; border-bottom:1px solid var(--border);
+  }
+  .nav-btn{
+    background:transparent; border:none; color:var(--muted); cursor:pointer;
+    padding:9px 20px; font-size:12.5px; font-weight:700; font-family:inherit; letter-spacing:.3px;
+    border-radius:10px 10px 0 0; border:1px solid transparent; border-bottom:none;
+    display:flex; align-items:center; gap:8px; transition:.15s;
+  }
+  .nav-btn:hover{color:var(--text); background:rgba(255,255,255,.02);}
+  .nav-btn .ndot{width:7px;height:7px;border-radius:50%;}
+  .nav-btn.active{
+    color:var(--text); background:var(--panel); border-color:var(--border);
+    box-shadow:inset 0 2px 0 var(--cyan);
+  }
+  .nav-btn[data-tab=ml] .ndot{background:var(--green);}
+  .nav-btn[data-tab=setup] .ndot{background:var(--blue);}
+  .nav-btn[data-tab=journal] .ndot{background:var(--purple);}
+  .nav-btn[data-tab=overview] .ndot{background:var(--cyan);}
+
+  /* ═══ MAIN ═══ */
+  .main{flex:1; overflow-y:auto; padding:16px 18px 40px;}
+
+  /* KPI cards */
+  .kpi-row{display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); margin-bottom:16px;}
+  .kpi{
+    background:linear-gradient(180deg,var(--panel),var(--card));
+    border:1px solid var(--border); border-radius:12px; padding:13px 15px;
+    position:relative; overflow:hidden; transition:.15s;
+  }
+  .kpi:hover{border-color:var(--border2); transform:translateY(-1px);}
+  .kpi::before{content:''; position:absolute; inset:0 auto 0 0; width:3px; background:var(--accent,#4a5775); opacity:.7;}
+  .kpi .lbl{font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.09em; font-weight:700;}
+  .kpi .val{font-family:var(--num); font-size:24px; font-weight:800; margin:6px 0 4px; line-height:1;}
+  .kpi .sub{font-size:10.5px; color:var(--muted);}
+  .kpi .sub b{color:var(--text);}
+  .kpi.cyan{--accent:var(--cyan);} .kpi.green{--accent:var(--green);} .kpi.blue{--accent:var(--blue);}
+  .kpi.purple{--accent:var(--purple);} .kpi.yellow{--accent:var(--yellow);} .kpi.red{--accent:var(--red);}
+  .val.green{color:var(--green);} .val.red{color:var(--red);} .val.yellow{color:var(--yellow);}
+  .val.blue{color:var(--blue);} .val.cyan{color:var(--cyan);} .val.purple{color:var(--purple);} .val.muted{color:var(--muted);}
+
+  /* panels */
+  .cols{display:grid; gap:14px; margin-bottom:16px;}
+  .cols.l2{grid-template-columns:minmax(0,1.8fr) minmax(0,1fr);}
+  .cols.l3{grid-template-columns:repeat(3,minmax(0,1fr));}
+  @media(max-width:1150px){.cols.l2,.cols.l3{grid-template-columns:1fr;}}
+
+  .panel{
+    background:linear-gradient(180deg,var(--panel),var(--card));
+    border:1px solid var(--border); border-radius:12px; padding:14px 15px; min-width:0;
+  }
+  .panel h3{
+    font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.1em;
+    margin-bottom:12px; display:flex; align-items:center; gap:8px; font-weight:800;
+  }
+  .panel h3 .ph{width:16px;height:16px;border-radius:5px;display:grid;place-items:center;font-size:9px;}
+  .panel h3 .ph.cyan{background:rgba(56,225,196,.12);color:var(--cyan);}
+  .panel h3 .ph.green{background:rgba(34,201,138,.12);color:var(--green);}
+  .panel h3 .ph.blue{background:rgba(77,163,255,.12);color:var(--blue);}
+  .panel h3 .ph.purple{background:rgba(167,139,250,.12);color:var(--purple);}
+  .panel h3 .ph.red{background:rgba(246,70,93,.12);color:var(--red);}
+
+  /* chart */
+  .chart-wrap{position:relative; height:330px;}
+  canvas.chart{width:100%; height:100%; display:block;}
+  .chart-legend{display:flex; gap:14px; font-size:10px; color:var(--muted); margin-top:8px; flex-wrap:wrap;}
+  .chart-legend i{width:10px;height:2px;display:inline-block;margin-right:4px;vertical-align:middle;border-radius:2px;}
+
+  /* ═══ GAUGES ═══ */
+  .gauge{
+    background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:10px 12px 12px; margin-bottom:10px;
+  }
+  .gauge:last-child{margin-bottom:0;}
+  .gauge .ghead{display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;}
+  .gauge .gname{font-size:11px; font-weight:800; letter-spacing:.5px; color:var(--muted);}
+  .gsig{font-size:10px; font-weight:900; padding:3px 9px; border-radius:99px; letter-spacing:.5px;}
+  .gsig.CALL{background:rgba(34,201,138,.14); color:var(--green); border:1px solid rgba(34,201,138,.3);}
+  .gsig.PUT{background:rgba(246,70,93,.14); color:var(--red); border:1px solid rgba(246,70,93,.3);}
+  .gsig.NEUTRAL{background:rgba(116,128,156,.12); color:var(--muted); border:1px solid rgba(116,128,156,.25);}
+  .gauge-svg{display:flex; justify-content:center; margin:6px 0 2px;}
+  .gauge .gmeta{display:flex; justify-content:space-between; font-family:var(--num); font-size:10px; color:var(--dim); margin-top:4px;}
+
+  /* ═══ TABLES ═══ */
+  .tbl-wrap{overflow-x:auto; border:1px solid var(--border); border-radius:10px;}
+  table{width:100%; border-collapse:collapse; font-size:12px; font-variant-numeric:tabular-nums;}
+  th{
+    text-align:left; color:var(--muted); font-size:9.5px; text-transform:uppercase; letter-spacing:.08em;
+    padding:9px 12px; border-bottom:1px solid var(--border); white-space:nowrap;
+    position:sticky; top:0; background:var(--panel2); z-index:1;
+  }
+  td{padding:8px 12px; border-bottom:1px solid var(--grid); white-space:nowrap;}
+  tbody tr{transition:background .1s;}
+  tbody tr:hover{background:rgba(77,163,255,.045);}
+  tbody tr:last-child td{border-bottom:none;}
+  .pill{padding:2.5px 9px; border-radius:99px; font-size:10px; font-weight:800; letter-spacing:.3px;}
+  .pill.WIN{background:rgba(34,201,138,.14); color:var(--green);}
+  .pill.LOSE{background:rgba(246,70,93,.14); color:var(--red);}
+  .pill.PENDING{background:rgba(240,185,11,.14); color:var(--yellow);}
+  .dir-call{color:var(--green); font-weight:800;}
+  .dir-put{color:var(--red); font-weight:800;}
+  .empty{color:var(--dim); text-align:center; padding:26px; font-size:12px;}
+
+  /* ═══ SETUP CHECKLIST ═══ */
+  .setup-card{background:var(--card); border:1px solid var(--border); border-radius:12px; padding:13px; margin-bottom:10px;}
+  .setup-card.triggered{border-color:var(--green); box-shadow:0 0 18px rgba(34,201,138,.18);}
+  .setup-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
+  .setup-head h4{font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:800;}
+  .setup-score{font-family:var(--num); font-size:20px; font-weight:800;}
+  .setup-score.ok{color:var(--green);} .setup-score.wait{color:var(--yellow);}
+  .setup-meta{display:flex; gap:10px; font-size:11px; color:var(--muted); margin-bottom:10px; flex-wrap:wrap; align-items:center;}
+  .tb{display:inline-block; font-size:9.5px; font-weight:900; padding:3px 9px; border-radius:99px; letter-spacing:.4px;}
+  .tb.ready{background:rgba(34,201,138,.14); color:var(--green);}
+  .tb.wait{background:rgba(116,128,156,.1); color:var(--muted);}
+  .tier{display:inline-block; font-size:9.5px; font-weight:900; padding:3px 9px; border-radius:99px; letter-spacing:.4px;}
+  .tier.FIRE{background:rgba(34,201,138,.16); color:var(--green); border:1px solid rgba(34,201,138,.5);}
+  .tier.FADE{background:rgba(240,185,11,.15); color:var(--yellow); border:1px solid rgba(240,185,11,.5);}
+  .tier.WATCH{background:rgba(56,189,248,.13); color:var(--cyan); border:1px solid rgba(56,189,248,.45);}
+  .tier.NONE{background:rgba(116,128,156,.1); color:var(--muted); border:1px solid var(--border);}
+  .frac{font-size:10px; color:var(--dim); font-variant-numeric:tabular-nums;}
+  .prog{height:5px; border-radius:3px; background:var(--grid); overflow:hidden; margin-bottom:10px;}
+  .prog i{display:block; height:100%; border-radius:3px; background:linear-gradient(90deg,var(--cyan),var(--green)); transition:width .5s;}
+  .setup-list{list-style:none; font-size:11.5px;}
+  .setup-list li{display:flex; gap:8px; padding:4px 0; border-bottom:1px solid rgba(19,28,48,.7); align-items:baseline;}
+  .setup-list li:last-child{border-bottom:none;}
+  .setup-list .iname{font-weight:700; flex-shrink:0; color:var(--text);}
+  .setup-list .inote{color:var(--dim);}
+  .setup-note{margin-top:9px; padding-top:9px; border-top:1px dashed var(--border); font-size:10.5px; color:var(--dim);}
+  .setup-note.ready{color:var(--green);}
+
+  .feed-row{
+    display:flex; align-items:center; gap:9px; padding:8px 10px; border-bottom:1px solid rgba(19,28,48,.7);
+    font-size:11.5px; font-variant-numeric:tabular-nums;
+  }
+  .feed-row:last-child{border-bottom:none;}
+  .feed-row .fdir{width:52px; text-align:center; font-weight:900; font-size:11px; border-radius:6px; padding:2px 0;}
+  .feed-row .fdir.CALL{background:rgba(34,201,138,.14); color:var(--green);}
+  .feed-row .fdir.PUT{background:rgba(246,70,93,.14); color:var(--red);}
+  .feed-row .ftime{color:var(--dim); font-family:var(--num); font-size:10.5px;}
+  .feed-row .fprice{font-family:var(--num); font-weight:700; margin-left:auto;}
+  .feed-row .fconf{font-family:var(--num); color:var(--muted); font-size:11px;}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ TOP BAR ═══════════ -->
+<div class="topbar">
+  <div class="brand">
+    <div class="logo">X</div>
+    <div>
+      <div class="name">XAUUSD<span> PRO</span> TERMINAL</div>
+      <div class="ver">ML + RULE-BASED MONITOR</div>
+    </div>
+  </div>
+  <div class="pricebox">
+    <span class="sym" id="symbolBadge">frxXAUUSD</span>
+    <span class="price" id="tickerPrice">–</span>
+    <span class="chg" id="tickerChg"></span>
+  </div>
+  <span class="live-badge"><span class="dot"></span>LIVE</span>
+  <div class="spacer"></div>
+  <div class="topstat">
+    <div class="ts">M1<br><b id="hM1">–</b></div>
+    <div class="ts">M5<br><b id="hM5">–</b></div>
+    <div class="ts">Session<br><b id="hSession">–</b></div>
+    <div class="ts">UTC<br><b id="hUtc">–</b></div>
+  </div>
+  <a class="logout" href="/logout">ออกจากระบบ</a>
+</div>
+
+<!-- ═══════════ NAV ═══════════ -->
+<div class="nav">
+  <button class="nav-btn active" data-tab="overview"><span class="ndot"></span>ภาพรวม</button>
+  <button class="nav-btn" data-tab="ml"><span class="ndot"></span>ML สัญญาณ</button>
+  <button class="nav-btn" data-tab="setup"><span class="ndot"></span>Rule-Based</button>
+  <button class="nav-btn" data-tab="journal"><span class="ndot"></span>Journal / P&amp;L</button>
+</div>
+
+<!-- ═══════════ MAIN ═══════════ -->
+<div class="main">
+
+  <!-- ─── OVERVIEW ─── -->
+  <section id="tab-overview">
+    <div class="kpi-row">
+      <div class="kpi cyan"><div class="lbl">ML Winrate</div><div class="val cyan" id="ovMlWinrate">–</div><div class="sub" id="ovMlWinrateSub">รอสัญญาณ...</div></div>
+      <div class="kpi green"><div class="lbl">ML Margin vs BE</div><div class="val" id="ovMlMargin">–</div><div class="sub" id="ovMlN">–</div></div>
+      <div class="kpi blue"><div class="lbl">Setup Winrate</div><div class="val blue" id="ovSetWinrate">–</div><div class="sub" id="ovSetWinrateSub">รอสัญญาณ...</div></div>
+      <div class="kpi purple"><div class="lbl">Setup Margin vs BE</div><div class="val" id="ovSetMargin">–</div><div class="sub" id="ovSetN">–</div></div>
+      <div class="kpi yellow"><div class="lbl">P&amp;L รวม (จำลอง)</div><div class="val" id="ovPnl">–</div><div class="sub" id="ovPnlSub">–</div></div>
+      <div class="kpi green"><div class="lbl">Model M1</div><div class="val purple" id="ovModelM1">–</div><div class="sub" id="ovModelM1Sub">–</div></div>
+      <div class="kpi red"><div class="lbl">Model M5</div><div class="val purple" id="ovModelM5">–</div><div class="sub" id="ovModelM5Sub">–</div></div>
+    </div>
+
+    <div class="cols l2">
+      <div class="panel">
+        <h3><span class="ph cyan">📈</span>กราฟราคา — Candlestick 1 นาที</h3>
+        <div class="chart-wrap"><canvas id="candleChart" class="chart"></canvas></div>
+        <div class="chart-legend">
+          <span><i style="background:var(--cyan);"></i>EMA20</span>
+          <span><i style="background:var(--purple);"></i>EMA50</span>
+          <span><i style="background:var(--green);"></i>CALL zone</span>
+          <span><i style="background:var(--red);"></i>PUT zone</span>
+        </div>
+      </div>
+      <div class="panel">
+        <h3><span class="ph green">🎯</span>Probability Gauges</h3>
+        <div id="gaugePanel"></div>
+      </div>
+    </div>
+
+    <div class="cols l3">
+      <div class="panel">
+        <h3><span class="ph purple">📊</span>เส้น P&amp;L (Equity Curve)</h3>
+        <div class="chart-wrap" style="height:230px;"><canvas id="equityChart" class="chart"></canvas></div>
+      </div>
+      <div class="panel">
+        <h3><span class="ph green">⚡</span>สัญญาณ ML ล่าสุด</h3>
+        <div id="mlRecentFeed" style="max-height:230px;overflow-y:auto;"></div>
+      </div>
+      <div class="panel">
+        <h3><span class="ph blue">🔍</span>Setup Checklist สด</h3>
+        <div id="setupMini"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── ML ─── -->
+  <section id="tab-ml" style="display:none;">
+    <div class="kpi-row">
+      <div class="kpi cyan"><div class="lbl">ML Winrate รวม</div><div class="val cyan" id="mlWr">–</div><div class="sub" id="mlWrSub">–</div></div>
+      <div class="kpi blue"><div class="lbl">Breakeven</div><div class="val blue" id="mlBe">–</div><div class="sub">ต้องชนะเกินนี้ถึงกำไร</div></div>
+      <div class="kpi"><div class="lbl">Margin vs BE</div><div class="val" id="mlMargin">–</div><div class="sub">CI ล่าง − Breakeven</div></div>
+      <div class="kpi"><div class="lbl">95% CI</div><div class="val" id="mlCi" style="font-size:15px;">–</div><div class="sub">ช่วงเชื่อมั่น winrate</div></div>
+      <div class="kpi yellow"><div class="lbl">Resolved / Pending</div><div class="val yellow" id="mlN">–</div><div class="sub" id="mlNsub">–</div></div>
+      <div class="kpi cyan"><div class="lbl">Winrate M1</div><div class="val cyan" id="mlWrM1">–</div><div class="sub">ถือ 15 นาที</div></div>
+      <div class="kpi cyan"><div class="lbl">Winrate M5</div><div class="val cyan" id="mlWrM5">–</div><div class="sub">ถือ 30 นาที</div></div>
+    </div>
+    <div class="panel">
+      <h3><span class="ph green">🕐</span>ประวัติสัญญาณ ML ทั้งหมด</h3>
+      <div class="tbl-wrap" style="max-height:480px;overflow-y:auto;">
+        <table id="mlFullTable">
+          <thead><tr><th>เวลา</th><th>TF</th><th>ทิศทาง</th><th>Entry</th><th>Exit</th><th>Win Prob</th><th>Thresh</th><th>Hold</th><th>Model</th><th>ผล</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div id="mlEmpty" class="empty" style="display:none;">ยังไม่มีสัญญาณ ML — รอ notifier.py ทำงาน</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── SETUP ─── -->
+  <section id="tab-setup" style="display:none;">
+    <div class="kpi-row">
+      <div class="kpi blue"><div class="lbl">Setup Winrate รวม</div><div class="val blue" id="setWr">–</div><div class="sub" id="setWrSub">–</div></div>
+      <div class="kpi blue"><div class="lbl">Breakeven</div><div class="val blue" id="setBe">–</div><div class="sub">ต้องชนะเกินนี้ถึงกำไร</div></div>
+      <div class="kpi"><div class="lbl">Margin vs BE</div><div class="val" id="setMargin">–</div><div class="sub">CI ล่าง − Breakeven</div></div>
+      <div class="kpi"><div class="lbl">95% CI</div><div class="val" id="setCi" style="font-size:15px;">–</div><div class="sub">ช่วงเชื่อมั่น winrate</div></div>
+      <div class="kpi yellow"><div class="lbl">Resolved / Pending</div><div class="val yellow" id="setN">–</div><div class="sub" id="setNsub">–</div></div>
+      <div class="kpi blue"><div class="lbl">Winrate M1</div><div class="val blue" id="setWrM1">–</div><div class="sub">ถือ 15 นาที</div></div>
+      <div class="kpi blue"><div class="lbl">Winrate M5</div><div class="val blue" id="setWrM5">–</div><div class="sub">ถือ 30 นาที</div></div>
+    </div>
+    <div class="cols l3">
+      <div class="panel"><h3><span class="ph blue">🔍</span>Checklist สด M1</h3><div id="setupM1"></div></div>
+      <div class="panel"><h3><span class="ph blue">🔍</span>Checklist สด M5</h3><div id="setupM5"></div></div>
+      <div class="panel">
+        <h3><span class="ph blue">🕐</span>ประวัติสัญญาณ Rule-Based</h3>
+        <div class="tbl-wrap" style="max-height:420px;overflow-y:auto;">
+          <table id="setupTable">
+            <thead><tr><th>เวลา</th><th>TF</th><th>ทิศทาง</th><th>Entry</th><th>Exit</th><th>Score</th><th>Tier</th><th>ผล</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div id="setEmpty" class="empty" style="display:none;">ยังไม่มีสัญญาณ — รอ setup_feed.py ทำงาน</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── JOURNAL ─── -->
+  <section id="tab-journal" style="display:none;">
+    <div class="kpi-row">
+      <div class="kpi"><div class="lbl">Trades ที่สรุปผล</div><div class="val" id="jn">–</div><div class="sub" id="jnSub">–</div></div>
+      <div class="kpi yellow"><div class="lbl">Total P&amp;L</div><div class="val yellow" id="jPnl">–</div><div class="sub">กำไร = +payout, ขาดทุน = −1</div></div>
+      <div class="kpi green"><div class="lbl">Winrate Journal</div><div class="val" id="jWr">–</div><div class="sub" id="jWrSub">–</div></div>
+      <div class="kpi blue"><div class="lbl">Breakeven</div><div class="val blue" id="jBe">–</div><div class="sub">ต้องชนะเกินนี้ถึงกำไร</div></div>
+      <div class="kpi"><div class="lbl">Margin vs BE</div><div class="val" id="jMargin">–</div><div class="sub">CI ล่าง − Breakeven</div></div>
+      <div class="kpi"><div class="lbl">95% CI</div><div class="val" id="jCi" style="font-size:15px;">–</div><div class="sub">ช่วงเชื่อมั่น winrate</div></div>
+    </div>
+    <div class="cols l2">
+      <div class="panel">
+        <h3><span class="ph purple">📊</span>Equity Curve (P&amp;L สะสม)</h3>
+        <div class="chart-wrap" style="height:300px;"><canvas id="equityFullChart" class="chart"></canvas></div>
+      </div>
+      <div class="panel">
+        <h3><span class="ph purple">🗓</span>ผลรายวัน</h3>
+        <div class="tbl-wrap" style="max-height:300px;overflow-y:auto;">
+          <table id="dailyTable">
+            <thead><tr><th>วัน</th><th>Trades</th><th>Wins</th><th>Winrate</th><th>P&amp;L</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <h3><span class="ph purple">🧬</span>Model Registry — ประวัติโมเดลที่เทรน</h3>
+      <div class="tbl-wrap">
+        <table id="modelTable">
+          <thead><tr><th>Key</th><th>Version</th><th>เทรนเมื่อ</th><th>Horizon</th><th>n_rows</th><th>AUC val</th><th>AUC test</th><th>Conf</th><th>Feature Set</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+const REFRESH_MS = 5000;
+let equityChart, equityFullChart;
+
+/* ═══════ HELPERS ═══════ */
+function fmtTime(iso){ if(!iso) return '–'; return new Date(iso).toLocaleString('th-TH',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+function fmtHM(iso){ if(!iso) return '–'; return new Date(iso).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+async function fetchJSON(url){ const res=await fetch(url); if(!res.ok) throw new Error(url+' → '+res.status); return res.json(); }
+function dirClass(d){ return d==='CALL'?'dir-call':(d==='PUT'?'dir-put':''); }
+function marginColor(m){ if(m==null||isNaN(m)) return 'muted'; if(m>1) return 'green'; if(m<-1) return 'red'; return 'yellow'; }
+function fmtMargin(m){ return m==null?'–':(m>0?'+':'')+m+'pp'; }
+
+/* ═══════ CANDLESTICK + VOLUME + EMA (pure canvas) ═══════ */
+function ema(vals, period){
+  const out=new Array(vals.length).fill(null);
+  if(!vals.length) return out;
+  const k=2/(period+1); let prev=vals[0];
+  for(let i=0;i<vals.length;i++){
+    prev=(i===0)?vals[0]:vals[i]*k+prev*(1-k);
+    if(i>=period-1) out[i]=prev;
+  }
+  return out;
+}
+function drawCandles(canvas, data){
+  const dpr=window.devicePixelRatio||1;
+  const rect=canvas.getBoundingClientRect();
+  canvas.width=rect.width*dpr; canvas.height=rect.height*dpr;
+  const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+  const W=rect.width, H=rect.height;
+  ctx.clearRect(0,0,W,H);
+  if(!data||data.length<2){
+    ctx.fillStyle='#4a5775'; ctx.font='13px Segoe UI'; ctx.fillText('รอข้อมูลราคา...',20,H/2); return;
+  }
+  const padL=8,padR=56,padT=10,padB=24;
+  const volH=Math.floor(H*0.14), priceBottom=H-padB-volH;
+  let min=Infinity,max=-Infinity;
+  data.forEach(d=>{min=Math.min(min,d.low);max=Math.max(max,d.high);});
+  const range=(max-min)||1; min-=range*0.06; max+=range*0.06;
+  const n=data.length, plotW=W-padL-padR, plotH=priceBottom-padT;
+  const step=plotW/(n-1), bw=Math.max(plotW/n*0.55,1);
+
+  // grid + price labels (right axis)
+  ctx.strokeStyle='#131c30'; ctx.fillStyle='#4a5775'; ctx.font='9.5px Cascadia Mono,monospace';
+  const GRID=5;
+  for(let i=0;i<=GRID;i++){
+    const y=padT+plotH*i/GRID;
+    ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
+    const val=max-(max-min)*i/GRID;
+    ctx.textAlign='right'; ctx.fillText(val.toFixed(1),W-padR+6,y+3);
+  }
+  ctx.textAlign='left';
+
+  // EMA lines
+  const closes=data.map(d=>d.close);
+  const e20=ema(closes,20), e50=ema(closes,50);
+  const py=v=>padT+(max-v)/(max-min)*plotH;
+  const px=i=>padL+step*i;
+  const drawLine=(arr,color)=>{ ctx.strokeStyle=color; ctx.lineWidth=1.2; ctx.beginPath(); let started=false;
+    arr.forEach((v,i)=>{ if(v==null) return; if(!started){ctx.moveTo(px(i),py(v));started=true;} else ctx.lineTo(px(i),py(v)); });
+    ctx.stroke(); };
+  drawLine(e20,'rgba(56,225,196,.9)'); drawLine(e50,'rgba(167,139,250,.9)');
+
+  // volume bars
+  const vmax=Math.max(...data.map(d=>Math.max(d.volume||0,0)),1);
+  data.forEach((d,i)=>{
+    const x=px(i); const v=d.volume||0;
+    const hh=v/vmax*volH;
+    ctx.fillStyle=(d.close>=d.open)?'rgba(34,201,138,.22)':'rgba(246,70,93,.22)';
+    ctx.fillRect(x-bw/2,priceBottom+volH-hh,bw,hh);
+  });
+
+  // candles
+  data.forEach((d,i)=>{
+    const x=px(i), up=d.close>=d.open;
+    ctx.strokeStyle=up?'#22c98a':'#f6465d'; ctx.fillStyle=up?'#22c98a':'#f6465d';
+    ctx.beginPath(); ctx.moveTo(x,py(d.high)); ctx.lineTo(x,py(d.low)); ctx.stroke();
+    const yO=py(d.open),yC=py(d.close),top=Math.min(yO,yC),hgt=Math.max(Math.abs(yO-yC),1);
+    ctx.fillRect(x-bw/2,top,bw,hgt);
+  });
+
+  // last price line + tag
+  const lp=data[data.length-1].close;
+  const lc=lp>=data[data.length-1].open?'#22c98a':'#f6465d';
+  ctx.strokeStyle=lc; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(padL,py(lp)); ctx.lineTo(W-padR,py(lp)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle=lc; ctx.font='bold 10.5px Cascadia Mono,monospace';
+  ctx.textAlign='right'; ctx.fillText(lp.toFixed(2),W-padR+6,py(lp)-4);
+  ctx.textAlign='left';
+  ctx.fillStyle='#4a5775';
+  ctx.fillText(data[0].t?fmtHM(data[0].t):'',padL,H-6);
+  ctx.fillText(data[data.length-1].t?fmtHM(data[data.length-1].t):'',W-padR-70,H-6);
+}
+
+/* ═══════ SVG SEMICIRCLE GAUGE ═══════ */
+function arcPath(cx,cy,r,a0,a1){
+  const x0=cx+r*Math.cos(a0),y0=cy+r*Math.sin(a0);
+  const x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1);
+  const large=Math.abs(a1-a0)>Math.PI?1:0;
+  return `M${x0},${y0} A${r},${r} 0 ${large} 1 ${x1},${y1}`;
+}
+function gaugeSVG(g){
+  if(!g) return `<div class="gauge"><div class="ghead"><span class="gname">TF</span><span class="gsig NEUTRAL">–</span></div><div class="empty" style="padding:8px;">รอข้อมูล</div></div>`;
+  const up=g.prob_up*100, dn=g.prob_down*100;
+  const cx=110, cy=72, r=58, w=13;
+  const a0=Math.PI, aEnd=2*Math.PI;
+  const upEnd=a0+(aEnd-a0)*Math.min(up,100)/100;
+  const sigClass=g.signal==='CALL'?'CALL':(g.signal==='PUT'?'PUT':'NEUTRAL');
+  return `<div class="gauge">
+    <div class="ghead"><span class="gname">TF ${g.timeframe||'–'} — WIN PROBABILITY</span><span class="gsig ${sigClass}">${g.signal||'–'}</span></div>
+    <div class="gauge-svg">
+      <svg width="220" height="96" viewBox="0 0 220 96">
+        <path d="${arcPath(cx,cy,r,a0,aEnd)}" stroke="#131c30" stroke-width="${w}" fill="none" stroke-linecap="round"/>
+        <path d="${arcPath(cx,cy,r,a0,upEnd)}" stroke="#22c98a" stroke-width="${w}" fill="none" stroke-linecap="round"/>
+        <path d="${arcPath(cx,cy,r,upEnd,aEnd)}" stroke="#f6465d" stroke-width="${w}" fill="none" stroke-linecap="round"/>
+        <text x="110" y="84" text-anchor="middle" font-size="20" font-weight="800" font-family="Cascadia Mono,monospace" fill="#e8eefb">${g.signal==='NEUTRAL'?'NEUTRAL':(g.confidence*100).toFixed(0)+'%'}</text>
+      </svg>
+    </div>
+    <div class="gmeta">
+      <span style="color:var(--green);">▲ CALL ${up.toFixed(1)}%</span>
+      <span>Thresh ${(g.threshold_used*100).toFixed(0)}%</span>
+      <span style="color:var(--red);">▼ PUT ${dn.toFixed(1)}%</span>
+    </div>
+  </div>`;
+}
+
+/* ═══════ TABS ═══════ */
+document.querySelectorAll('.nav-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.main section').forEach(s=>s.style.display='none');
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).style.display='block';
+    window.dispatchEvent(new Event('resize'));
+  });
+});
+
+/* ═══════ RENDER ═══════ */
+function renderStat(el,val,cls){ el.textContent=val; el.className='val'+(cls?' '+cls:''); }
+
+async function refreshOverview(){
+  try{
+    const ml=await fetchJSON('/api/ml/stats');
+    renderStat(document.getElementById('ovMlWinrate'), ml.n_resolved?ml.winrate+'%':'–', ml.n_resolved?'cyan':'muted');
+    document.getElementById('ovMlWinrateSub').textContent=ml.n_resolved?`CI [${ml.ci_low}% – ${ml.ci_high}%]`:'รอสัญญาณ...';
+    const me=document.getElementById('ovMlMargin');
+    me.textContent=ml.n_resolved?fmtMargin(ml.margin):'–'; me.className='val '+marginColor(ml.margin);
+    document.getElementById('ovMlN').textContent=`${ml.n_resolved} ชนะ/แพ้ = ${ml.wins}/${ml.losses}`;
+  }catch(e){}
+  try{
+    const st=await fetchJSON('/api/stats');
+    renderStat(document.getElementById('ovSetWinrate'), st.n_resolved?st.winrate+'%':'–', st.n_resolved?'blue':'muted');
+    document.getElementById('ovSetWinrateSub').textContent=st.n_resolved?`CI [${st.ci_low}% – ${st.ci_high}%]`:'รอสัญญาณ...';
+    const se=document.getElementById('ovSetMargin');
+    se.textContent=st.n_resolved?fmtMargin(st.margin):'–'; se.className='val '+marginColor(st.margin);
+    document.getElementById('ovSetN').textContent=`${st.n_resolved} ชนะ/แพ้ = ${st.wins}/${st.losses}`;
+  }catch(e){}
+  try{
+    const j=await fetchJSON('/api/journal/stats');
+    const pe=document.getElementById('ovPnl');
+    pe.textContent=j.total_pnl==null?'–':((j.total_pnl>0?'+':'')+j.total_pnl.toFixed(2));
+    pe.className='val '+(j.total_pnl>0?'green':(j.total_pnl<0?'red':'muted'));
+    document.getElementById('ovPnlSub').textContent=`${j.n} trades · ชนะ ${j.wins} / แพ้ ${j.losses}`;
+    drawEquity(j.equity||[]);
+  }catch(e){}
+  try{
+    const reg=await fetchJSON('/api/models');
+    const m1=reg.find(r=>r.model_key==='M1'), m5=reg.find(r=>r.model_key==='M5');
+    const me1=document.getElementById('ovModelM1'), me5=document.getElementById('ovModelM5');
+    if(m1){me1.textContent=m1.version; me1.className='val purple'; document.getElementById('ovModelM1Sub').textContent=`AUC ${m1.auc_test} · conf ${m1.chosen_conf}`;}
+    if(m5){me5.textContent=m5.version; me5.className='val purple'; document.getElementById('ovModelM5Sub').textContent=`AUC ${m5.auc_test} · conf ${m5.chosen_conf}`;}
+  }catch(e){}
+}
+
+function drawEquity(points){
+  const el=document.getElementById('equityChart'); if(!el) return;
+  const labels=points.map(p=>p.t), values=points.map(p=>p.equity);
+  const up=values.length>0&&values[values.length-1]>=0;
+  const cfg={type:'line',
+    data:{labels,datasets:[{data:values,borderColor:up?'#22c98a':'#f6465d',
+      backgroundColor:up?'rgba(34,201,138,.15)':'rgba(246,70,93,.15)',fill:true,pointRadius:0,borderWidth:2,tension:.25}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,
+      scales:{x:{display:false},y:{grid:{color:'#131c30'},ticks:{color:'#4a5775',font:{size:10}}}},
+      plugins:{legend:{display:false}} }};
+  if(equityChart){equityChart.data=cfg.data; equityChart.update('none');} else equityChart=new Chart(el,cfg);
+}
+
+async function refreshPrice(){
+  try{
+    const prices=await fetchJSON('/api/prices?limit=240');
+    if(!prices||!prices.length) return;
+    const el=document.getElementById('candleChart');
+    drawCandles(el,prices);
+    const last=prices[prices.length-1], prev=prices[prices.length-2];
+    const chg=prev?last.close-prev.close:0;
+    const chgPct=prev?chg/prev.close*100:0;
+    const pe=document.getElementById('tickerPrice');
+    pe.textContent=last.close.toFixed(2);
+    pe.className='price '+(chg>=0?'up':'down');
+    const ce=document.getElementById('tickerChg');
+    ce.textContent=`${chg>=0?'+':''}${chg.toFixed(2)} (${chgPct>=0?'+':''}${chgPct.toFixed(2)}%)`;
+    ce.className='chg '+(chg>=0?'up':'down');
+  }catch(e){}
+}
+
+async function refreshGauges(){
+  try{
+    const latest=await fetchJSON('/api/ml/latest');
+    const panel=document.getElementById('gaugePanel');
+    const m1=latest['M1'], m5=latest['M5'];
+    panel.innerHTML=gaugeSVG(m1?{...m1,timeframe:'M1'}:null)+gaugeSVG(m5?{...m5,timeframe:'M5'}:null);
+  }catch(e){}
+}
+
+async function refreshHeaderSignals(){
+  try{
+    const latest=await fetchJSON('/api/ml/latest');
+    const sigEl=(id,g)=>{ const el=document.getElementById(id);
+      if(!g) el.textContent='–';
+      else el.innerHTML=`<span style="color:${g.signal==='CALL'?'var(--green)':(g.signal==='PUT'?'var(--red)':'var(--muted)')}">${g.signal} ${(g.confidence*100).toFixed(0)}%</span>`;
+    };
+    sigEl('hM1',latest['M1']); sigEl('hM5',latest['M5']);
+  }catch(e){}
+}
+
+function feedRow(r){
+  return `<div class="feed-row">
+    <span class="fdir ${r.direction||''}">${r.direction||'–'}</span>
+    <span class="ftime">${fmtHM(r.signal_time)}</span>
+    <span class="fprice">${r.entry_price!=null?r.entry_price.toFixed(2):'–'}</span>
+    <span class="fconf">${r.confidence!=null?(r.confidence*100).toFixed(1)+'%':'–'}</span>
+    <span class="pill ${r.result}">${r.result}</span>
+  </div>`;
+}
+
+async function refreshMlTab(){
+  try{
+    const s=await fetchJSON('/api/ml/stats');
+    renderStat(document.getElementById('mlWr'),s.n_resolved?s.winrate+'%':'–',s.n_resolved?'cyan':'muted');
+    document.getElementById('mlWrSub').textContent=s.n_resolved?`[${s.ci_low}% – ${s.ci_high}%] (${s.wins}/${s.n_resolved})`:'';
+    document.getElementById('mlBe').textContent=s.breakeven+'%';
+    const me=document.getElementById('mlMargin'); me.textContent=s.n_resolved?fmtMargin(s.margin):'–'; me.className='val '+marginColor(s.margin);
+    document.getElementById('mlCi').textContent=s.n_resolved?`[${s.ci_low}%, ${s.ci_high}%]`:'–';
+    document.getElementById('mlN').textContent=`${s.n_resolved} / ${s.n_pending}`;
+    document.getElementById('mlNsub').textContent=`ชนะ ${s.wins} / แพ้ ${s.losses}`;
+    const byTf=await fetchJSON('/api/ml/stats/by_timeframe');
+    const set=(id,v)=>{const el=document.getElementById(id);
+      if(v&&v.n_resolved){el.textContent=v.winrate+'%';el.className='val cyan';} else {el.textContent='–';el.className='val muted';}};
+    set('mlWrM1',byTf['M1']); set('mlWrM5',byTf['M5']);
+  }catch(e){}
+  try{
+    const rows=await fetchJSON('/api/ml/signals?limit=100');
+    const body=document.querySelector('#mlFullTable tbody');
+    const empty=document.getElementById('mlEmpty');
+    if(!rows.length){body.innerHTML='';empty.style.display='block';return;}
+    empty.style.display='none';
+    body.innerHTML=rows.map(r=>`<tr>
+      <td>${fmtTime(r.signal_time)}</td>
+      <td><b>${r.timeframe||'M1'}</b></td>
+      <td class="${dirClass(r.direction)}">${r.direction||'–'}</td>
+      <td class="mono">${r.entry_price!=null?r.entry_price.toFixed(2):'–'}</td>
+      <td class="mono">${r.exit_price!=null?r.exit_price.toFixed(2):'–'}</td>
+      <td class="mono">${r.confidence!=null?(r.confidence*100).toFixed(1)+'%':'–'}</td>
+      <td class="mono">${r.threshold_used!=null?(r.threshold_used*100).toFixed(0)+'%':'–'}</td>
+      <td class="mono">${r.horizon_min}m</td>
+      <td style="font-size:10px;color:var(--muted)">${r.model_version||'–'}</td>
+      <td><span class="pill ${r.result}">${r.result}</span></td>
+    </tr>`).join('');
+  }catch(e){}
+  try{
+    const rows=await fetchJSON('/api/ml/signals?limit=8');
+    document.getElementById('mlRecentFeed').innerHTML=rows.length?rows.map(feedRow).join(''):'<div class="empty">ยังไม่มีสัญญาณ</div>';
+  }catch(e){}
+}
+
+async function refreshSetupTab(){
+  try{
+    const s=await fetchJSON('/api/stats');
+    renderStat(document.getElementById('setWr'),s.n_resolved?s.winrate+'%':'–',s.n_resolved?'blue':'muted');
+    document.getElementById('setWrSub').textContent=s.n_resolved?`[${s.ci_low}% – ${s.ci_high}%] (${s.wins}/${s.n_resolved})`:'';
+    document.getElementById('setBe').textContent=s.breakeven+'%';
+    const me=document.getElementById('setMargin'); me.textContent=s.n_resolved?fmtMargin(s.margin):'–'; me.className='val '+marginColor(s.margin);
+    document.getElementById('setCi').textContent=s.n_resolved?`[${s.ci_low}%, ${s.ci_high}%]`:'–';
+    document.getElementById('setN').textContent=`${s.n_resolved} / ${s.n_pending}`;
+    document.getElementById('setNsub').textContent=`ชนะ ${s.wins} / แพ้ ${s.losses}`;
+    const byTf=await fetchJSON('/api/stats/by_timeframe');
+    const set=(id,v)=>{const el=document.getElementById(id);
+      if(v&&v.n_resolved){el.textContent=v.winrate+'%';el.className='val blue';} else {el.textContent='–';el.className='val muted';}};
+    set('setWrM1',byTf['M1']); set('setWrM5',byTf['M5']);
+  }catch(e){}
+  try{
+    const rows=await fetchJSON('/api/signals?limit=100');
+    const body=document.querySelector('#setupTable tbody');
+    const empty=document.getElementById('setEmpty');
+    if(!rows.length){body.innerHTML='';empty.style.display='block';return;}
+    empty.style.display='none';
+    body.innerHTML=rows.map(r=>`<tr>
+      <td>${fmtTime(r.signal_time)}</td>
+      <td><b>${r.timeframe||'M1'}</b></td>
+      <td class="${dirClass(r.direction)}">${r.direction}</td>
+      <td class="mono">${r.entry_price!=null?r.entry_price.toFixed(2):'–'}</td>
+      <td class="mono">${r.exit_price!=null?r.exit_price.toFixed(2):'–'}</td>
+      <td class="mono">${r.score!=null?r.score.toFixed(1)+'/'+(r.total||'–'):'–'}</td>
+      <td><span class="tier ${r.tier||'NONE'}">${r.tier||'–'}</span></td>
+      <td><span class="pill ${r.result}">${r.result}</span></td>
+    </tr>`).join('');
+  }catch(e){}
+}
+
+function renderSetupCard(s){
+  if(!s) return `<div class="setup-card"><div class="setup-head"><h4>Checklist</h4></div><div class="empty" style="padding:10px;">ยังไม่มีข้อมูล — รอ setup_feed.py สะสมแท่ง</div></div>`;
+  const max=(s.max_score||s.total||15);
+  const items=Object.entries(s.details||{}).map(([name,d])=>{
+    const w=d.weight||1;
+    const frac=d.frac!=null?d.frac:(d.ok?1:0);
+    const pct=Math.round(frac*100);
+    return `<li>
+      <span class="mono">${d.ok?'✅':'▫️'}</span>
+      <span class="iname">${name}:</span>
+      <span class="inote">${d.note||''}</span>
+      <span class="frac">${pct}% ×${w}</span>
+    </li>`}).join('');
+  const grip=(s.grip_hits&&s.grip_hits.length)?'🔒 '+s.grip_hits.join(', '):'';
+  const ready=!!s.entry_trigger;
+  const tier=s.tier||'NONE';
+  const pct=Math.max(2,Math.round((s.score||0)/max*100));
+  const tierLabel=tier==='FIRE'?'🎯 พร้อมเข้า':tier==='FADE'?'⚡ Fade เร็ว':tier==='WATCH'?'👀 รอ Rejection':'⏳ รอเงื่อนไข';
+  return `<div class="setup-card ${ready?'triggered':''}">
+    <div class="setup-head">
+      <h4>Setup Checklist</h4>
+      <span style="display:flex;align-items:center;gap:8px;">
+        <span class="tier ${tier}">${tier}</span>
+        <span class="setup-score ${ready?'ok':'wait'}">${(s.score||0).toFixed(1)}/<span style="font-size:12px;color:var(--muted)">${max}</span></span>
+      </span>
+    </div>
+    <div class="prog"><i style="width:${pct}%"></i></div>
+    <div class="setup-meta">
+      <span>เทรนด์: <b class="${dirClass(s.bias)}">${s.bias||'?'}</b></span>
+      <span class="tb ${ready?'ready':'wait'}">${tierLabel}${s.direction?' '+s.direction:''}</span>
+    </div>
+    <ul class="setup-list">${items}</ul>
+    <div class="setup-note ${ready?'ready':''}">${s.entry_trigger_note||''}</div>
+    ${grip?`<div style="margin-top:6px;font-size:10px;color:var(--yellow);">${grip}</div>`:''}
+  </div>`;
+}
+
+async function refreshSetupMini(){
+  try{
+    const latest=await fetchJSON('/api/setup/latest');
+    document.getElementById('setupM1').innerHTML=renderSetupCard(latest['M1']);
+    document.getElementById('setupM5').innerHTML=renderSetupCard(latest['M5']);
+    document.getElementById('setupMini').innerHTML=renderSetupCard(latest['M1']);
+  }catch(e){}
+}
+
+async function refreshJournalTab(){
+  try{
+    const j=await fetchJSON('/api/journal/stats');
+    document.getElementById('jn').textContent=j.n;
+    document.getElementById('jnSub').textContent=`ชนะ ${j.wins} / แพ้ ${j.losses} · ${j.daily.length} วัน`;
+    const pe=document.getElementById('jPnl');
+    pe.textContent=(j.total_pnl>0?'+':'')+j.total_pnl.toFixed(2);
+    pe.className='val '+(j.total_pnl>0?'green':(j.total_pnl<0?'red':'muted'));
+    renderStat(document.getElementById('jWr'),j.winrate+'%',j.n?'green':'muted');
+    document.getElementById('jWrSub').textContent=j.n?`[${j.ci_low}% – ${j.ci_high}%]`:'ยังไม่มีผล';
+    document.getElementById('jBe').textContent=j.breakeven+'%';
+    const me=document.getElementById('jMargin'); me.textContent=j.n?fmtMargin(j.margin):'–'; me.className='val '+marginColor(j.margin);
+    document.getElementById('jCi').textContent=j.n?`[${j.ci_low}%, ${j.ci_high}%]`:'–';
+    drawEquityFull(j.equity||[]);
+    const daily=j.daily||[];
+    document.querySelector('#dailyTable tbody').innerHTML=daily.map(d=>`
+      <tr><td>${d.day}</td><td class="mono">${d.n}</td><td class="mono">${d.wins}</td><td class="mono">${d.winrate}%</td>
+      <td class="mono ${d.pnl>0?'dir-call':'dir-put'}">${(d.pnl>0?'+':'')+d.pnl.toFixed(2)}</td></tr>`).join('')
+      || '<tr><td colspan="5" class="empty">ยังไม่มีข้อมูล</td></tr>';
+  }catch(e){}
+  try{
+    const models=await fetchJSON('/api/models');
+    document.querySelector('#modelTable tbody').innerHTML=models.map(m=>`
+      <tr>
+        <td><b>${m.model_key}</b></td>
+        <td>${m.version}</td>
+        <td class="mono">${m.trained_at}</td>
+        <td class="mono">${m.horizon}</td>
+        <td class="mono">${m.n_rows||'–'}</td>
+        <td class="mono">${m.auc_val!=null?m.auc_val:'–'}</td>
+        <td class="mono ${m.auc_test!=null&&m.auc_test>=0.54?'dir-call':'dir-put'}">${m.auc_test!=null?m.auc_test:'–'}</td>
+        <td class="mono">${m.chosen_conf!=null?m.chosen_conf:'–'}</td>
+        <td style="font-size:10px;color:var(--muted)">${m.feature_set||'–'}</td>
+      </tr>`).join('') || '<tr><td colspan="9" class="empty">ยังไม่มีโมเดลที่ลงทะเบียน</td></tr>';
+  }catch(e){}
+}
+
+function drawEquityFull(points){
+  const el=document.getElementById('equityFullChart'); if(!el) return;
+  const labels=points.map(p=>p.t), values=points.map(p=>p.equity);
+  const last=values[values.length-1]||0;
+  const cfg={type:'line',
+    data:{labels,datasets:[{data:values,borderColor:last>=0?'#22c98a':'#f6465d',
+      backgroundColor:last>=0?'rgba(34,201,138,.15)':'rgba(246,70,93,.15)',fill:true,pointRadius:0,borderWidth:2,tension:.2}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,
+      scales:{x:{ticks:{color:'#4a5775',font:{size:10},maxTicksLimit:6},grid:{color:'#131c30'}},
+              y:{grid:{color:'#131c30'},ticks:{color:'#4a5775',font:{size:10}}}},
+      plugins:{legend:{display:false}} }};
+  if(equityFullChart){equityFullChart.data=cfg.data;equityFullChart.update('none');} else equityFullChart=new Chart(el,cfg);
+}
+
+function updateClock(){
+  document.getElementById('hUtc').textContent=new Date().toISOString().substring(11,19);
+  const h=new Date().getUTCHours();
+  document.getElementById('hSession').textContent=h>=12&&h<21?'NY':(h>=7&&h<16?'London':(h>=0&&h<8?'Asia':'อื่นๆ'));
+}
+
+async function refreshAll(){
+  updateClock();
+  await Promise.all([
+    refreshOverview(),refreshPrice(),refreshGauges(),refreshHeaderSignals(),
+    refreshMlTab(),refreshSetupTab(),refreshSetupMini(),refreshJournalTab(),
+  ]);
+}
+
+refreshAll();
+setInterval(refreshAll, REFRESH_MS);
+</script>
+</body>
+</html>
