@@ -10,9 +10,12 @@ option (Rise/Fall) ต้องให้ horizon ของโมเดลเท�
     model_m5.joblib  ← แท่ง 5m, horizon=6 แท่ง = ถือ 30 นาที
 
 วิธีใช้:
-    python -m backend.ml_forecaster.train_live_models                # ใช้ข้อมูลที่มีในเครื่อง
-    python -m backend.ml_forecaster.train_live_models --fetch-days 60  # ดึงข้อมูลใหม่ก่อนเทรน
+    python -m backend.ml_forecaster.train_live_models                # ใช้ข้อมูลในเครื่อง ถ้าไม่มี → ดึงจาก Deriv อัตโนมัติ
+    python -m backend.ml_forecaster.train_live_models --fetch-days 60  # บังคับดึงข้อมูลใหม่ก่อนเทรน
     python -m backend.ml_forecaster.train_live_models --retrain       # บังคับเทรนใหม่ (ลบโมเดลเก่า)
+
+หมายเหตุ (VPS/เครื่องใหม่): ไม่ต้องมี CSV ย้อนหลังในเครื่องแล้ว — ถ้าไม่มีไฟล์ในเครื่อง
+ตัวเทรนจะดึงข้อมูลจาก Deriv API เอง (default 60 วัน) ผ่าน fetch_history_paginated
 
 คำแนะนำ: ยิ่งมีข้อมูลเยอะโมเดลยิ่งแม่น — ควรมีอย่างน้อย 30-90 วัน (M1) ข้อมูล 2-3 วัน
 ที่ผ่านมาให้ผล AUC ต่ำมาก (ใกล้ 0.5) เหมือนที่เห็นอยู่ตอนนี้
@@ -58,9 +61,12 @@ CONF_GRID = [0.50, 0.52, 0.55, 0.58, 0.60, 0.62, 0.65, 0.68, 0.70]
 
 MODEL_VERSION = "v2_meanrev"  # version tag สำหรับ model registry
 
+DEFAULT_FETCH_DAYS = 60  # ใช้เมื่อไม่มีข้อมูลในเครื่องเลย (VPS/เครื่องใหม่)
+
 
 def load_price_data(fetch_days: int = 0) -> pd.DataFrame:
-    """รวบรวมข้อมูล 1m จากทุกแหล่งในเครื่อง (cache + csv 90d) แล้ว optional ดึงเพิ่ม"""
+    """รวบรวมข้อมูล 1m จากทุกแหล่งในเครื่อง (cache + csv 90d) แล้ว optional ดึงเพิ่ม
+    ถ้าไม่มีข้อมูลในเครื่องเลย จะดึงจาก Deriv API เอง (ไม่ error)"""
     candidates = [
         DATA_DIR / "deriv_frxXAUUSD_60s.csv",
         ROOT_DIR / "deriv_frxXAUUSD_60s_90d.csv",
@@ -75,14 +81,10 @@ def load_price_data(fetch_days: int = 0) -> pd.DataFrame:
                 print(f"[Train] รวมข้อมูลจาก {p} → {len(df)} แท่ง")
 
     if fetch_days > 0:
-        print(f"[Train] กำลังดึงข้อมูลเพิ่มย้อนหลัง {fetch_days} วันจาก Deriv ...")
-        from fetch_history_paginated import fetch_history
-        df_new = fetch_history("frxXAUUSD", 60, fetch_days)
-        if not df_new.empty:
-            parts.append(df_new)
-            out = DATA_DIR / "deriv_frxXAUUSD_60s.csv"
-            df_new.to_csv(out)
-            print(f"[Train] ดึงเพิ่ม {len(df_new)} แท่ง → บันทึก {out}")
+        parts.append(_fetch_from_api(fetch_days))
+    elif not parts:
+        # ไม่มีข้อมูลในเครื่องเลย (เช่น clone บน VPS) — ดึงจาก API เองให้อัตโนมัติ
+        parts.append(_fetch_from_api(DEFAULT_FETCH_DAYS))
 
     if not parts:
         raise FileNotFoundError("ไม่พบข้อมูล 1m ในเครื่องเลย ใช้ --fetch-days 60 เพื่อดึงข้อมูลก่อน")
@@ -96,6 +98,20 @@ def load_price_data(fetch_days: int = 0) -> pd.DataFrame:
     df = df[["open", "high", "low", "close", "volume"]].astype(float)
     print(f"[Train] รวมทั้งหมด {len(df)} แท่ง | {df.index[0]} → {df.index[-1]}")
     return df
+
+
+def _fetch_from_api(fetch_days: int) -> pd.DataFrame:
+    """ดึงข้อมูล 1m ย้อนหลังจาก Deriv API แล้ว cache ไว้ใน data/ กันดึงซ้ำ"""
+    print(f"[Train] ดึงข้อมูลย้อนหลัง {fetch_days} วันจาก Deriv API ...")
+    from fetch_history_paginated import fetch_history
+    df_new = fetch_history("frxXAUUSD", 60, fetch_days)
+    if df_new.empty:
+        raise FileNotFoundError("ดึงข้อมูลจาก Deriv API ไม่ได้ — เช็คเน็ต/การเชื่อมต่อ Deriv")
+    DATA_DIR.mkdir(exist_ok=True)
+    out = DATA_DIR / "deriv_frxXAUUSD_60s.csv"
+    df_new.to_csv(out)
+    print(f"[Train] ดึงมาแล้ว {len(df_new)} แท่ง → cache ไว้ {out}")
+    return df_new
 
 
 def resample_to(df: pd.DataFrame, minutes: int) -> pd.DataFrame:
@@ -157,7 +173,8 @@ def train_one(df: pd.DataFrame, horizon: int, out_name: str, label: str):
 def main():
     parser = argparse.ArgumentParser(description="เทรนโมเดล live แยกตาม timeframe (M1/M5)")
     parser.add_argument("--fetch-days", type=int, default=0,
-                        help="ดึงข้อมูลเพิ่มก่อนเทรน (0 = ใช้ข้อมูลที่มีในเครื่อง)")
+                        help="บังคับดึงข้อมูลย้อนหลัง (วัน) ก่อนเทรน "
+                             "0 = ใช้ข้อมูลในเครื่อง ถ้าไม่มีจะดึงจาก Deriv อัตโนมัติ 60 วัน")
     parser.add_argument("--retrain", action="store_true",
                         help="บังคับเทรนใหม่ (ลบโมเดลเก่าก่อน)")
     args = parser.parse_args()
