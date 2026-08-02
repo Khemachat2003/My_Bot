@@ -1,22 +1,28 @@
 # ── GitHub Actions: auto build + deploy ขึ้น VPS ─────────────────────────────
-# ทุกครั้งที่ push เข้า main → SSH เข้า VPS → docker compose up -d --build
+# ทุกครั้งที่ push เข้า main → SSH เข้า VPS → git pull → docker compose up -d --build
 #
 # ตั้งค่าใน GitHub repo → Settings → Secrets and variables → Actions:
 #   VPS_HOST      = IP หรือ domain ของ VPS
-#   VPS_USER      = user ที่มีสิทธิ์ docker (เช่น bot)
+#   VPS_USER      = user ที่ใช้ SSH เข้า VPS (เช่น linuxuser)
 #   SSH_KEY       = private key (ed25519) ที่ใช้ SSH เข้า VPS (paste ทั้งก้อน)
 #
-# วิธีใช้:
-#   - push โค้ดขึ้น GitHub ก่อน (ครั้งแรก)
-#   - เตรียมไฟล์ .env บน VPS ไว้ที่ /opt/xauusd-bot/.env (ไม่ commit ขึ้น git)
-#   - จากนั้น push โค้ดใหม่ทุกครั้ง → deploy อัตโนมัติ
+# ── ข้อกำหนดบน VPS (ต้องทำก่อน workflow จะทำงาน) ─────────────────────────────
+#   1. ติดตั้ง Docker + ตั้ง user ให้มีสิทธิ์ docker
+#        sudo usermod -aG docker $USER      # แล้ว logout/login ใหม่ (หรือ reboot)
+#      → ถ้าใช้ docker group ตรงๆ ต่อได้เลย อย่าใช้ sudo ในคำสั่ง (ssh ไม่มี TTY
+#        ให้พิมพ์ password)  workflow นี้เลยสั่ง docker ตรงๆ (ไม่ใช้ sudo)
+#   2. clone repo ไปไว้ที่ /opt/xauusd-bot (ต้องเป็น path เดียวกับด้านล่าง):
+#        sudo mkdir -p /opt/xauusd-bot
+#        sudo chown -R $USER:$USER /opt/xauusd-bot
+#        git clone https://github.com/Khemachat2003/My_Bot.git /opt/xauusd-bot
+#        cd /opt/xauusd-bot && cp .env.example .env && nano .env   # ตั้งค่า
+#        mkdir -p data && docker compose up -d --build             # ลองรันครั้งแรกด้วยมือ
+#   3. ตรวจว่าคำสั่ง docker ผ่าน SSH โดยไม่ต้องพิมพ์รหัสผ่าน:
+#        ssh -i ~/.ssh/id_ed25519 linuxuser@<vps-ip> "docker ps"
+#      ถ้าได้ "permission denied" → logout แล้ว login ใหม่ (docker group มีผลตอน login เท่านั้น)
 #
-# วิธีแรกบน VPS (ทำครั้งเดียว):
-#   sudo mkdir -p /opt/xauusd-bot && cd /opt/xauusd-bot
-#   sudo git clone <repo-url> .
-#   sudo cp .env.example .env && sudo nano .env
-#   sudo mkdir -p data
-#   docker compose up -d --build
+# หมายเหตุ: ถ้า deploy.yml ยังไม่แน่ใจ ช่วงทดสอบให้ deploy มือก่อน
+#   (git pull && docker compose up -d --build) แล้วค่อยเปิด auto-deploy
 name: Deploy to VPS
 
 on:
@@ -44,11 +50,11 @@ jobs:
         run: |
           ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} '
             set -e
-            cd /opt/xauusd-bot || exit 1
+            cd /opt/xauusd-bot || { echo "PATH: ไม่พบ /opt/xauusd-bot — ดูขั้นตอนข้อ 2 ในหัวข้อ workflow"; exit 1; }
             git pull --ff-only
-            sudo docker compose up -d --build --pull always
+            docker compose up -d --build --pull always
             echo "--- ตรวจ healthcheck ---"
             sleep 8
             curl -s -f http://127.0.0.1:8000/api/health || echo "WARNING: health ยังไม่ตอบ (อาจยัง boot) — ดู logs ด้วย docker compose logs -f"
-            sudo docker compose ps
+            docker compose ps
           '

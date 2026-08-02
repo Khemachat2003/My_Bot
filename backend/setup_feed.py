@@ -87,6 +87,10 @@ class SetupFeedEngine:
             self.buffer = df_init.tail(BUFFER_MAX).copy()
             if not self.buffer.empty:
                 self.last_price = float(self.buffer["close"].iloc[-1])
+                # backfill ราคาย้อนหลังลงตาราง prices ให้กราฟ Dashboard เต็มทันที
+                # (ไม่ต้องรอ poll สะสมทีละแท่งหลายชั่วโมง)
+                n = db.backfill_prices(self.buffer)
+                print(f"[SetupFeed] Backfill ราคาย้อนหลัง {n} แท่งลง prices (กราฟ Dashboard)")
             print(f"[SetupFeed] Buffer พร้อมใช้งาน: {len(self.buffer)} แท่ง (1m, {self.symbol})")
         except Exception as e:
             print(f"[SetupFeed] WARNING: ดึง History ไม่สำเร็จ ({e}) — รอรอบถัดไป")

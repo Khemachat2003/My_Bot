@@ -96,14 +96,28 @@ def _load_model_bundle(cfg: dict) -> dict:
     )
 
 
-MODELS = {cfg["label"]: _load_model_bundle(cfg) for cfg in ML_TIMEFRAMES}
-
-
 def _conf_threshold(label: str) -> float:
     """ลำดับ: .env ML_CONF_THRESHOLD > chosen_conf จากโมเดล > 0.55"""
     if ENV_CONF is not None:
         return ENV_CONF
     return MODELS[label].get("chosen_conf") or 0.55
+
+
+def _load_models_safe() -> dict:
+    """โหลดโมเดลทุก TF — ถ้าตัวไหน fail จะ log แล้วข้ามตัวนั้น ไม่ทำให้ process ทั้งหมดตาย
+    (เดิม load ที่ module level → โมเดลตัวเดียวพัง = notifier ตาย = ml_latest/Prob Gauge
+    บน Dashboard ว่างตลอดทั้งที่ container ยัง healthy เพราะ healthcheck ตรวจแค่ API)"""
+    loaded: dict = {}
+    for cfg in ML_TIMEFRAMES:
+        try:
+            loaded[cfg["label"]] = _load_model_bundle(cfg)
+        except Exception as e:
+            print(f"❌ [MLFeed] ไม่สามารถโหลดโมเดล TF:{cfg['label']} ({e}) — "
+                  f"ข้าม TF นี้ไป (Dashboard Prob Gauge ของ TF นี้จะว่าง)")
+    return loaded
+
+
+MODELS = _load_models_safe()
 
 
 def fetch_live_or_cache_candles(symbol: str, count: int = 500, retries: int = 3) -> pd.DataFrame:
@@ -270,6 +284,12 @@ class MLFeedEngine:
             float(last_row["open"]), float(last_row["high"]),
             float(last_row["low"]), float(last_row["close"]),
         )
+        # backfill ราคาย้อนหลัง (เฉพาะครั้งแรก/ครั้งแรกของ symbol ใหม่)
+        # กันกราฟ Dashboard ว่างบนเครื่องที่เพิ่งเริ่ม เช่น VPS
+        if getattr(self, "_backfilled_symbol", None) != symbol:
+            n = db.backfill_prices(raw_df)
+            self._backfilled_symbol = symbol
+            print(f"[MLFeed] Backfill ราคาย้อนหลัง {n} แท่งลง prices (กราฟ Dashboard)")
 
         self._resolve_pending(now, last_price)
 
@@ -277,6 +297,8 @@ class MLFeedEngine:
         pending_tfs = {row["timeframe"] for row in db.fetch_pending_ml_signals()}
 
         for cfg in ML_TIMEFRAMES:
+            if cfg["label"] not in MODELS:
+                continue
             df_tf = _resample(raw_df, cfg["resample_min"])
             if len(df_tf) < cfg["min_bars"]:
                 continue

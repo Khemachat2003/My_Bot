@@ -32,6 +32,12 @@ services:
       options:
         max-size: "10m"
         max-file: "5"
+    # VPS แผนเล็ก (1GB RAM): จำกัด memory กัน OOM-kill (kernel ฆ่า container ได้)
+    # ตรวจจริงด้วย docker stats — ถ้าพุ่งถึง limit บ่อยๆ ให้ลดเหลือ 512m
+    deploy:
+      resources:
+        limits:
+          memory: 700M
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
       interval: 30s

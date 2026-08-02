@@ -46,3 +46,7 @@ Thumbs.db
 test_*.py
 *.tmp
 *.temp
+NUL
+
+# ── git repo ที่ clone ซ้อนในโปรเจกต์ (กัน commit ผิด) ─────────────────
+My_Bot/

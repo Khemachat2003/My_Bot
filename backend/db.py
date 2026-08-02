@@ -15,6 +15,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+import pandas as pd
+
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "bot.db"
 DB_PATH.parent.mkdir(exist_ok=True)
 
@@ -329,6 +331,43 @@ def insert_price(ts: str, open_: float, high: float, low: float, close: float) -
     )
     conn.commit()
     conn.close()
+
+
+def backfill_prices(candles) -> int:
+    """เขียนแท่งเทียนย้อนหลังทั้งชุดลง prices ครั้งเดียว (ตอนเริ่มระบบ)
+
+    เดิมทั้ง setup_feed/notifier แทรกแค่ "แท่งสุดท้าย" ต่อ poll → บนเครื่องใหม่
+    (เช่น VPS เพิ่ง boot) ตาราง prices จะว่างเปล่าแล้วค่อยๆ งอกทีละแท่ง
+    ทำให้กราฟ Dashboard แท่งเทียนว่าง/ไม่เต็มกรอบไปหลายชั่วโมง
+    ฟังก์ชันนี้ bulk เขียนทุกแท่งใน buffer (เฉพาะที่ยังไม่มีในตาราง) ให้กราฟ
+    มีประวัติทันที ใช้ INSERT OR REPLACE เพื่อให้ค่าแท่งล่าสุดถูกเสมอ
+    """
+    if candles is None or len(candles) == 0:
+        return 0
+    rows = []
+    for ts, r in candles.iterrows():
+        ts_iso = pd.Timestamp(ts).isoformat()
+        rows.append((ts_iso, float(r["open"]), float(r["high"]),
+                     float(r["low"]), float(r["close"])))
+    if not rows:
+        return 0
+
+    conn = get_conn()
+    try:
+        conn.executemany(
+            "INSERT OR REPLACE INTO prices (ts, open, high, low, close) VALUES (?, ?, ?, ?, ?)",
+            rows,
+        )
+        conn.execute(
+            """DELETE FROM prices WHERE ts NOT IN (
+                 SELECT ts FROM prices ORDER BY ts DESC LIMIT ?
+               )""",
+            (MAX_PRICE_ROWS,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return len(rows)
 
 
 def insert_tick(timestamp_iso: str, price: float) -> None:
