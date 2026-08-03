@@ -3,6 +3,8 @@
   "max_score": 15,
   "fire_score": 12,
   "watch_score": 9,
+  "cooldown_minutes": 30,
+  "daily_cap": 0,
   "adx_min": 20,
   "ema200_tol_pct": 0.12,
   "ema100_tol_pct": 0.08,

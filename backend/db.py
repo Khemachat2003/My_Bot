@@ -17,6 +17,14 @@ from typing import Optional
 
 import pandas as pd
 
+try:
+    from backend.deriv_feed import DEFAULT_SYMBOL
+except ModuleNotFoundError:
+    try:
+        from backend.data_feed.deriv_feed import DEFAULT_SYMBOL
+    except ModuleNotFoundError:
+        DEFAULT_SYMBOL = "frxXAUUSD"
+
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "bot.db"
 DB_PATH.parent.mkdir(exist_ok=True)
 
@@ -98,8 +106,10 @@ def init_db() -> None:
         );
 
         CREATE TABLE IF NOT EXISTS prices (
-            ts TEXT PRIMARY KEY,
-            open REAL, high REAL, low REAL, close REAL
+            ts TEXT NOT NULL,
+            symbol TEXT NOT NULL DEFAULT 'frxXAUUSD',
+            open REAL, high REAL, low REAL, close REAL,
+            PRIMARY KEY (ts, symbol)
         );
 
         CREATE TABLE IF NOT EXISTS ticks (
@@ -173,6 +183,39 @@ def init_db() -> None:
         conn.execute("ALTER TABLE setup_signals ADD COLUMN total INTEGER")
     if "tier" not in cols:
         conn.execute("ALTER TABLE setup_signals ADD COLUMN tier TEXT DEFAULT 'NONE'")
+
+    # Migration: ตาราง prices เก่า (ยุคก่อนมีคอลัมน์ symbol) → เพิ่ม symbol
+    # แล้วสมมติว่าแถวเก่าทั้งหมดเป็น frxXAUUSD (ข้อมูลกราฟเดิม)
+    try:
+        pcols = {r["name"] for r in conn.execute("PRAGMA table_info(prices)").fetchall()}
+        if "symbol" not in pcols:
+            conn.execute("ALTER TABLE prices ADD COLUMN symbol TEXT NOT NULL DEFAULT 'frxXAUUSD'")
+            conn.commit()
+
+        # Migration 2: ตารางเก่ายังมี PK = (ts) ตัวเดียว → XAUUSD กับ R_100 ที่
+        # ts ตรงกันชนกัน (REPLACE ทับ) จนกราฟ scale เพี้ยน/ข้อมูลหาย
+        # → rebuild เป็น PK (ts, symbol) เพื่อให้ 2 สัญลักษณ์อยู่ร่วมกันได้
+        pk = [r[1] for r in conn.execute("PRAGMA table_info(prices)").fetchall()
+              if r[5] == 1]
+        if pk != ["ts", "symbol"]:
+            conn.execute("""
+                CREATE TABLE prices_new (
+                    ts TEXT NOT NULL,
+                    symbol TEXT NOT NULL DEFAULT 'frxXAUUSD',
+                    open REAL, high REAL, low REAL, close REAL,
+                    PRIMARY KEY (ts, symbol)
+                )
+            """)
+            conn.execute("""
+                INSERT OR IGNORE INTO prices_new (ts, symbol, open, high, low, close)
+                SELECT ts, symbol, open, high, low, close FROM prices
+            """)
+            conn.execute("DROP TABLE prices")
+            conn.execute("ALTER TABLE prices_new RENAME TO prices")
+            conn.commit()
+    except Exception:
+        pass
+
     conn.commit()
     conn.close()
 
@@ -223,6 +266,31 @@ def fetch_recent_setup_signals(limit: int = 100) -> list[dict]:
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def fetch_last_setup_signal(timeframe: str) -> dict | None:
+    """สัญญาณล่าสุดของ TF นี้ (สำหรับ cooldown — กันยิงซ้ำหลัง restart)"""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM setup_signals WHERE timeframe = ? ORDER BY signal_time DESC LIMIT 1",
+        (timeframe,),
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def count_setup_signals_since(start_iso: str) -> int:
+    """จำนวนสัญญาณที่ยิงตั้งแต่เวลา start_iso (ใช้สำหรับ daily cap)"""
+    conn = get_conn()
+    if start_iso:
+        row = conn.execute(
+            "SELECT COUNT(*) AS c FROM setup_signals WHERE signal_time >= ?",
+            (start_iso,),
+        ).fetchone()
+    else:
+        row = conn.execute("SELECT COUNT(*) AS c FROM setup_signals").fetchone()
+    conn.close()
+    return int(row["c"])
 
 
 def compute_setup_stats(payout: float = 0.82) -> dict:
@@ -317,23 +385,25 @@ def fetch_ml_latest() -> dict:
 
 
 # PRICES / TICKS (shared)
-def insert_price(ts: str, open_: float, high: float, low: float, close: float) -> None:
+def insert_price(ts: str, open_: float, high: float, low: float, close: float,
+                 symbol: str | None = None) -> None:
+    symbol = symbol or DEFAULT_SYMBOL
     conn = get_conn()
     conn.execute(
-        "INSERT OR REPLACE INTO prices (ts, open, high, low, close) VALUES (?, ?, ?, ?, ?)",
-        (ts, open_, high, low, close),
+        "INSERT OR REPLACE INTO prices (ts, symbol, open, high, low, close) VALUES (?, ?, ?, ?, ?, ?)",
+        (ts, symbol, open_, high, low, close),
     )
     conn.execute(
         """DELETE FROM prices WHERE ts NOT IN (
-             SELECT ts FROM prices ORDER BY ts DESC LIMIT ?
+             SELECT ts FROM prices WHERE symbol = ? ORDER BY ts DESC LIMIT ?
            )""",
-        (MAX_PRICE_ROWS,),
+        (symbol, MAX_PRICE_ROWS),
     )
     conn.commit()
     conn.close()
 
 
-def backfill_prices(candles) -> int:
+def backfill_prices(candles, symbol: str | None = None) -> int:
     """เขียนแท่งเทียนย้อนหลังทั้งชุดลง prices ครั้งเดียว (ตอนเริ่มระบบ)
 
     เดิมทั้ง setup_feed/notifier แทรกแค่ "แท่งสุดท้าย" ต่อ poll → บนเครื่องใหม่
@@ -344,10 +414,11 @@ def backfill_prices(candles) -> int:
     """
     if candles is None or len(candles) == 0:
         return 0
+    symbol = symbol or DEFAULT_SYMBOL
     rows = []
     for ts, r in candles.iterrows():
         ts_iso = pd.Timestamp(ts).isoformat()
-        rows.append((ts_iso, float(r["open"]), float(r["high"]),
+        rows.append((ts_iso, symbol, float(r["open"]), float(r["high"]),
                      float(r["low"]), float(r["close"])))
     if not rows:
         return 0
@@ -355,14 +426,14 @@ def backfill_prices(candles) -> int:
     conn = get_conn()
     try:
         conn.executemany(
-            "INSERT OR REPLACE INTO prices (ts, open, high, low, close) VALUES (?, ?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO prices (ts, symbol, open, high, low, close) VALUES (?, ?, ?, ?, ?, ?)",
             rows,
         )
         conn.execute(
             """DELETE FROM prices WHERE ts NOT IN (
-                 SELECT ts FROM prices ORDER BY ts DESC LIMIT ?
+                 SELECT ts FROM prices WHERE symbol = ? ORDER BY ts DESC LIMIT ?
                )""",
-            (MAX_PRICE_ROWS,),
+            (symbol, MAX_PRICE_ROWS),
         )
         conn.commit()
     finally:
@@ -386,10 +457,11 @@ def insert_tick(timestamp_iso: str, price: float) -> None:
     conn.close()
 
 
-def fetch_recent_prices(limit: int = 500) -> list[dict]:
+def fetch_recent_prices(limit: int = 500, symbol: str | None = None) -> list[dict]:
+    symbol = symbol or DEFAULT_SYMBOL
     conn = get_conn()
     rows = conn.execute(
-        "SELECT * FROM prices ORDER BY ts DESC LIMIT ?", (limit,)
+        "SELECT * FROM prices WHERE symbol = ? ORDER BY ts DESC LIMIT ?", (symbol, limit)
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows][::-1]

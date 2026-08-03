@@ -56,8 +56,6 @@ DATA_DIR = ROOT_DIR / "data"
 
 # ── Config จาก .env ──────────────────────────────────────────────────────────
 POLL_SECONDS = int(os.getenv("ML_POLL_SECONDS", "60"))
-ENV_CONF = os.getenv("ML_CONF_THRESHOLD")
-ENV_CONF = float(ENV_CONF) if ENV_CONF and ENV_CONF.strip() else None
 DERIV_SYMBOL = os.getenv("DERIV_SYMBOL", "frxXAUUSD")
 BACKUP_SYMBOL = os.getenv("DERIV_SYMBOL_BACKUP", "R_100")
 
@@ -97,9 +95,15 @@ def _load_model_bundle(cfg: dict) -> dict:
 
 
 def _conf_threshold(label: str) -> float:
-    """ลำดับ: .env ML_CONF_THRESHOLD > chosen_conf จากโมเดล > 0.55"""
-    if ENV_CONF is not None:
-        return ENV_CONF
+    """ลำดับ: .env ML_CONF_THRESHOLD (อ่านสดทุกครั้ง — แก้ .env แล้วไม่มีผลทันที
+    โดยไม่ต้อง restart) > chosen_conf จากโมเดล > 0.55"""
+    import os as _os
+    raw = _os.getenv("ML_CONF_THRESHOLD")
+    if raw and raw.strip():
+        try:
+            return float(raw)
+        except ValueError:
+            pass
     return MODELS[label].get("chosen_conf") or 0.55
 
 
@@ -277,17 +281,19 @@ class MLFeedEngine:
         candle_time = raw_df.index[-1]
         now = pd.Timestamp.now(tz="UTC")
 
-        # เก็บแท่งล่าสุดลง prices (ตารางร่วมสำหรับกราฟ Dashboard)
+        # เก็บแท่งล่าสุดลง prices (ตารางร่วมสำหรับกราฟ Dashboard) — แยก symbol
+        # กัน XAUUSD ปนกับ R_100 (สำรอง) ในตารางเดียวจนกราฟ scale เพี้ยน
         last_row = raw_df.iloc[-1]
         db.insert_price(
             pd.Timestamp(candle_time).isoformat(),
             float(last_row["open"]), float(last_row["high"]),
             float(last_row["low"]), float(last_row["close"]),
+            symbol=symbol,
         )
         # backfill ราคาย้อนหลัง (เฉพาะครั้งแรก/ครั้งแรกของ symbol ใหม่)
         # กันกราฟ Dashboard ว่างบนเครื่องที่เพิ่งเริ่ม เช่น VPS
         if getattr(self, "_backfilled_symbol", None) != symbol:
-            n = db.backfill_prices(raw_df)
+            n = db.backfill_prices(raw_df, symbol=symbol)
             self._backfilled_symbol = symbol
             print(f"[MLFeed] Backfill ราคาย้อนหลัง {n} แท่งลง prices (กราฟ Dashboard)")
 
@@ -356,13 +362,14 @@ class MLFeedEngine:
                         f"Entry: {last_price:.2f} | Win Prob: {res['confidence']:.1%} | Hold: {hold_min}m\n"
                         f"เวลาเข้า: {now.strftime('%H:%M:%S')} UTC"
                     )
-                    send_telegram(msg)
+                    ok = send_telegram(msg)
+                    print(f"[MLFeed] Telegram ALERT [{cfg['label']}] {'ส่งสำเร็จ' if ok else 'ส่งไม่สำเร็จ (ดู log ด้านบน)'}")
 
             self._last_signal_state[cfg["label"]] = res["signal"]
 
     def run(self):
         print("=== 🟢 เริ่มต้นระบบ ML Model Engine (Real-time Context 500 แท่ง, M1/M5) ===")
-        print(f"    poll={POLL_SECONDS}s | threshold={ENV_CONF or 'จากโมเดล'} "
+        print(f"    poll={POLL_SECONDS}s | threshold={_conf_threshold('M1')} "
               f"| symbol={DERIV_SYMBOL} (backup={BACKUP_SYMBOL})")
         errors = 0
         while True:

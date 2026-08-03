@@ -25,6 +25,7 @@ import sys
 import time
 import traceback
 from datetime import datetime, timezone
+from pathlib import Path
 
 # ป้องกัน print ภาษาไทย/emoji แล้ว crash เมื่อ console เป็น cp1252
 try:
@@ -56,6 +57,28 @@ SETUP_TIMEFRAMES = [
 ]
 
 SETUP_MIN_BARS = 30
+
+# 🚦 กันสัญญาณถี่เกิน (เทคนิคจริงออกออเดอร์ไม่ถี่ — ตั้งค่าได้ใน setup_config.json / env)
+#   - cooldown: อย่างน้อยกี่นาทีระหว่างสัญญาณแต่ละตัวของ TF เดียวกัน
+#   - daily cap: สูงสุดกี่ไม้/วัน/ทั้งหมด (0 = ไม่จำกัด)
+def _int_env(name: str, default: int) -> int:
+    v = os.getenv(name)
+    try:
+        return int(v) if v is not None else default
+    except ValueError:
+        return default
+
+try:
+    import json as _json
+    _cfg_path = Path(__file__).resolve().parent / "setup_config.json"
+    _cfg = _json.loads(_cfg_path.read_text(encoding="utf-8"))
+    COOLDOWN_MIN = int(_cfg.get("cooldown_minutes", 30))
+    DAILY_CAP = int(_cfg.get("daily_cap", 0))
+except Exception:
+    COOLDOWN_MIN = _int_env("SETUP_COOLDOWN_MINUTES", 30)
+    DAILY_CAP = _int_env("SETUP_DAILY_CAP", 0)
+COOLDOWN_MIN = _int_env("SETUP_COOLDOWN_MINUTES", COOLDOWN_MIN)
+DAILY_CAP = _int_env("SETUP_DAILY_CAP", DAILY_CAP)
 
 
 class SetupFeedEngine:
@@ -89,7 +112,7 @@ class SetupFeedEngine:
                 self.last_price = float(self.buffer["close"].iloc[-1])
                 # backfill ราคาย้อนหลังลงตาราง prices ให้กราฟ Dashboard เต็มทันที
                 # (ไม่ต้องรอ poll สะสมทีละแท่งหลายชั่วโมง)
-                n = db.backfill_prices(self.buffer)
+                n = db.backfill_prices(self.buffer, symbol=self.symbol)
                 print(f"[SetupFeed] Backfill ราคาย้อนหลัง {n} แท่งลง prices (กราฟ Dashboard)")
             print(f"[SetupFeed] Buffer พร้อมใช้งาน: {len(self.buffer)} แท่ง (1m, {self.symbol})")
         except Exception as e:
@@ -145,6 +168,7 @@ class SetupFeedEngine:
             pd.Timestamp(last.name).isoformat(),
             float(last["open"]), float(last["high"]),
             float(last["low"]), float(last["close"]),
+            symbol=self.symbol,
         )
         db.insert_tick(now.isoformat(), self.last_price)
 
@@ -229,6 +253,28 @@ class SetupFeedEngine:
 
             was_triggered = self._last_entry_trigger.get(tf_label, False)
             if result.entry_trigger and not was_triggered:
+                # 🚦 cooldown: ข้ามถ้ายังไม่ครบเวลาจากสัญญาณล่าสุดของ TF นี้ (อิง DB — กัน restart ยิงซ้ำ)
+                last_sig = db.fetch_last_setup_signal(timeframe=tf_label)
+                if last_sig:
+                    last_time = pd.to_datetime(last_sig["signal_time"])
+                    elapsed = (now - last_time).total_seconds() / 60.0
+                    if elapsed < COOLDOWN_MIN:
+                        print(f"[SetupFeed] ข้ามสัญญาณ [{tf_label}] — ยังอยู่ใน cooldown "
+                              f"{elapsed:.0f}/{COOLDOWN_MIN} นาที (ID#{last_sig['id']})")
+                        self._last_entry_trigger[tf_label] = result.entry_trigger
+                        continue
+
+                # 🚦 daily cap: ข้ามถ้าวันนี้ยิงเกิน cap แล้ว (นับตั้งแต่ 00:00 UTC)
+                if DAILY_CAP > 0:
+                    start_of_day = pd.Timestamp(
+                        now.tz_localize(None) if now.tz is not None else now
+                    ).normalize().isoformat()
+                    day_count = db.count_setup_signals_since(start_iso=start_of_day)
+                    if day_count >= DAILY_CAP:
+                        print(f"[SetupFeed] ข้ามสัญญาณ [{tf_label}] — ถึง daily cap {DAILY_CAP} แล้ว")
+                        self._last_entry_trigger[tf_label] = result.entry_trigger
+                        continue
+
                 target_time = (now + pd.Timedelta(minutes=hold_min)).isoformat()
                 try:
                     new_sig_id = db.insert_setup_signal(
@@ -260,7 +306,8 @@ class SetupFeedEngine:
                     f"เหตุผล: {result.entry_trigger_note}\n"
                     f"เวลาเข้า: {now.strftime('%H:%M:%S')} UTC"
                 )
-                send_telegram(msg_trigger)
+                ok = send_telegram(msg_trigger)
+                print(f"[SetupFeed] Telegram ALERT [{tf_label}] {'ส่งสำเร็จ' if ok else 'ส่งไม่สำเร็จ (ดู log ด้านบน)'}")
 
             self._last_entry_trigger[tf_label] = result.entry_trigger
 

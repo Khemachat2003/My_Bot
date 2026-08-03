@@ -473,11 +473,17 @@ function drawCandles(canvas, data){
   if(!data||data.length<2){
     ctx.fillStyle='#4a5775'; ctx.font='13px Segoe UI'; ctx.fillText('รอข้อมูลราคา...',20,H/2); return;
   }
-  const padL=8,padR=56,padT=10,padB=24;
+  const padL=8,padT=10,padB=24;
   const volH=Math.floor(H*0.14), priceBottom=H-padB-volH;
   let min=Infinity,max=-Infinity;
   data.forEach(d=>{min=Math.min(min,d.low);max=Math.max(max,d.high);});
   const range=(max-min)||1; min-=range*0.06; max+=range*0.06;
+  // จำนวนทศนิยมตามขนาดราคา (XAUUSD ~4000 → 2 จุด, R_100 ~600 → 2 จุด)
+  const dec = (max>1000||min>1000)?1:2;
+  // กันตัวเลขแกนขวาล้น/ชนแท่ง: padR = ความกว้างตัวเลขราคา + ระยะ
+  ctx.font='9.5px Cascadia Mono,monospace';
+  const labelW=(max.toFixed(dec)).length*6.2+2;
+  const padR=Math.max(50,labelW+14);
   const n=data.length, plotW=W-padL-padR, plotH=priceBottom-padT;
   const step=plotW/(n-1), bw=Math.max(plotW/n*0.55,1);
 
@@ -488,7 +494,7 @@ function drawCandles(canvas, data){
     const y=padT+plotH*i/GRID;
     ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
     const val=max-(max-min)*i/GRID;
-    ctx.textAlign='right'; ctx.fillText(val.toFixed(1),W-padR+6,y+3);
+    ctx.textAlign='right'; ctx.fillText(val.toFixed(dec),W-padR+6,y+3);
   }
   ctx.textAlign='left';
 
@@ -525,7 +531,7 @@ function drawCandles(canvas, data){
   const lc=lp>=data[data.length-1].open?'#22c98a':'#f6465d';
   ctx.strokeStyle=lc; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(padL,py(lp)); ctx.lineTo(W-padR,py(lp)); ctx.stroke(); ctx.setLineDash([]);
   ctx.fillStyle=lc; ctx.font='bold 10.5px Cascadia Mono,monospace';
-  ctx.textAlign='right'; ctx.fillText(lp.toFixed(2),W-padR+6,py(lp)-4);
+  ctx.textAlign='right'; ctx.fillText(lp.toFixed(dec),W-padR+6,Math.max(py(lp)-4,12));
   ctx.textAlign='left';
   ctx.fillStyle='#4a5775';
   ctx.fillText(data[0].t?fmtHM(data[0].t):'',padL,H-6);
@@ -558,7 +564,7 @@ function gaugeSVG(g){
     </div>
     <div class="gmeta">
       <span style="color:var(--green);">▲ CALL ${up.toFixed(1)}%</span>
-      <span>Thresh ${(g.threshold_used*100).toFixed(0)}%</span>
+      <span>Thresh ${(g.env_threshold!=null?g.env_threshold:g.threshold_used)*100|0}%</span>
       <span style="color:var(--red);">▼ PUT ${dn.toFixed(1)}%</span>
     </div>
   </div>`;
@@ -627,7 +633,9 @@ function drawEquity(points){
 
 async function refreshPrice(){
   try{
-    const prices=await fetchJSON('/api/prices?limit=240');
+    let sym='frxXAUUSD';
+    try{ const s=await fetchJSON('/api/symbol'); if(s&&s.symbol){sym=s.symbol; document.getElementById('symbolBadge').textContent=s.symbol;} }catch(e){}
+    const prices=await fetchJSON('/api/prices?limit=240&symbol='+encodeURIComponent(sym));
     if(!prices||!prices.length) return;
     const el=document.getElementById('candleChart');
     drawCandles(el,prices);

@@ -34,6 +34,7 @@ from pydantic import BaseModel
 
 from backend import db
 from backend import setup_db
+from backend.market_hours import choose_symbol, symbol_label
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = ROOT_DIR / "frontend"
@@ -218,10 +219,20 @@ def logout():
     return resp
 
 
+@app.get("/api/symbol")
+def get_symbol(_auth=Depends(require_auth)):
+    """สัญลักษณ์ที่ระบบกำลังใช้อยู่จริง (สลับ R_100 อัตโนมัติเมื่อตลาดทองปิด)"""
+    sym = choose_symbol()
+    return {"symbol": sym, "label": symbol_label(sym)}
+
+
 @app.get("/api/prices")
-def get_prices(limit: int = Query(500, ge=1, le=5000), _auth=Depends(require_auth)):
-    """ราคา/กราฟ ใช้ร่วมกันทั้ง 2 ระบบ"""
-    return db.fetch_recent_prices(limit=limit)
+def get_prices(limit: int = Query(500, ge=1, le=5000),
+               symbol: str = Query("", description="เช่น frxXAUUSD / R_100 — ว่าง = ค่าเริ่มต้น"),
+               _auth=Depends(require_auth)):
+    """ราคา/กราฟ ใช้ร่วมกันทั้ง 2 ระบบ — กรองตาม symbol (กันสเกลราคาปนกัน)"""
+    sym = symbol or db.DEFAULT_SYMBOL
+    return db.fetch_recent_prices(limit=limit, symbol=sym)
 
 
 # ── 🔵 RULE-BASED SETUP ENGINE (System 1) ───────────────────────────────
@@ -275,7 +286,20 @@ def get_ml_stats_by_timeframe(payout: float = Query(0.82, ge=0.0, le=5.0), _auth
 @app.get("/api/ml/latest")
 def get_ml_latest(_auth=Depends(require_auth)):
     """ค่า prob_up/prob_down ล่าสุดต่อ timeframe → Real-time Probability Gauge"""
-    return db.fetch_ml_latest()
+    data = db.fetch_ml_latest()
+    # ส่ง threshold สดจาก .env ด้วย (เผื่อ DB ค้างค่าเก่า — user เปลี่ยน 0.57
+    # แต่หน้าเว็บยังโชว์ 0.6 เพราะ ml_latest ยังเขียนด้วยค่าก่อน restart)
+    env_conf = os.getenv("ML_CONF_THRESHOLD")
+    env_threshold = None
+    if env_conf and env_conf.strip():
+        try:
+            env_threshold = float(env_conf)
+        except ValueError:
+            pass
+    if env_threshold is not None:
+        for k, v in data.items():
+            v["env_threshold"] = env_threshold
+    return data
 
 
 # ── 📓 Trade Journal & Model Registry ─────────────────────────────────────────
