@@ -229,6 +229,8 @@
   .guide-steps{list-style:none; font-size:11.5px;}
   .guide-steps li{display:flex; gap:9px; align-items:flex-start; padding:5px 0; border-bottom:1px solid rgba(19,28,48,.7);}
   .guide-steps li:last-child{border-bottom:none;}
+  .gstep{display:flex; flex-direction:column; gap:3px; padding:8px 10px; border-radius:9px; background:rgba(12,18,32,.55); border:1px solid var(--border); font-size:11px; line-height:1.5;}
+  .gstep b{font-size:11.5px;}
   .guide-ico{flex-shrink:0; width:19px; height:19px; border-radius:50%; display:grid; place-items:center; font-size:10.5px; font-weight:900; margin-top:1px; line-height:1;}
   .guide-ico.pass{background:rgba(34,201,138,.16); color:var(--green);}
   .guide-ico.part{background:rgba(240,185,11,.14); color:var(--yellow);}
@@ -259,6 +261,11 @@
   .feed-row .ftime{color:var(--dim); font-family:var(--num); font-size:10.5px;}
   .feed-row .fprice{font-family:var(--num); font-weight:700; margin-left:auto;}
   .feed-row .fconf{font-family:var(--num); color:var(--muted); font-size:11px;}
+  .hi-badge{
+    display:inline-block; background:linear-gradient(135deg,#f7b847,#ff8a3d); color:#1a1305;
+    font-size:9px; font-weight:900; border-radius:10px; padding:1px 6px; margin-left:4px; vertical-align:1px;
+    font-family:var(--num); letter-spacing:.3px;
+  }
 
   /* ═══ MOBILE RESPONSIVE ═══ */
   @media(max-width:1100px){
@@ -284,6 +291,12 @@
     .tbl-wrap{font-size:11.5px;}
     th,td{padding:7px 9px;}
     .gauge .gname{font-size:10px;}
+    .chart-tools{width:100%; justify-content:space-between; margin-top:6px; flex-wrap:wrap; gap:6px;}
+    .sym-select{flex:1 1 100%; font-size:12px; padding:7px 9px;}
+    .tf-btn{padding:6px 10px; font-size:11.5px;}
+    .ind-chip{padding:6px 11px; font-size:11px;}
+    .theme-lbl select{font-size:12px; padding:6px 8px;}
+    .pro-chart-wrap{height:420px;}
   }
   @media(max-width:480px){
     .brand .name{font-size:12.5px;}
@@ -294,6 +307,8 @@
     .chart-wrap{height:240px;}
     .guide-steps .gname{white-space:normal;}
     .guide-action{font-size:11.5px;}
+    .nav-btn{font-size:11px; padding:8px 4px;}
+    .pro-chart-wrap{height:360px;}
   }
 </style>
 </head>
@@ -439,6 +454,24 @@
       <div class="kpi yellow"><div class="lbl">Resolved / Pending</div><div class="val yellow" id="mlN">–</div><div class="sub" id="mlNsub">–</div></div>
       <div class="kpi cyan"><div class="lbl">Winrate M1</div><div class="val cyan" id="mlWrM1">–</div><div class="sub">ถือ 15 นาที</div></div>
       <div class="kpi cyan"><div class="lbl">Winrate M5</div><div class="val cyan" id="mlWrM5">–</div><div class="sub">ถือ 30 นาที</div></div>
+    </div>
+    <div class="guide-card">
+      <div class="gname">แนวทางสัญญาณ ML ที่ความมั่นใจสูง (conf ≥ 0.70)</div>
+      <div class="guide-steps" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">
+        <div class="gstep">
+          <b style="color:var(--yellow);">≥ 0.70 — HIGH</b>
+          <span>สัญญาณแรง · ใช้ <b>1/3 ของเงินเดิมพัน</b> · เข้าตามทิศทางสัญญาณ (CALL/PUT)</span>
+        </div>
+        <div class="gstep">
+          <b style="color:var(--green);">0.60 – 0.69</b>
+          <span>สัญญาณปานกลาง · รอจังหวะยืนยันจาก Rule-Based (แนวรับ/ต้าน) ก่อนเข้า</span>
+        </div>
+        <div class="gstep">
+          <b style="color:var(--muted);">&lt; 0.60</b>
+          <span>ความมั่นใจต่ำกว่าจุดคุ้มทุน — <b>ไม่ควรเปิดออเดอร์</b> รอสัญญาณถัดไป</span>
+        </div>
+      </div>
+      <div class="guide-note">จุดคุ้มทุนจริงดูจากค่า <b>Breakeven</b> ด้านบน — จะเปิดออเดอร์ได้เมื่อความมั่นใจ (Win Prob) สูงกว่า Breakeven เสมอ</div>
     </div>
     <div class="panel">
       <h3><span class="ph green"></span>ประวัติสัญญาณ ML ทั้งหมด</h3>
@@ -1069,18 +1102,24 @@ async function refreshHeaderSignals(){
     const latest=await fetchJSON('/api/ml/latest');
     const sigEl=(id,g)=>{ const el=document.getElementById(id);
       if(!g) el.textContent='–';
-      else el.innerHTML=`<span style="color:${g.signal==='CALL'?'var(--green)':(g.signal==='PUT'?'var(--red)':'var(--muted)')}">${g.signal} ${(g.confidence*100).toFixed(0)}%</span>`;
+      else {
+        const c=(g.confidence||0)*100;
+        const col=g.signal==='CALL'?'var(--green)':(g.signal==='PUT'?'var(--red)':'var(--muted)');
+        const hi=(g.confidence||0)>0.7?` <span class="hi-badge">★${Math.round(c)}%</span>`:'';
+        el.innerHTML=`<span style="color:${col}">${g.signal} ${Math.round(c)}%</span>${hi}`;
+      }
     };
     sigEl('hM1',latest['M1']); sigEl('hM5',latest['M5']);
   }catch(e){}
 }
 
 function feedRow(r){
+  const hi=(r.confidence!=null&&r.confidence>0.7)?' <span class="hi-badge">HIGH</span>':'';
   return `<div class="feed-row">
     <span class="fdir ${r.direction||''}">${r.direction||'–'}</span>
     <span class="ftime">${fmtHM(r.signal_time)}</span>
     <span class="fprice">${r.entry_price!=null?r.entry_price.toFixed(2):'–'}</span>
-    <span class="fconf">${r.confidence!=null?(r.confidence*100).toFixed(1)+'%':'–'}</span>
+    <span class="fconf">${r.confidence!=null?(r.confidence*100).toFixed(1)+'%':'–'}${hi}</span>
     <span class="pill ${r.result}">${r.result}</span>
   </div>`;
 }
@@ -1115,7 +1154,7 @@ async function refreshMlTab(){
       <td class="mono">${r.confidence!=null?(r.confidence*100).toFixed(1)+'%':'–'}</td>
       <td class="mono">${r.threshold_used!=null?(r.threshold_used*100).toFixed(0)+'%':'–'}</td>
       <td class="mono">${r.horizon_min}m</td>
-      <td style="font-size:10px;color:var(--muted)">${r.model_version||'–'}</td>
+      <td style="font-size:10px;color:var(--muted)">${r.model_version||'–'}${r.confidence!=null&&r.confidence>0.7?' <span class="hi-badge">HIGH</span>':''}</td>
       <td><span class="pill ${r.result}">${r.result}</span></td>
     </tr>`).join('');
   }catch(e){}
