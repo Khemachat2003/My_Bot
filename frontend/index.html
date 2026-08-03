@@ -134,12 +134,12 @@
     font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.1em;
     margin-bottom:12px; display:flex; align-items:center; gap:8px; font-weight:800;
   }
-  .panel h3 .ph{width:16px;height:16px;border-radius:5px;display:grid;place-items:center;font-size:9px;}
-  .panel h3 .ph.cyan{background:rgba(56,225,196,.12);color:var(--cyan);}
-  .panel h3 .ph.green{background:rgba(34,201,138,.12);color:var(--green);}
-  .panel h3 .ph.blue{background:rgba(77,163,255,.12);color:var(--blue);}
-  .panel h3 .ph.purple{background:rgba(167,139,250,.12);color:var(--purple);}
-  .panel h3 .ph.red{background:rgba(246,70,93,.12);color:var(--red);}
+  .panel h3 .ph{width:8px;height:8px;border-radius:2px;display:inline-block;}
+  .panel h3 .ph.cyan{background:var(--cyan);box-shadow:0 0 6px rgba(56,225,196,.5);}
+  .panel h3 .ph.green{background:var(--green);box-shadow:0 0 6px rgba(34,201,138,.5);}
+  .panel h3 .ph.blue{background:var(--blue);box-shadow:0 0 6px rgba(77,163,255,.5);}
+  .panel h3 .ph.purple{background:var(--purple);box-shadow:0 0 6px rgba(167,139,250,.5);}
+  .panel h3 .ph.red{background:var(--red);box-shadow:0 0 6px rgba(246,70,93,.5);}
 
   /* chart */
   .chart-wrap{position:relative; height:330px;}
@@ -160,6 +160,7 @@
   .gsig.PUT{background:rgba(246,70,93,.14); color:var(--red); border:1px solid rgba(246,70,93,.3);}
   .gsig.NEUTRAL{background:rgba(116,128,156,.12); color:var(--muted); border:1px solid rgba(116,128,156,.25);}
   .gauge-svg{display:flex; justify-content:center; margin:6px 0 2px;}
+  .gauge-svg svg{max-width:100%; height:auto;}
   .gauge .gmeta{display:flex; justify-content:space-between; font-family:var(--num); font-size:10px; color:var(--dim); margin-top:4px;}
 
   /* ═══ TABLES ═══ */
@@ -220,6 +221,41 @@
   .feed-row .ftime{color:var(--dim); font-family:var(--num); font-size:10.5px;}
   .feed-row .fprice{font-family:var(--num); font-weight:700; margin-left:auto;}
   .feed-row .fconf{font-family:var(--num); color:var(--muted); font-size:11px;}
+
+  /* ═══ MOBILE RESPONSIVE ═══ */
+  @media(max-width:1100px){
+    .topstat{display:none;}
+  }
+  @media(max-width:820px){
+    body{font-size:13px; overflow:auto;}
+    .topbar{flex-wrap:wrap; gap:8px; padding:8px 12px;}
+    .brand .ver{display:none;}
+    .pricebox{order:3; flex:1 1 100%; justify-content:center; padding:5px 10px;}
+    .pricebox .price{font-size:26px;}
+    .pricebox .chg{font-size:11px;}
+    .live-badge{margin-left:auto;}
+    .nav{overflow-x:auto; padding:8px 10px 0; -webkit-overflow-scrolling:touch;}
+    .nav-btn{flex:1 1 0; justify-content:center; padding:9px 6px; font-size:12px; gap:6px;}
+    .main{padding:12px 10px 30px;}
+    .kpi-row{grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:9px;}
+    .kpi{padding:11px 13px;}
+    .kpi .val{font-size:21px;}
+    .cols.l2,.cols.l3{grid-template-columns:1fr;}
+    .panel{padding:12px;}
+    .chart-wrap{height:280px;}
+    .tbl-wrap{font-size:11.5px;}
+    th,td{padding:7px 9px;}
+    .gauge .gname{font-size:10px;}
+  }
+  @media(max-width:480px){
+    .brand .name{font-size:12.5px;}
+    .logout{font-size:10.5px; padding:5px 9px;}
+    .live-badge{font-size:9px; padding:2px 7px;}
+    .topbar{gap:6px;}
+    .kpi .val{font-size:19px;}
+    .chart-wrap{height:240px;}
+    .setup-meta{gap:6px;}
+  }
 </style>
 </head>
 <body>
@@ -274,7 +310,7 @@
 
     <div class="cols l2">
       <div class="panel">
-        <h3><span class="ph cyan">📈</span>กราฟราคา — Candlestick 1 นาที</h3>
+        <h3><span class="ph cyan"></span>กราฟราคา — Candlestick 1 นาที</h3>
         <div class="chart-wrap"><canvas id="candleChart" class="chart"></canvas></div>
         <div class="chart-legend">
           <span><i style="background:var(--cyan);"></i>EMA20</span>
@@ -284,22 +320,22 @@
         </div>
       </div>
       <div class="panel">
-        <h3><span class="ph green">🎯</span>Probability Gauges</h3>
+        <h3><span class="ph green"></span>Probability Gauges</h3>
         <div id="gaugePanel"></div>
       </div>
     </div>
 
     <div class="cols l3">
       <div class="panel">
-        <h3><span class="ph purple">📊</span>เส้น P&amp;L (Equity Curve)</h3>
+        <h3><span class="ph purple"></span>เส้น P&amp;L (Equity Curve)</h3>
         <div class="chart-wrap" style="height:230px;"><canvas id="equityChart" class="chart"></canvas></div>
       </div>
       <div class="panel">
-        <h3><span class="ph green">⚡</span>สัญญาณ ML ล่าสุด</h3>
+        <h3><span class="ph green"></span>สัญญาณ ML ล่าสุด</h3>
         <div id="mlRecentFeed" style="max-height:230px;overflow-y:auto;"></div>
       </div>
       <div class="panel">
-        <h3><span class="ph blue">🔍</span>Setup Checklist สด</h3>
+        <h3><span class="ph blue"></span>Setup Checklist สด</h3>
         <div id="setupMini"></div>
       </div>
     </div>
@@ -317,7 +353,7 @@
       <div class="kpi cyan"><div class="lbl">Winrate M5</div><div class="val cyan" id="mlWrM5">–</div><div class="sub">ถือ 30 นาที</div></div>
     </div>
     <div class="panel">
-      <h3><span class="ph green">🕐</span>ประวัติสัญญาณ ML ทั้งหมด</h3>
+      <h3><span class="ph green"></span>ประวัติสัญญาณ ML ทั้งหมด</h3>
       <div class="tbl-wrap" style="max-height:480px;overflow-y:auto;">
         <table id="mlFullTable">
           <thead><tr><th>เวลา</th><th>TF</th><th>ทิศทาง</th><th>Entry</th><th>Exit</th><th>Win Prob</th><th>Thresh</th><th>Hold</th><th>Model</th><th>ผล</th></tr></thead>
@@ -340,10 +376,10 @@
       <div class="kpi blue"><div class="lbl">Winrate M5</div><div class="val blue" id="setWrM5">–</div><div class="sub">ถือ 30 นาที</div></div>
     </div>
     <div class="cols l3">
-      <div class="panel"><h3><span class="ph blue">🔍</span>Checklist สด M1</h3><div id="setupM1"></div></div>
-      <div class="panel"><h3><span class="ph blue">🔍</span>Checklist สด M5</h3><div id="setupM5"></div></div>
+      <div class="panel"><h3><span class="ph blue"></span>Checklist สด M1</h3><div id="setupM1"></div></div>
+      <div class="panel"><h3><span class="ph blue"></span>Checklist สด M5</h3><div id="setupM5"></div></div>
       <div class="panel">
-        <h3><span class="ph blue">🕐</span>ประวัติสัญญาณ Rule-Based</h3>
+        <h3><span class="ph blue"></span>ประวัติสัญญาณ Rule-Based</h3>
         <div class="tbl-wrap" style="max-height:420px;overflow-y:auto;">
           <table id="setupTable">
             <thead><tr><th>เวลา</th><th>TF</th><th>ทิศทาง</th><th>Entry</th><th>Exit</th><th>Score</th><th>Tier</th><th>ผล</th></tr></thead>
@@ -367,11 +403,11 @@
     </div>
     <div class="cols l2">
       <div class="panel">
-        <h3><span class="ph purple">📊</span>Equity Curve (P&amp;L สะสม)</h3>
+        <h3><span class="ph purple"></span>Equity Curve (P&amp;L สะสม)</h3>
         <div class="chart-wrap" style="height:300px;"><canvas id="equityFullChart" class="chart"></canvas></div>
       </div>
       <div class="panel">
-        <h3><span class="ph purple">🗓</span>ผลรายวัน</h3>
+        <h3><span class="ph purple"></span>ผลรายวัน</h3>
         <div class="tbl-wrap" style="max-height:300px;overflow-y:auto;">
           <table id="dailyTable">
             <thead><tr><th>วัน</th><th>Trades</th><th>Wins</th><th>Winrate</th><th>P&amp;L</th></tr></thead>
@@ -381,7 +417,7 @@
       </div>
     </div>
     <div class="panel">
-      <h3><span class="ph purple">🧬</span>Model Registry — ประวัติโมเดลที่เทรน</h3>
+      <h3><span class="ph purple"></span>Model Registry — ประวัติโมเดลที่เทรน</h3>
       <div class="tbl-wrap">
         <table id="modelTable">
           <thead><tr><th>Key</th><th>Version</th><th>เทรนเมื่อ</th><th>Horizon</th><th>n_rows</th><th>AUC val</th><th>AUC test</th><th>Conf</th><th>Feature Set</th></tr></thead>
@@ -713,11 +749,11 @@ function renderSetupCard(s){
       <span class="inote">${d.note||''}</span>
       <span class="frac">${pct}% ×${w}</span>
     </li>`}).join('');
-  const grip=(s.grip_hits&&s.grip_hits.length)?'🔒 '+s.grip_hits.join(', '):'';
+  const grip=(s.grip_hits&&s.grip_hits.length)?''+s.grip_hits.join(', '):'';
   const ready=!!s.entry_trigger;
   const tier=s.tier||'NONE';
   const pct=Math.max(2,Math.round((s.score||0)/max*100));
-  const tierLabel=tier==='FIRE'?'🎯 พร้อมเข้า':tier==='FADE'?'⚡ Fade เร็ว':tier==='WATCH'?'👀 รอ Rejection':'⏳ รอเงื่อนไข';
+  const tierLabel=tier==='FIRE'?'พร้อมเข้า':tier==='FADE'?'Fade เร็ว':tier==='WATCH'?'รอ Rejection':'รอเงื่อนไข';
   return `<div class="setup-card ${ready?'triggered':''}">
     <div class="setup-head">
       <h4>Setup Checklist</h4>
