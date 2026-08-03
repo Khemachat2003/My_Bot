@@ -1,6 +1,11 @@
 # XAUUSD Bot — production image (Python 3.11 slim)
 FROM python:3.11-slim
 
+# libgomp1 = OpenMP runtime ที่ lightgbm ต้องใช้ (image slim ไม่มี → import lightgbm
+# พังตอน unpickle โมเดล = notifier ตาย = Prob Gauge/ML ว่างตลอด บน VPS)
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
 # กัน crash เรื่อง locale/console encoding บน Linux
 ENV PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8 \
