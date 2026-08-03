@@ -1,22 +1,29 @@
 """
-setup_scorer.py — 🔵 Sniper Reversion Checklist V2 (Rule-Based Setup Engine)
+setup_scorer.py — 🔵 Trend-Aligned EMA200 Rejection Checklist V3 (Rule-Based Setup Engine)
 ===================================================================================
-ปรับตามเทคนิคที่เจ้าของระบบใช้เทรด option จริง (อธิบายโดยเจ้าของ):
+ปรับใหม่ตาม Setup101.txt ฉบับเต็ม (หลักการที่เจ้าของระบบเทรดจริง):
 
-  Flow จริง: ดูราคา → ดูเทรน (ZigZag/EMA) → ADX แรงไหม → RSI over/divergence
-             → EMA 3 เส้นตัดกันตามเทรนไหม → BB บีบ/ขยาย/ตำแหน่งเทียบ SMA
-             → ZigZag ทำ HH/HL ตามเทรน → ราคาออกนอก BB → ราคาใกล้ EMA200/100
-             → จุดนั้นอยู่ในแนวรับ/แนวต้านหลักหรือย่อย + grip ไหม
-             → สุดท้าย: rejection ที่โซน EMA → เข้า
+  🎯 หลักการ: เทรด "ตามเทรนใหญ่" รอให้ราคาย่อกลับมาหา EMA 200 แล้วเกิด Reject → เข้า
+     ตามทิศทางเทรน ไม่ใช่สวนเทรน (ไม่ fade)
 
-  11 ข้อ ถ่วงน้ำหนัก (max = 15) ตั้งค่าได้ใน setup_config.json (ไม่ต้องแตะโค้ด)
-  ค่า config โหลดอัตโนมัติใหม่ทุกครั้งที่ไฟล์เปลี่ยน (mtime) — ระบบ poll 15 วิ
+  ลำดับตรวจ (ตรง Setup101 ข้อ 2.1-2.10):
+    1) เทรนด์ใหญ่: EMA50/100/200 เรียงตามทิศ + Zigzag HH/HL (หรือ LH/LL)
+    2) ADX > 20 → เทรนด์แข็งแรง
+    3) RSI อยู่ในโซน (y่อลึกในเทรนด์ขึ้น = overbought อ่อนตัว / oversold)
+    4) ราคาเคยทะลุ EMA100 ขึ้นไปแล้ว (ยืนยันว่าเป็นเทรนด์จริง ไม่ใช่แค่สวิง)
+    5) BB ขยายตัว (มีวอลุ่มสนับสนุน) — บีบตัว = ไม่เหมาะ
+    6) Zigzag ยังทำยอดตามทิศเทรนด์ต่อเนื่อง
+    7) ราคาย่อลงมาอยู่โซน EMA200 (อย่างน้อยต้องผ่าน EMA100 มาแล้ว)
+    8) จุดย่อตรงแนวรับ/ต้านสำคัญ (หลัก/ย่อย) + มีเส้น Grip ซ้อน = ยิ่งมั่นใจ
+    9) Rejection ที่ EMA200: ราคาแตะ EMA200 แล้วถูกดีดกลับ (wick) หรือ
+       แตะ-ดีด-แตะซ้ำ (double-touch ตามนิยามใน Setup101) → จุดชี้ขาด
 
-  Tier สัญญาณ (กันพลาดจังหวะตามที่เจ้าของระบบกังวล):
-    FIRE  = setup ครบ + ราคากลับมาที่ EMA + มี rejection → พิจารณาเข้า
-    FADE  = RSI สุดขั้ว + ราคายืดไกลเกินไป (ไม่ต้องรอราคากลับถึง EMA) → เข้าเร็ว
-    WATCH = ราคากลับมาอยู่ในโซน EMA แล้ว รอ rejection ยืนยัน (เตรียมแผน)
-    NONE  = ยังไม่เข้าเงื่อนไข
+  Tier:
+    FIRE  = เทรนด์ชัดเจน + ราคาแตะโซน EMA200 + Reject เกิด → เข้าตามเทรน
+    WATCH = เทรนด์ชัดเจน + ราคากำลังเข้าใกล้โซน EMA200 (รอ Reject ยืนยัน)
+    NONE  = ไม่มีเทรนด์ชัดเจน / ยังห่าง EMA200
+
+  ตั้งค่าได้ใน setup_config.json (โหลด auto ทุก poll)
 """
 from __future__ import annotations
 
@@ -54,10 +61,10 @@ class SetupResult:
     target_hold_minutes: int
     score: float = 0.0
     max_score: int = 15
-    tier: str = "NONE"                       # FIRE / FADE / WATCH / NONE
-    direction: str = ""                      # CALL / PUT
-    bias: str = ""                           # BULLISH_REVERSION / BEARISH_REVERSION
-    entry_trigger: bool = False              # True ถ้า tier เป็น FIRE หรือ FADE (เข้าได้)
+    tier: str = "NONE"                       # FIRE / WATCH / NONE
+    direction: str = ""                      # CALL / PUT (ตามเทรนใหญ่)
+    bias: str = ""                           # BULLISH_TREND / BEARISH_TREND
+    entry_trigger: bool = False              # True เฉพาะ FIRE
     entry_trigger_note: str = ""
     details: dict[str, dict] = field(default_factory=dict)  # name -> {ok, frac, note, weight}
     grip_hits: list[str] = field(default_factory=list)
@@ -154,7 +161,6 @@ def _zigzag_structure(piv_highs, piv_lows) -> str:
 
 # ── แนวรับ/แนวต้าน หลัก/ย่อย (cluster pivot + นับครั้งเทสต์ + โซน) ───────────
 def _cluster_levels(prices: list[float], tol_pct: float) -> list[dict]:
-    """รวม pivot ที่ใกล้กัน (ภายใน tolerance) เป็น 1 แนว → นับครั้งที่เทสต์"""
     if not prices:
         return []
     clusters: list[list[float]] = []
@@ -178,7 +184,6 @@ def _cluster_levels(prices: list[float], tol_pct: float) -> list[dict]:
 
 
 def _find_levels(df: pd.DataFrame, cfg: dict, lookback: int = 200) -> tuple[list[dict], list[dict]]:
-    """คืน (supports, resistances) ที่ถ่วงด้วยจำนวนครั้งที่เทสต์"""
     sl = min(lookback, len(df))
     seg = df.iloc[-sl:]
     piv_h, piv_l = _find_pivots(seg["high"], seg["low"], left=2, right=2)
@@ -258,8 +263,8 @@ def _divergence_frac(rsi: pd.Series, piv_lows, piv_highs, direction: str) -> tup
         return 0.0, "ไม่พบ Bearish Divergence/Convergence"
 
 
-# ── Rejection Candle (ดูย้อนหลัง lookback แท่ง, แบบมี partial) ────────────────
-def _rejection_frac(df: pd.DataFrame, direction: str, lookback: int = 2) -> tuple[float, str]:
+# ── Rejection Candle (ดูย้อนหลัง lookback แท่ง) ───────────────────────────────
+def _rejection_frac(df: pd.DataFrame, direction: str, lookback: int = 3) -> tuple[float, str]:
     n = len(df)
     best = 0.0
     best_note = ""
@@ -307,8 +312,50 @@ def _rejection_frac(df: pd.DataFrame, direction: str, lookback: int = 2) -> tupl
     return 0.0, f"ยังไม่เห็น Rejection ชัดเจนใน {lookback} แท่งย้อนหลัง"
 
 
-# ── คะแนนรายทิศทาง ───────────────────────────────────────────────────────────
-def _score_direction(df: pd.DataFrame, direction: str, ctx: dict, cfg: dict) -> tuple[float, dict, list[str]]:
+# ── Rejection ที่ EMA200 (ตามนิยาม Setup101: แตะ→ดีด→แตะซ้ำ) ────────────────
+def _ema200_rejection_frac(df: pd.DataFrame, ema200: pd.Series, direction: str, cfg: dict) -> tuple[float, str]:
+    """ราคาแตะ EMA200 แล้วถูกดีดกลับ (wick / engulfing) หรือ แตะ-ดีด-แตะซ้ำ
+    → ถือว่า 'Reject ที่ EMA200' ตาม Setup101 ข้อ 10"""
+    tol = float(cfg.get("ema200_tol_pct", 0.12))
+    lookback = int(cfg.get("rejection_lookback", 6))
+    n = len(df)
+    e200 = float(ema200.iloc[-1])
+
+    # นับครั้งที่แท่งแตะโซน EMA200 (low ของแท่ง ใกล้/ต่ำกว่า EMA200 ในเทรนด์ขึ้น)
+    touches = []
+    for k in range(lookback):
+        idx = n - 1 - k
+        if idx < 0:
+            break
+        row = df.iloc[idx]
+        if direction == "CALL":
+            near = float(row["low"]) <= e200 * (1 + tol / 100.0)
+        else:
+            near = float(row["high"]) >= e200 * (1 - tol / 100.0)
+        if near:
+            touches.append(k)
+    if not touches:
+        return 0.0, f"ราคายังไม่แตะโซน EMA200 ({tol:.2f}%) ใน {lookback} แท่ง"
+
+    rfrac, rnote = _rejection_frac(df, direction, min(lookback, 3))
+
+    if len(touches) >= 2 and touches[0] == 0 and touches[1] > 0:
+        return 1.0, f"Double-touch EMA200: แตะ-ดีด-แตะซ้ำ (แท่งที่ {touches[1] + 1}) = Reject ตามนิยาม"
+    if touches[0] == 0:
+        # กำลังแตะอยู่ตอนนี้ → ดู rejection candle
+        if rfrac >= 1.0:
+            return 1.0, f"ราคาแตะ EMA200 ตรงนี้ + {rnote} → Reject"
+        if rfrac >= 0.6:
+            return 0.7, f"ราคาแตะ EMA200 + สัญญาณอ่อน: {rnote}"
+        return 0.5, "กำลังแตะโซน EMA200 (ยังรอ Reject ชัดเจน)"
+    # แตะในอดีต แต่ตอนนี้ดีดออกไปแล้ว
+    return 0.6, f"เคยแตะ EMA200 ใน {touches[0] + 1} แท่งก่อน (ดีดกลับแล้ว)"
+
+
+# ── คะแนนตามเทรนเดียว (Trend-Aligned) ───────────────────────────────────────
+def _score_trend_setup(df: pd.DataFrame, direction: str, ctx: dict, cfg: dict) -> tuple[float, dict, list[str]]:
+    """ประเมิน checklist ตาม Setup101 โดยผูกกับทิศเทรนใหญ่ (direction) เท่านั้น
+    — ไม่มีการให้คะแนนทิศสวนเทรน"""
     weights: dict = cfg.get("weights", {})
     details: dict[str, dict] = {}
     grip_hits: list[str] = []
@@ -324,91 +371,110 @@ def _score_direction(df: pd.DataFrame, direction: str, ctx: dict, cfg: dict) -> 
 
     close = ctx["close"]
     last_close = close.iloc[-1]
-
-    # 1) โครงสร้างเทรน (ZigZag) — HH/HL ตามทิศ CALL / LH/LL ตามทิศ PUT
-    struct = ctx["structure"]
-    piv_h, piv_l = ctx["piv_highs"], ctx["piv_lows"]
-    if direction == "CALL":
-        ok = struct in ("UPTREND", "SIDEWAYS") and len(piv_l) >= 2 and piv_l[-1][1] >= piv_l[-2][1]
-        add("structure", 1.0 if ok else 0.0, f"โครงสร้างสวิง: {struct}" + ("" if ok else " (ขัดทิศ CALL)"))
-    else:
-        ok = struct in ("DOWNTREND", "SIDEWAYS") and len(piv_h) >= 2 and piv_h[-1][1] <= piv_h[-2][1]
-        add("structure", 1.0 if ok else 0.0, f"โครงสร้างสวิง: {struct}" + ("" if ok else " (ขัดทิศ PUT)"))
-
-    # 2) ADX — เทรนแข็งแรง
-    adx = ctx["adx"]
-    add("adx", 1.0 if adx >= cfg.get("adx_min", 20) else 0.0, f"ADX={adx:.1f} (>= {cfg.get('adx_min', 20)})")
-
-    # 3) RSI Zone (มี partial ใกล้สุดขั้ว)
+    ema50, ema100, ema200 = ctx["ema50"], ctx["ema100"], ctx["ema200"]
+    e50, e100, e200 = ema50.iloc[-1], ema100.iloc[-1], ema200.iloc[-1]
     rsi = float(ctx["rsi"].iloc[-1])
-    rzone = float(cfg.get("rsi_zone", 30))
-    if direction == "CALL":
-        frac = 1.0 if rsi <= rzone else (0.5 if rsi <= rzone + 10 else 0.0)
-        add("rsi_zone", frac, f"RSI={rsi:.1f} (<= {rzone:.0f})")
-    else:
-        frac = 1.0 if rsi >= 100 - rzone else (0.5 if rsi >= 100 - rzone - 10 else 0.0)
-        add("rsi_zone", frac, f"RSI={rsi:.1f} (>= {100 - rzone:.0f})")
+    piv_h, piv_l = ctx["piv_highs"], ctx["piv_lows"]
 
-    # 4) RSI Divergence/Convergence
+    # 1) เทรนด์ใหญ่ — EMA เรียงตามทิศ
+    if direction == "CALL":
+        align = e50 > e100 > e200
+        ema_note = f"EMA50 {e50:.2f} > EMA100 {e100:.2f} > EMA200 {e200:.2f}" if align else (
+            f"EMA50 {e50:.2f} / EMA100 {e100:.2f} / EMA200 {e200:.2f} — ยังไม่เรียงตามเทรนขึ้น")
+    else:
+        align = e50 < e100 < e200
+        ema_note = f"EMA50 {e50:.2f} < EMA100 {e100:.2f} < EMA200 {e200:.2f}" if align else (
+            f"EMA50 {e50:.2f} / EMA100 {e100:.2f} / EMA200 {e200:.2f} — ยังไม่เรียงตามเทรนลง")
+    add("trend_ema", 1.0 if align else 0.0, ema_note)
+
+    # 2) ADX — เทรนแข็งแรง (Setup101 ข้อ 2)
+    adx = ctx["adx"]
+    adx_min = float(cfg.get("adx_min", 20))
+    adx_frac = 1.0 if adx >= adx_min else (0.5 if adx >= adx_min - 5 else 0.0)
+    add("adx", adx_frac, f"ADX={adx:.1f} (>= {adx_min:.0f})")
+
+    # 3) RSI — อยู่ในโซนที่เหมาะกับ pullback ตามเทรน (Setup101 ข้อ 3)
+    rsi_cfg = cfg.get("rsi", {})
+    if direction == "CALL":
+        # เทรนด์ขึ้น: อยากได้ RSI ย่อลงจาก overbought (มี room ดีดกลับ)
+        rzone_lo = float(rsi_cfg.get("overbought", 70))
+        if rsi < 45:
+            rfrac, rnote = 1.0, f"RSI={rsi:.1f} ย่อลึกในเทรนด์ขึ้น (โอเคสำหรับจุดกลับตัว)"
+        elif rsi < rzone_lo:
+            rfrac, rnote = 0.5, f"RSI={rsi:.1f} อ่อนตัวจาก overbought (ยังมี room)"
+        else:
+            rfrac, rnote = 0.0, f"RSI={rsi:.1f} ยัง overbought (>= {rzone_lo:.0f}) — เสี่ยงที่ราคาจะย่อต่อไป"
+    else:
+        rzone_hi = float(rsi_cfg.get("oversold", 30))
+        if rsi > 55:
+            rfrac, rnote = 1.0, f"RSI={rsi:.1f} ย่อลึกในเทรนด์ลง (โอเคสำหรับจุดกลับตัว)"
+        elif rsi > rzone_hi:
+            rfrac, rnote = 0.5, f"RSI={rsi:.1f} อ่อนตัวจาก oversold (ยังมี room)"
+        else:
+            rfrac, rnote = 0.0, f"RSI={rsi:.1f} ยัง oversold (<= {rzone_hi:.0f}) — เสี่ยงที่จะร่วงต่อ"
+    add("rsi_zone", rfrac, rnote)
+
+    # 4) RSI Divergence/Convergence — เพิ่มความมั่นใจ (Setup101 ข้อ 3)
     dfrac, dnote = _divergence_frac(ctx["rsi"], piv_l, piv_h, direction)
     add("rsi_div", dfrac, dnote)
 
-    # 5) EMA 50/100/200 — เทรน + สัญญาณตัดระยะกลาง
-    ema50, ema100, ema200 = ctx["ema50"], ctx["ema100"], ctx["ema200"]
+    # 5) ราคาเคยทะลุ EMA100 มาแล้ว (ยืนยันเทรนด์จริง) (Setup101 ข้อ 8)
+    look = min(20, len(close))
+    recent_high = float(close.iloc[-look:].max())
+    past_ema100 = float(ema100.iloc[-look:].max())
     if direction == "CALL":
-        align = ema50.iloc[-1] <= ema100.iloc[-1] <= ema200.iloc[-1]      # ราคาอยู่ใต้ EMA = ยืดลงแล้ว
-        crossed = ema50.iloc[-1] > ema100.iloc[-1] and ema50.iloc[-3] <= ema100.iloc[-3]
-        ema_note = (f"EMA50={ema50.iloc[-1]:.2f} ≤ EMA100={ema100.iloc[-1]:.2f} ≤ EMA200={ema200.iloc[-1]:.2f}"
-                    if align else f"EMA50 ตัดขึ้นเหนือ EMA100 แล้ว" if crossed else
-                    f"EMA50={ema50.iloc[-1]:.2f} EMA100={ema100.iloc[-1]:.2f} EMA200={ema200.iloc[-1]:.2f}")
+        crossed = recent_high > past_ema100 * (1 + float(cfg.get("ema100_tol_pct", 0.08)) / 100.0)
+        cross_note = f"ราคาเคยขึ้นเหนือ EMA100 (สูงสุด {recent_high:.2f} > {past_ema100:.2f})" if crossed else \
+            f"ราคายังไม่เคยทะลุ EMA100 ใน {look} แท่ง ({recent_high:.2f})"
     else:
-        align = ema50.iloc[-1] >= ema100.iloc[-1] >= ema200.iloc[-1]
-        crossed = ema50.iloc[-1] < ema100.iloc[-1] and ema50.iloc[-3] >= ema100.iloc[-3]
-        ema_note = (f"EMA50={ema50.iloc[-1]:.2f} ≥ EMA100={ema100.iloc[-1]:.2f} ≥ EMA200={ema200.iloc[-1]:.2f}"
-                    if align else f"EMA50 ตัดลงใต้ EMA100 แล้ว" if crossed else
-                    f"EMA50={ema50.iloc[-1]:.2f} EMA100={ema100.iloc[-1]:.2f} EMA200={ema200.iloc[-1]:.2f}")
-    add("ema", min(1.0, (0.7 if align else 0.0) + (0.5 if crossed else 0.0)), ema_note)
+        crossed = recent_high < past_ema100 * (1 - float(cfg.get("ema100_tol_pct", 0.08)) / 100.0)
+        cross_note = f"ราคาเคยร่วงใต้ EMA100 (ต่ำสุด {recent_high:.2f} < {past_ema100:.2f})" if crossed else \
+            f"ราคายังไม่เคยหลุด EMA100 ใน {look} แท่ง ({recent_high:.2f})"
+    add("ema100", 1.0 if crossed else 0.0, cross_note)
 
-    # 6) BB เต็มรูปแบบ — ตำแหน่งเทียบ mid + ทะลุ band + ขยาย/บีบ
-    bb_mid, bb_up, bb_lo = ctx["bb_mid"], ctx["bb_up"], ctx["bb_lo"]
+    # 6) BB — ขยายตัว (มีวอลุ่ม) ไม่ใช่บีบ (Setup101 ข้อ 5)
     width = ctx["bb_width"]
-    cur_w = width.iloc[-1]
-    avg_w = width.rolling(20).mean().iloc[-1]
-    min_w30 = width.rolling(30).min().iloc[-1]
-    expanding = bool(cur_w > avg_w)
-    recent_squeeze = bool(width.iloc[-6:].min() <= min_w30 * 1.05) if not np.isnan(min_w30) else False
-    if direction == "CALL":
-        side = bool(last_close < bb_mid.iloc[-1])
-        extreme = bool(last_close <= bb_lo.iloc[-1])
-        pos_note = f"ราคา {last_close:.2f} ใต้ mid {bb_mid.iloc[-1]:.2f}" + (" ทะลุ band ล่าง!" if extreme else "")
+    cur_w = float(width.iloc[-1])
+    avg_w = float(width.rolling(20).mean().iloc[-1]) if len(width) >= 20 else cur_w
+    expanding = cur_w > avg_w
+    squeeze = bool(np.isnan(avg_w)) or cur_w <= avg_w * 0.9
+    if expanding and not squeeze:
+        bb_note = f"BB ขยาย (width {cur_w:.2f}% > avg {avg_w:.2f}%) — มีวอลุ่มสนับสนุน"
+        bb_frac = 1.0
+    elif not squeeze:
+        bb_note = f"BB ทรงตัว (width {cur_w:.2f}% vs avg {avg_w:.2f}%)"
+        bb_frac = 0.5
     else:
-        side = bool(last_close > bb_mid.iloc[-1])
-        extreme = bool(last_close >= bb_up.iloc[-1])
-        pos_note = f"ราคา {last_close:.2f} เหนือ mid {bb_mid.iloc[-1]:.2f}" + (" ทะลุ band บน!" if extreme else "")
-    side_frac = 1.0 if extreme else (0.7 if side else 0.0)
-    state_frac = 1.0 if expanding else (0.5 if recent_squeeze else 0.0)
-    bb_note = f"{pos_note} | BB width {cur_w:.2f}% " + ("ขยาย" if expanding else ("กำลังบีบ" if recent_squeeze else "ทรงตัว"))
-    add("bb", side_frac * 0.6 + state_frac * 0.4, bb_note)
+        bb_note = f"BB บีบตัว (width {cur_w:.2f}%) — ยังไม่เหมาะตาม Setup101"
+        bb_frac = 0.0
+    add("bb", bb_frac, bb_note)
 
-    # 7) SMA5 — ระยะยืดเกิน + จุดตัดระยะสั้น
-    sma5 = ctx["sma5"]
-    atr = ctx["atr"]
-    dist_atr = abs(last_close - sma5.iloc[-1]) / atr if atr else 0.0
-    overext = dist_atr >= float(cfg.get("sma5_atr_min", 1.0))
+    # 7) Zigzag — ทำยอดตามทิศเทรน (Setup101 ข้อ 6)
+    struct = ctx["structure"]
     if direction == "CALL":
-        crossed = last_close > sma5.iloc[-1] and close.iloc[-2] <= sma5.iloc[-2]
-        cross_txt = "ตัดขึ้น" if crossed else ""
+        ok = struct == "UPTREND"
+        zz_note = f"Zigzag: {struct} — HH/HL ตามเทรนขึ้น" if ok else f"Zigzag: {struct} — ขัด/ยังไม่ยืนยันเทรนขึ้น"
     else:
-        crossed = last_close < sma5.iloc[-1] and close.iloc[-2] >= sma5.iloc[-2]
-        cross_txt = "ตัดลง" if crossed else ""
-    sma_note = f"ห่าง SMA5 {dist_atr:.2f}x ATR" + (f" + SMA5 {cross_txt}" if crossed else "")
-    add("sma5", min(1.0, (0.5 if overext else 0.0) + (0.5 if crossed else 0.0)), sma_note)
+        ok = struct == "DOWNTREND"
+        zz_note = f"Zigzag: {struct} — LH/LL ตามเทรนลง" if ok else f"Zigzag: {struct} — ขัด/ยังไม่ยืนยันเทรนลง"
+    add("structure", 1.0 if ok else 0.0, zz_note)
 
-    # 8) แนวรับ/แนวต้าน หลัก/ย่อย + grip เสริม
-    sr = cfg.get("sr", {})
-    tol = float(sr.get("tolerance_pct", 0.20))
-    major_tests = int(sr.get("major_tests", 3))
-    minor_tests = int(sr.get("minor_tests", 2))
+    # 8) Pullback — ราคาย่อมาอยู่โซน EMA200 (Setup101 ข้อ 8: อย่างน้อยผ่าน EMA100)
+    tol200 = float(cfg.get("ema200_tol_pct", 0.12))
+    dist200 = abs(last_close - e200) / e200 * 100.0
+    if dist200 <= tol200:
+        pb_frac = 1.0
+        pb_note = f"ราคา {last_close:.2f} แตะโซน EMA200 {e200:.2f} (ห่าง {dist200:.2f}% ≤ {tol200:.2f}%)"
+    elif dist200 <= tol200 * 2.5:
+        pb_frac = 0.6
+        pb_note = f"ราคา {last_close:.2f} ใกล้โซน EMA200 {e200:.2f} (ห่าง {dist200:.2f}%)"
+    else:
+        pb_frac = 0.0
+        pb_note = f"ราคา {last_close:.2f} ยังห่าง EMA200 {e200:.2f} ({dist200:.2f}%) — ยังไม่ถึงจุดย่อ"
+    add("pullback", pb_frac, pb_note)
+
+    # 9) แนวรับ/ต้านสำคัญ + Grip (Setup101 ข้อ 9)
+    tol_sr = float(cfg.get("sr", {}).get("tolerance_pct", 0.20))
     if direction == "CALL":
         near = _nearest_level(last_close, ctx["supports"])
         lvl_word = "แนวรับ"
@@ -417,20 +483,16 @@ def _score_direction(df: pd.DataFrame, direction: str, ctx: dict, cfg: dict) -> 
         lvl_word = "แนวต้าน"
     grip_step = _grip_step(last_close, cfg)
     ng = _near_grip(last_close, grip_step, float(cfg.get("grip", {}).get("tolerance_pct", 0.05)))
-    if near and near["dist_pct"] <= tol:
+    if near and near["dist_pct"] <= tol_sr:
         tests = near["tests"]
-        is_zone = near["span"] > last_close * float(sr.get("zone_pct", 0.35)) / 100.0
+        major_tests = int(cfg.get("sr", {}).get("major_tests", 3))
+        minor_tests = int(cfg.get("sr", {}).get("minor_tests", 2))
         if tests >= major_tests:
-            frac = 1.0
-            lvl_type = "แนวหลัก"
+            frac, lvl_type = 1.0, "แนวหลัก"
         elif tests >= minor_tests:
-            frac = 0.7
-            lvl_type = "แนวย่อย"
+            frac, lvl_type = 0.7, "แนวย่อย"
         else:
-            frac = 0.5
-            lvl_type = "โซนเบา"
-        if is_zone:
-            lvl_type += " (โซน)"
+            frac, lvl_type = 0.5, "โซนเบา"
         if ng and tests >= minor_tests:
             frac = 1.0
             grip_hits.append("Grip")
@@ -440,26 +502,11 @@ def _score_direction(df: pd.DataFrame, direction: str, ctx: dict, cfg: dict) -> 
             grip_hits.append("Grip")
     else:
         frac = 0.0
-        note = f"ไม่ใกล้{lvl_word}สำคัญ (tol {tol:.2f}%)" + (f" | Grip ห่าง" if ng else "")
+        note = f"ไม่ใกล้{lvl_word}สำคัญ (tol {tol_sr:.2f}%)" + (f" | Grip ห่าง" if ng else "")
     add("sr", frac, note)
 
-    # 9) EMA Pullback — ราคากลับมาใกล้ EMA200/100
-    tol_pb = float(cfg.get("ema_pullback_pct", 0.20))
-    d200 = abs(last_close - ema200.iloc[-1]) / ema200.iloc[-1] * 100.0
-    d100 = abs(last_close - ema100.iloc[-1]) / ema100.iloc[-1] * 100.0
-    if d200 <= tol_pb:
-        pb_frac = 1.0
-        pb_txt = "แตะ EMA200"
-    elif d100 <= tol_pb:
-        pb_frac = 0.7
-        pb_txt = "แตะ EMA100"
-    else:
-        pb_frac = 0.0
-        pb_txt = "ยังไม่ถึงโซน EMA"
-    add("pullback", pb_frac, f"ห่าง EMA200 {d200:.2f}% / EMA100 {d100:.2f}% → {pb_txt}")
-
-    # 10) Rejection
-    rfrac, rnote = _rejection_frac(df, direction, int(cfg.get("rejection_lookback", 2)))
+    # 10) Rejection ที่ EMA200 — จุดชี้ขาด (Setup101 ข้อ 10)
+    rfrac, rnote = _ema200_rejection_frac(df, ema200, direction, cfg)
     add("rejection", rfrac, rnote)
 
     return round(score, 2), details, grip_hits
@@ -483,11 +530,10 @@ def score_setup(
                               "note": f"แท่งไม่พอ (ต้องการ >= 60, ได้ {len(df)})", "weight": 0}},
         )
 
-    close, high, low, open_ = df["close"], df["high"], df["low"], df["open"]
+    close, high, low = df["close"], df["high"], df["low"]
     ema50 = _calc_ema(close, 50)
     ema100 = _calc_ema(close, 100) if len(df) >= 100 else _calc_ema(close, len(df))
     ema200 = _calc_ema(close, 200) if len(df) >= 200 else _calc_ema(close, len(df))
-    sma5 = _calc_sma(close, 5)
     rsi = _calc_rsi(close, 14)
     bb_mid, bb_up, bb_lo, bb_width = _calc_bollinger_bands(
         close, cfg.get("bb", {}).get("period", 20), cfg.get("bb", {}).get("std", 2.0))
@@ -506,61 +552,64 @@ def score_setup(
 
     ctx = {
         "close": close, "ema50": ema50, "ema100": ema100, "ema200": ema200,
-        "sma5": sma5, "rsi": rsi, "bb_mid": bb_mid, "bb_up": bb_up, "bb_lo": bb_lo,
+        "rsi": rsi, "bb_mid": bb_mid, "bb_up": bb_up, "bb_lo": bb_lo,
         "bb_width": bb_width, "adx": adx.iloc[-1] if not np.isnan(adx.iloc[-1]) else 0.0,
         "atr": last_atr, "structure": structure,
         "piv_highs": piv_h, "piv_lows": piv_l, "supports": supports, "resistances": resistances,
     }
 
-    # คำนวณคะแนนทั้ง 2 ทิศ → เลือกทิศที่แข็งกว่า
-    call_score, call_details, call_grip = _score_direction(df, "CALL", ctx, cfg)
-    put_score, put_details, put_grip = _score_direction(df, "PUT", ctx, cfg)
-
-    if call_score >= put_score:
-        direction, score, details, grip_hits = "CALL", call_score, call_details, call_grip
-        other = "PUT"
+    # ── กำหนดเทรนด์ใหญ่จาก EMA ก่อน → direction จะผูกกับเทรนเท่านั้น ──
+    e50, e100, e200 = ema50.iloc[-1], ema100.iloc[-1], ema200.iloc[-1]
+    trend_align_up = e50 > e100 > e200
+    trend_align_down = e50 < e100 < e200
+    if trend_align_up:
+        direction, bias = "CALL", "BULLISH_TREND"
+    elif trend_align_down:
+        direction, bias = "PUT", "BEARISH_TREND"
     else:
-        direction, score, details, grip_hits = "PUT", put_score, put_details, put_grip
-        other = "CALL"
+        direction, bias = "", ""
 
+    # ไม่มีเทรนด์ชัดเจน → NONE (ไม่สวนเทรน)
+    if not direction:
+        return SetupResult(
+            timeframe=timeframe,
+            target_hold_minutes=target_hold_minutes,
+            score=0.0, max_score=max_score, tier="NONE",
+            direction="", bias="", entry_trigger=False,
+            entry_trigger_note=(
+                f"EMA ยังไม่เรียงตามเทรน (EMA50 {e50:.2f} / EMA100 {e100:.2f} / EMA200 {e200:.2f}) "
+                f"— รอเทรนชัดเจนก่อน ไม่เทรดสวนเทรน"),
+            details={
+                "trend_ema": {"ok": False, "frac": 0.0, "weight": int(weights.get("trend_ema", 2)),
+                              "note": "EMA ไม่เรียงตามทิศเทรน"},
+            },
+        )
+
+    score, details, grip_hits = _score_trend_setup(df, direction, ctx, cfg)
     score = round(score, 1)
-    bias = ("BULLISH_REVERSION" if direction == "CALL" else
-            "BEARISH_REVERSION" if direction == "PUT" else "")
 
-    # ── Tier ──
-    rsi_now = rsi.iloc[-1]
-    fade_cfg = cfg.get("fade", {})
-    dist_atr_now = abs(close.iloc[-1] - sma5.iloc[-1]) / last_atr
-    rsi_ext = float(fade_cfg.get("rsi_extreme", 25))
-    fade_rsi = (rsi_now <= rsi_ext) if direction == "CALL" else (rsi_now >= 100 - rsi_ext)
-    fade_dist = dist_atr_now >= float(fade_cfg.get("sma5_atr", 1.5))
-    fade_min_score = float(fade_cfg.get("min_score", 4))
-    fade_ok = bool(fade_cfg.get("enabled", True)) and fade_rsi and fade_dist and score >= fade_min_score
+    # ── Tier (Setup101 ข้อ 3: กรณี 1/2/3) ──
+    fire_score = float(cfg.get("fire_score", 12))
+    watch_score = float(cfg.get("watch_score", 9))
+    pullback_ok = details.get("pullback", {}).get("frac", 0.0) >= 0.5
+    reject_frac = details.get("rejection", {}).get("frac", 0.0)
+    trend_ok = details.get("trend_ema", {}).get("ok", False)
 
-    pb_ok = details.get("pullback", {}).get("frac", 0.0) >= 0.5
-    rej_ok = details.get("rejection", {}).get("frac", 0.0) >= 0.5
-    fire_score = float(cfg.get("fire_score", 10))
-    watch_score = float(cfg.get("watch_score", 7))
-
-    if score >= fire_score and pb_ok and rej_ok:
+    if trend_ok and pullback_ok and reject_frac >= 0.7 and score >= fire_score:
         tier = "FIRE"
-    elif fade_ok:
-        tier = "FADE"
-    elif score >= watch_score and pb_ok:
+    elif trend_ok and (pullback_ok or reject_frac >= 0.5) and score >= watch_score:
         tier = "WATCH"
     else:
         tier = "NONE"
 
-    entry_trigger = tier in ("FIRE", "FADE")
+    entry_trigger = tier == "FIRE"
     note_parts = [f"Setup {score:.1f}/{max_score} → {tier}"]
     if tier == "FIRE":
-        note_parts.append(f"ครบเงื่อนไข (≥{fire_score:.0f}) + ราคากลับมาโซน EMA + Rejection → พิจารณาเข้า {direction}")
-    elif tier == "FADE":
-        note_parts.append(f"Fade extreme: RSI {rsi_now:.0f} + ห่าง SMA5 {dist_atr_now:.2f}x ATR → เข้าเร็ว {direction} (ไม่ต้องรอราคากลับ EMA)")
+        note_parts.append(f"เทรน {direction} ชัดเจน + ราคาย่อแตะ EMA200 + Reject เกิด → เข้าตามเทรน {direction}")
     elif tier == "WATCH":
-        note_parts.append(f"ราคากลับมาที่โซน EMA แล้ว ({score:.1f}≥{watch_score:.0f}) — รอ Rejection ยืนยันก่อนเข้า {direction}")
+        note_parts.append(f"เทรน {direction} ชัดเจน + ราคากำลังเข้าใกล้ EMA200 — รอ Reject ยืนยันก่อนเข้า (Setup101 ข้อ 10)")
     else:
-        note_parts.append(f"สกอร์ต่ำกว่าเกณฑ์ / ยังไม่ถึงโซน EMA (ทิศเด่น {direction} {score:.1f}, {other} {max(call_score, put_score) if direction != 'PUT' else put_score:.1f})")
+        note_parts.append(f"สกอร์ {score:.1f} ต่ำกว่าเกณฑ์ / ยังไม่ถึงจุดย่อ EMA200 / ไม่มี Reject (ทิศเทรน {direction})")
 
     score_breakdown = {name: round(d["weight"] * d["frac"], 2)
                        for name, d in details.items()}
@@ -571,8 +620,8 @@ def score_setup(
         score=score,
         max_score=max_score,
         tier=tier,
-        direction=direction if score >= 3 else "",
-        bias=bias if score >= 3 else "",
+        direction=direction,
+        bias=bias,
         entry_trigger=entry_trigger,
         entry_trigger_note=" | ".join(note_parts),
         details=details,
