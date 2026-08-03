@@ -183,32 +183,42 @@
   .dir-put{color:var(--red); font-weight:800;}
   .empty{color:var(--dim); text-align:center; padding:26px; font-size:12px;}
 
-  /* ═══ SETUP CHECKLIST ═══ */
-  .setup-card{background:var(--card); border:1px solid var(--border); border-radius:12px; padding:13px; margin-bottom:10px;}
-  .setup-card.triggered{border-color:var(--green); box-shadow:0 0 18px rgba(34,201,138,.18);}
-  .setup-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
-  .setup-head h4{font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:800;}
-  .setup-score{font-family:var(--num); font-size:20px; font-weight:800;}
-  .setup-score.ok{color:var(--green);} .setup-score.wait{color:var(--yellow);}
-  .setup-meta{display:flex; gap:10px; font-size:11px; color:var(--muted); margin-bottom:10px; flex-wrap:wrap; align-items:center;}
-  .tb{display:inline-block; font-size:9.5px; font-weight:900; padding:3px 9px; border-radius:99px; letter-spacing:.4px;}
-  .tb.ready{background:rgba(34,201,138,.14); color:var(--green);}
-  .tb.wait{background:rgba(116,128,156,.1); color:var(--muted);}
+  /* ═══ SETUP GUIDE (คู่มือช่วยเทรด) ═══ */
+  .guide-card{background:linear-gradient(180deg,var(--panel),var(--card)); border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:12px; position:relative; overflow:hidden;}
+  .guide-card::before{content:''; position:absolute; inset:0 auto 0 0; width:3px;}
+  .guide-card.FIRE::before{background:var(--green); box-shadow:0 0 12px rgba(34,201,138,.6);}
+  .guide-card.WATCH::before{background:var(--cyan);}
+  .guide-card.NONE::before{background:var(--dim);}
+  .guide-head{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px;}
+  .guide-tf{font-size:10px; font-weight:800; letter-spacing:.4px; color:var(--muted); text-transform:uppercase; line-height:1.6;}
+  .guide-tf b{color:var(--text); font-size:11.5px;}
+  .guide-score{font-family:var(--num); font-size:22px; font-weight:800; line-height:1;}
+  .guide-score.ok{color:var(--green);} .guide-score.wait{color:var(--yellow);} .guide-score.none{color:var(--dim);}
+  .guide-action{margin:8px 0 10px; padding:8px 11px; border-radius:9px; font-size:12px; font-weight:800; letter-spacing:.2px; line-height:1.4;}
+  .guide-action.FIRE{background:rgba(34,201,138,.12); color:var(--green); border:1px solid rgba(34,201,138,.4);}
+  .guide-action.WATCH{background:rgba(56,189,248,.1); color:var(--cyan); border:1px solid rgba(56,189,248,.35);}
+  .guide-action.NONE{background:rgba(116,128,156,.08); color:var(--muted); border:1px solid var(--border);}
+  .guide-steps{list-style:none; font-size:11.5px;}
+  .guide-steps li{display:flex; gap:9px; align-items:flex-start; padding:5px 0; border-bottom:1px solid rgba(19,28,48,.7);}
+  .guide-steps li:last-child{border-bottom:none;}
+  .guide-ico{flex-shrink:0; width:19px; height:19px; border-radius:50%; display:grid; place-items:center; font-size:10.5px; font-weight:900; margin-top:1px; line-height:1;}
+  .guide-ico.pass{background:rgba(34,201,138,.16); color:var(--green);}
+  .guide-ico.part{background:rgba(240,185,11,.14); color:var(--yellow);}
+  .guide-ico.fail{background:rgba(246,70,93,.12); color:var(--red);}
+  .guide-steps .gname{font-weight:700; color:var(--text); flex-shrink:0; white-space:nowrap;}
+  .guide-steps .gnote{color:var(--dim); font-size:10.5px; line-height:1.45;}
+  .guide-prog{height:6px; border-radius:4px; background:var(--grid); overflow:hidden; margin:10px 0 12px;}
+  .guide-prog i{display:block; height:100%; border-radius:4px; transition:width .5s;}
+  .guide-prog.FIRE i{background:linear-gradient(90deg,var(--green),var(--cyan));}
+  .guide-prog.WATCH i{background:linear-gradient(90deg,var(--cyan),var(--blue));}
+  .guide-prog.NONE i{background:linear-gradient(90deg,var(--dim),var(--border2));}
+  .guide-note{margin-top:10px; padding:9px 11px; border-radius:9px; background:rgba(12,18,32,.6); border:1px dashed var(--border); font-size:11px; line-height:1.5;}
+  .guide-note.ready{color:var(--green); border-color:rgba(34,201,138,.35);}
+  .guide-note.wait{color:var(--dim);}
   .tier{display:inline-block; font-size:9.5px; font-weight:900; padding:3px 9px; border-radius:99px; letter-spacing:.4px;}
   .tier.FIRE{background:rgba(34,201,138,.16); color:var(--green); border:1px solid rgba(34,201,138,.5);}
-  .tier.FADE{background:rgba(240,185,11,.15); color:var(--yellow); border:1px solid rgba(240,185,11,.5);}
   .tier.WATCH{background:rgba(56,189,248,.13); color:var(--cyan); border:1px solid rgba(56,189,248,.45);}
   .tier.NONE{background:rgba(116,128,156,.1); color:var(--muted); border:1px solid var(--border);}
-  .frac{font-size:10px; color:var(--dim); font-variant-numeric:tabular-nums;}
-  .prog{height:5px; border-radius:3px; background:var(--grid); overflow:hidden; margin-bottom:10px;}
-  .prog i{display:block; height:100%; border-radius:3px; background:linear-gradient(90deg,var(--cyan),var(--green)); transition:width .5s;}
-  .setup-list{list-style:none; font-size:11.5px;}
-  .setup-list li{display:flex; gap:8px; padding:4px 0; border-bottom:1px solid rgba(19,28,48,.7); align-items:baseline;}
-  .setup-list li:last-child{border-bottom:none;}
-  .setup-list .iname{font-weight:700; flex-shrink:0; color:var(--text);}
-  .setup-list .inote{color:var(--dim);}
-  .setup-note{margin-top:9px; padding-top:9px; border-top:1px dashed var(--border); font-size:10.5px; color:var(--dim);}
-  .setup-note.ready{color:var(--green);}
 
   .feed-row{
     display:flex; align-items:center; gap:9px; padding:8px 10px; border-bottom:1px solid rgba(19,28,48,.7);
@@ -254,7 +264,8 @@
     .topbar{gap:6px;}
     .kpi .val{font-size:19px;}
     .chart-wrap{height:240px;}
-    .setup-meta{gap:6px;}
+    .guide-steps .gname{white-space:normal;}
+    .guide-action{font-size:11.5px;}
   }
 </style>
 </head>
@@ -382,7 +393,7 @@
         <h3><span class="ph blue"></span>ประวัติสัญญาณ Rule-Based</h3>
         <div class="tbl-wrap" style="max-height:420px;overflow-y:auto;">
           <table id="setupTable">
-            <thead><tr><th>เวลา</th><th>TF</th><th>ทิศทาง</th><th>Entry</th><th>Exit</th><th>Score</th><th>Tier</th><th>ผล</th></tr></thead>
+            <thead><tr><th>เวลา</th><th>TF</th><th>ทิศทาง</th><th>Entry</th><th>Exit</th><th>Score</th><th>Tier</th><th>ผ่าน</th><th>ผล</th></tr></thead>
             <tbody></tbody>
           </table>
           <div id="setEmpty" class="empty" style="display:none;">ยังไม่มีสัญญาณ — รอ setup_feed.py ทำงาน</div>
@@ -730,46 +741,67 @@ async function refreshSetupTab(){
       <td class="mono">${r.entry_price!=null?r.entry_price.toFixed(2):'–'}</td>
       <td class="mono">${r.exit_price!=null?r.exit_price.toFixed(2):'–'}</td>
       <td class="mono">${r.score!=null?r.score.toFixed(1)+'/'+(r.total||'–'):'–'}</td>
-      <td><span class="tier ${r.tier||'NONE'}">${r.tier||'–'}</span></td>
+      <td><span class="tier ${r.tier||'NONE'}">${TIER_ACTION[r.tier]?r.tier:'–'}</span></td>
+      <td class="mono">${r.details?Object.values(r.details).filter(d=>d.frac!=null?d.frac>=0.999:d.ok).length+'/10':'–'}</td>
       <td><span class="pill ${r.result}">${r.result}</span></td>
     </tr>`).join('');
   }catch(e){}
 }
 
+const SETUP_STEPS=[
+  ['trend_ema','1. เทรนใหญ่ EMA50>100>200'],
+  ['structure','2. โครงสร้าง Zigzag HH/HL'],
+  ['adx','3. ADX > 20 (แรงเทรน)'],
+  ['rsi_zone','4. RSI ย่อในโซนเทรน'],
+  ['rsi_div','5. Divergence / Convergence'],
+  ['bb','6. BB ขยาย (ไม่บีบ)'],
+  ['ema100','7. ราคาเคยทะลุ EMA100'],
+  ['pullback','8. ย่อมาหา EMA200'],
+  ['sr','9. แนวรับ/ต้าน + Grip'],
+  ['rejection','10. Reject ที่ EMA200'],
+];
+const BIAS_TXT={
+  'BULLISH_TREND':'เทรนขึ้น → CALL',
+  'BEARISH_TREND':'เทรนลง → PUT',
+};
+const TIER_ACTION={
+  'FIRE':'พร้อมเข้า — สัญญาณครบ ตามเทรน',
+  'WATCH':'รอ Reject ที่ EMA200 — เกือบครบแล้ว',
+  'NONE':'รอเงื่อนไข — ยังไม่เข้า',
+};
 function renderSetupCard(s){
-  if(!s) return `<div class="setup-card"><div class="setup-head"><h4>Checklist</h4></div><div class="empty" style="padding:10px;">ยังไม่มีข้อมูล — รอ setup_feed.py สะสมแท่ง</div></div>`;
+  if(!s) return `<div class="guide-card NONE"><div class="guide-head"><span class="guide-tf">Setup Guide</span></div><div class="guide-action NONE">ยังไม่มีข้อมูล — รอ setup_feed.py สะสมแท่ง</div></div>`;
   const max=(s.max_score||s.total||15);
-  const items=Object.entries(s.details||{}).map(([name,d])=>{
-    const w=d.weight||1;
+  const details=s.details||{};
+  const known=SETUP_STEPS.map(x=>x[0]);
+  const steps=[];
+  SETUP_STEPS.forEach(([key,label])=>{
+    const d=details[key]; if(!d) return;
     const frac=d.frac!=null?d.frac:(d.ok?1:0);
-    const pct=Math.round(frac*100);
-    return `<li>
-      <span class="mono">${d.ok?'✅':'▫️'}</span>
-      <span class="iname">${name}:</span>
-      <span class="inote">${d.note||''}</span>
-      <span class="frac">${pct}% ×${w}</span>
-    </li>`}).join('');
-  const grip=(s.grip_hits&&s.grip_hits.length)?''+s.grip_hits.join(', '):'';
-  const ready=!!s.entry_trigger;
+    const cls=frac>=0.999?'pass':(frac>0?'part':'fail');
+    const ico=frac>=0.999?'✓':(frac>0?'◐':'✕');
+    steps.push(`<li><span class="guide-ico ${cls}">${ico}</span><span class="gname">${label}</span><span class="gnote">${d.note||''}</span></li>`);
+  });
+  Object.entries(details).forEach(([k,d])=>{
+    if(known.includes(k)) return;
+    const cls=d.ok?'pass':'fail';
+    steps.push(`<li><span class="guide-ico ${cls}">${d.ok?'✓':'✕'}</span><span class="gname">${k}</span><span class="gnote">${d.note||''}</span></li>`);
+  });
   const tier=s.tier||'NONE';
-  const pct=Math.max(2,Math.round((s.score||0)/max*100));
-  const tierLabel=tier==='FIRE'?'พร้อมเข้า':tier==='FADE'?'Fade เร็ว':tier==='WATCH'?'รอ Rejection':'รอเงื่อนไข';
-  return `<div class="setup-card ${ready?'triggered':''}">
-    <div class="setup-head">
-      <h4>Setup Checklist</h4>
-      <span style="display:flex;align-items:center;gap:8px;">
-        <span class="tier ${tier}">${tier}</span>
-        <span class="setup-score ${ready?'ok':'wait'}">${(s.score||0).toFixed(1)}/<span style="font-size:12px;color:var(--muted)">${max}</span></span>
-      </span>
+  const bias=s.bias||'';
+  const biasTxt=BIAS_TXT[bias]||'ไม่มีเทรนชัดเจน';
+  const actionTxt=(TIER_ACTION[tier]||TIER_ACTION.NONE)+(s.direction&&tier==='FIRE'?` ${s.direction}`:'');
+  const scorePct=Math.round((s.score||0)/max*100);
+  const scoreCls=tier==='FIRE'?'ok':(tier==='WATCH'?'wait':'none');
+  return `<div class="guide-card ${tier}">
+    <div class="guide-head">
+      <span class="guide-tf">${s.timeframe||'Setup'} Guide<br><b class="${dirClass(s.direction)}">${biasTxt}</b></span>
+      <span class="guide-score ${scoreCls}">${(s.score||0).toFixed(1)}<span style="font-size:12px;color:var(--muted)">/${max}</span></span>
     </div>
-    <div class="prog"><i style="width:${pct}%"></i></div>
-    <div class="setup-meta">
-      <span>เทรนด์: <b class="${dirClass(s.bias)}">${s.bias||'?'}</b></span>
-      <span class="tb ${ready?'ready':'wait'}">${tierLabel}${s.direction?' '+s.direction:''}</span>
-    </div>
-    <ul class="setup-list">${items}</ul>
-    <div class="setup-note ${ready?'ready':''}">${s.entry_trigger_note||''}</div>
-    ${grip?`<div style="margin-top:6px;font-size:10px;color:var(--yellow);">${grip}</div>`:''}
+    <div class="guide-action ${tier}">${actionTxt}</div>
+    <ul class="guide-steps">${steps.join('')}</ul>
+    <div class="guide-prog ${tier}"><i style="width:${scorePct}%"></i></div>
+    ${s.entry_trigger_note?`<div class="guide-note ${tier==='FIRE'?'ready':'wait'}">${s.entry_trigger_note}</div>`:''}
   </div>`;
 }
 
