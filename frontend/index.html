@@ -98,6 +98,7 @@
   .nav-btn[data-tab=setup] .ndot{background:var(--blue);}
   .nav-btn[data-tab=journal] .ndot{background:var(--purple);}
   .nav-btn[data-tab=overview] .ndot{background:var(--cyan);}
+  .nav-btn[data-tab=pro] .ndot{background:var(--yellow);}
 
   /* ═══ MAIN ═══ */
   .main{flex:1; overflow-y:auto; padding:16px 18px 40px;}
@@ -157,6 +158,20 @@
   }
   .tf-btn:hover{color:var(--text);}
   .tf-btn.active{background:var(--cyan); color:#04121a;}
+  .ind-bar{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin:10px 0 8px;}
+  .ind-chip{
+    background:var(--card); border:1px solid var(--border); color:var(--muted); cursor:pointer;
+    font-size:10.5px; font-weight:800; font-family:inherit; padding:4px 10px; border-radius:20px; transition:.15s;
+  }
+  .ind-chip:hover{color:var(--text); border-color:var(--purple);}
+  .ind-chip.active{background:var(--purple); color:#fff; border-color:var(--purple);}
+  .ind-spacer{flex:1;}
+  .theme-lbl{display:inline-flex; align-items:center; gap:6px; font-size:11px; color:var(--muted); font-weight:700;}
+  .theme-lbl select{
+    background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:8px;
+    padding:4px 8px; font-size:11px; font-weight:700; font-family:inherit; cursor:pointer;
+  }
+  .pro-chart-wrap{height:480px;}
   .chart-legend{display:flex; gap:14px; font-size:10px; color:var(--muted); margin-top:8px; flex-wrap:wrap;}
   .chart-legend i{width:10px;height:2px;display:inline-block;margin-right:4px;vertical-align:middle;border-radius:2px;}
 
@@ -314,6 +329,7 @@
   <button class="nav-btn active" data-tab="overview"><span class="ndot"></span>ภาพรวม</button>
   <button class="nav-btn" data-tab="ml"><span class="ndot"></span>ML สัญญาณ</button>
   <button class="nav-btn" data-tab="setup"><span class="ndot"></span>Rule-Based</button>
+  <button class="nav-btn" data-tab="pro"><span class="ndot"></span>Chart Pro</button>
   <button class="nav-btn" data-tab="journal"><span class="ndot"></span>Journal / P&amp;L</button>
 </div>
 
@@ -374,6 +390,42 @@
         <h3><span class="ph blue"></span>Setup Checklist สด</h3>
         <div id="setupMini"></div>
       </div>
+    </div>
+  </section>
+
+  <!-- ─── CHART PRO ─── -->
+  <section id="tab-pro" style="display:none;">
+    <div class="panel pro-panel">
+      <h3><span class="ph yellow"></span>Chart Pro
+        <span class="chart-tools">
+          <select id="proSymbol" class="sym-select"></select>
+          <span class="tf-group" id="proTfGroup">
+            <button class="tf-btn active" data-tf="1m">1m</button>
+            <button class="tf-btn" data-tf="5m">5m</button>
+            <button class="tf-btn" data-tf="15m">15m</button>
+            <button class="tf-btn" data-tf="30m">30m</button>
+            <button class="tf-btn" data-tf="1h">1h</button>
+            <button class="tf-btn" data-tf="4h">4h</button>
+          </span>
+        </span>
+      </h3>
+      <div class="ind-bar" id="proIndBar">
+        <span class="ind-chip active" data-ind="ema">EMA</span>
+        <span class="ind-chip" data-ind="bb">Bollinger</span>
+        <span class="ind-chip" data-ind="macd">MACD</span>
+        <span class="ind-chip" data-ind="rsi">RSI</span>
+        <span class="ind-chip" data-ind="stoch">Stochastic</span>
+        <span class="ind-chip" data-ind="vol">Volume</span>
+        <span class="ind-spacer"></span>
+        <label class="theme-lbl">สีแท่ง
+          <select id="proTheme">
+            <option value="gr">เขียว/แดง</option>
+            <option value="cy">ฟ้า/ชมพู</option>
+          </select>
+        </label>
+      </div>
+      <div class="chart-wrap pro-chart-wrap"><canvas id="proChart" class="chart"></canvas></div>
+      <div class="chart-legend" id="proLegend"></div>
     </div>
   </section>
 
@@ -566,6 +618,276 @@ function drawCandles(canvas, data){
   ctx.fillText(nd[nd.length-1].t?fmtHM(nd[nd.length-1].t):'',W-padR-70,H-6);
 }
 
+/* ═══════ INDICATORS (Chart Pro) ═══════ */
+function sma(vals, period){
+  const out=new Array(vals.length).fill(null); let sum=0;
+  for(let i=0;i<vals.length;i++){
+    sum+=vals[i];
+    if(i>=period) sum-=vals[i-period];
+    if(i>=period-1) out[i]=sum/period;
+  }
+  return out;
+}
+function stdev(vals, period){
+  const out=new Array(vals.length).fill(null);
+  for(let i=period-1;i<vals.length;i++){
+    const slice=vals.slice(i-period+1,i+1);
+    const mean=slice.reduce((a,b)=>a+b,0)/period;
+    out[i]=Math.sqrt(slice.reduce((a,b)=>a+(b-mean)**2,0)/period);
+  }
+  return out;
+}
+function bollinger(closes, period=20, mult=2){
+  const mid=sma(closes,period), sd=stdev(closes,period);
+  return {
+    mid,
+    up: closes.map((_,i)=>mid[i]==null?null:mid[i]+mult*sd[i]),
+    low: closes.map((_,i)=>mid[i]==null?null:mid[i]-mult*sd[i]),
+  };
+}
+function rsi(closes, period=14){
+  const out=new Array(closes.length).fill(null);
+  let g=0,l=0, seeded=false;
+  for(let i=1;i<closes.length;i++){
+    const ch=closes[i]-closes[i-1];
+    if(i===period+1){
+      let ag=0,al=0;
+      for(let j=1;j<=period;j++){ const d=closes[j]-closes[j-1]; if(d>0)ag+=d; else al-=d; }
+      g=ag/period; l=al/period; seeded=true;
+    } else if(i>period+1){
+      g=(g*(period-1)+Math.max(ch,0))/period;
+      l=(l*(period-1)+Math.max(-ch,0))/period;
+    } else { continue; }
+    out[i]=l===0?100:100-100/(1+g/l);
+  }
+  return out;
+}
+function macd(closes, fast=12, slow=26, sig=9){
+  const ef=ema(closes,fast), es=ema(closes,slow);
+  const line=closes.map((_,i)=>(ef[i]==null||es[i]==null)?null:ef[i]-es[i]);
+  const signal=line.map((_,i)=>(i<slow+sig-2||line[i]==null)?null:null); // ใช้ EMA ของ line ที่ไม่ null
+  // compute EMA on the macd line (skip leading nulls)
+  const valid=line.map((v,i)=>({v,i})).filter(x=>x.v!=null);
+  const sigArr=new Array(line.length).fill(null);
+  if(valid.length){
+    const k=2/(sig+1); let prev=valid[0].v;
+    for(let t=0;t<valid.length;t++){
+      prev=(t===0)?valid[0].v:valid[t].v*k+prev*(1-k);
+      if(t>=sig-1) sigArr[valid[t].i]=prev;
+    }
+  }
+  const hist=line.map((_,i)=>(line[i]==null||sigArr[i]==null)?null:line[i]-sigArr[i]);
+  return {line, signal:sigArr, hist};
+}
+function stochastic(h,l,c,period=14,smoothK=3,smoothD=3){
+  const kRaw=new Array(h.length).fill(null), kSmooth=new Array(h.length).fill(null), d=new Array(h.length).fill(null);
+  for(let i=period-1;i<h.length;i++){
+    let hh=-Infinity,ll=Infinity;
+    for(let j=i-period+1;j<=i;j++){ hh=Math.max(hh,h[j]); ll=Math.min(ll,l[j]); }
+    kRaw[i]=hh===ll?50:(c[i]-ll)/(hh-ll)*100;
+  }
+  for(let i=0;i<kRaw.length;i++){
+    if(kRaw[i]==null){ kSmooth[i]=null; continue; }
+    if(i<smoothK-1){ kSmooth[i]=null; continue; }
+    let s=0,ok=0;
+    for(let j=i-smoothK+1;j<=i;j++){ if(kRaw[j]!=null){s+=kRaw[j];ok++;} }
+    kSmooth[i]=ok? s/ok : null;
+  }
+  for(let i=0;i<kSmooth.length;i++){
+    if(kSmooth[i]==null){ d[i]=null; continue; }
+    if(i<smoothD-1){ d[i]=null; continue; }
+    let s=0,ok=0;
+    for(let j=i-smoothD+1;j<=i;j++){ if(kSmooth[j]!=null){s+=kSmooth[j];ok++;} }
+    d[i]=ok? s/ok : null;
+  }
+  return {k:kSmooth,d};
+}
+
+/* ═══════ CHART PRO (multi-indicator canvas) ═══════ */
+let proInd={ema:true,bb:false,macd:true,rsi:true,stoch:false,vol:true};
+let proTheme='gr';
+
+function proData(){ const sym=document.getElementById('proSymbol')?.value||'frxXAUUSD'; return sym; }
+
+function drawProChart(){
+  const canvas=document.getElementById('proChart'); if(!canvas) return;
+  const tf=document.querySelector('#proTfGroup .tf-btn.active')?.dataset.tf||'1m';
+  fetchJSON('/api/candles?tf='+tf+'&count=300&symbol='+encodeURIComponent(proData()))
+    .then(d=>{ if(d&&d.length) renderPro(canvas,d); })
+    .catch(()=>{});
+}
+
+function renderPro(canvas, data){
+  const dpr=window.devicePixelRatio||1;
+  const rect=canvas.getBoundingClientRect();
+  canvas.width=rect.width*dpr; canvas.height=rect.height*dpr;
+  const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+  const W=rect.width, H=rect.height;
+  ctx.clearRect(0,0,W,H);
+  if(!data||data.length<2){
+    ctx.fillStyle='#4a5775'; ctx.font='13px Segoe UI'; ctx.fillText('รอข้อมูลราคา...',20,H/2); return;
+  }
+  const norm=d=>d.o!=null?{o:d.o,h:d.h,l:d.l,c:d.c,t:d.t,v:d.v||0}:{o:d.open,h:d.high,l:d.low,c:d.close,t:d.ts||d.t,v:d.volume||0};
+  const nd=data.map(norm);
+  const UP=proTheme==='gr'?'#22c98a':'#38e1c4', DN=proTheme==='gr'?'#f6465d':'#ff6faf';
+  const UPf=proTheme==='gr'?'rgba(34,201,138,.9)':'rgba(56,225,196,.9)', DNf=proTheme==='gr'?'rgba(246,70,93,.9)':'rgba(255,111,175,.9)';
+
+  // layout: price 56% + volume 8% + oscillators 36% (แบ่ง RSI/MACD/STOCH ที่เปิด)
+  const osc=[]; if(proInd.rsi) osc.push({k:'rsi',h:86}); if(proInd.macd) osc.push({k:'macd',h:110}); if(proInd.stoch) osc.push({k:'stoch',h:86});
+  const oscH=proInd.vol? 160 : 200;
+  const priceH=H-oschH-30;
+  const padL=8, padT=10, padB=8;
+  let min=Infinity,max=-Infinity;
+  nd.forEach(d=>{min=Math.min(min,d.l);max=Math.max(max,d.h);});
+  const range=(max-min)||1; min-=range*0.06; max+=range*0.06;
+  const dec=(max>1000||min>1000)?1:(max>100?2:(max>1?3:4));
+  ctx.font='9.5px Cascadia Mono,monospace';
+  const labelW=(max.toFixed(dec)).length*6.2+2;
+  const padR=Math.max(50,labelW+14);
+  const n=nd.length, plotW=W-padL-padR, plotH=priceH-padT;
+  const step=plotW/(n-1), bw=Math.max(plotW/n*0.55,1);
+  const px=i=>padL+step*i;
+  const py=v=>padT+(max-v)/(max-min)*plotH;
+  const closes=nd.map(d=>d.c);
+
+  // price grid
+  ctx.strokeStyle='#131c30'; ctx.fillStyle='#4a5775'; ctx.font='9.5px Cascadia Mono,monospace';
+  const GRID=5;
+  for(let i=0;i<=GRID;i++){
+    const y=padT+plotH*i/GRID;
+    ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
+    ctx.textAlign='right'; ctx.fillText((max-(max-min)*i/GRID).toFixed(dec),W-padR+6,y+3);
+  }
+  ctx.textAlign='left';
+
+  // volume (top strip under price)
+  let volTop=priceH;
+  if(proInd.vol){
+    const vh=28, vmax=Math.max(...nd.map(d=>d.v),1);
+    ctx.fillStyle='#0e1526';
+    ctx.fillRect(0,volTop,W,vh);
+    nd.forEach((d,i)=>{
+      const x=px(i), hh=d.v/vmax*(vh-4);
+      ctx.fillStyle=(d.c>=d.o)?'rgba(34,201,138,.25)':'rgba(246,70,93,.25)';
+      ctx.fillRect(x-bw/2,volTop+vh-2-hh,bw,hh);
+    });
+    volTop+=vh;
+  }
+
+  // BB overlay
+  if(proInd.bb){
+    const bb=bollinger(closes,20,2);
+    ctx.strokeStyle='rgba(247,184,71,.7)'; ctx.lineWidth=1;
+    ctx.setLineDash([3,3]);
+    [bb.up,bb.mid,bb.low].forEach(arr=>{ ctx.beginPath(); let st=false;
+      arr.forEach((v,i)=>{ if(v==null)return; if(!st){ctx.moveTo(px(i),py(v));st=true;} else ctx.lineTo(px(i),py(v)); });
+      ctx.stroke(); });
+    ctx.setLineDash([]);
+  }
+
+  // EMA overlays
+  if(proInd.ema){
+    const e9=ema(closes,9), e21=ema(closes,21);
+    [['rgba(56,225,196,.95)',e9],['rgba(167,139,250,.95)',e21]].forEach(([col,arr])=>{
+      ctx.strokeStyle=col; ctx.lineWidth=1.2; ctx.beginPath(); let st=false;
+      arr.forEach((v,i)=>{ if(v==null)return; if(!st){ctx.moveTo(px(i),py(v));st=true;} else ctx.lineTo(px(i),py(v)); });
+      ctx.stroke();
+    });
+  }
+
+  // candles
+  nd.forEach((d,i)=>{
+    const x=px(i), up=d.c>=d.o;
+    ctx.strokeStyle=up?UPf:DNf; ctx.fillStyle=up?UPf:DNf;
+    ctx.beginPath(); ctx.moveTo(x,py(d.h)); ctx.lineTo(x,py(d.l)); ctx.stroke();
+    const yO=py(d.o),yC=py(d.c),top=Math.min(yO,yC),hgt=Math.max(Math.abs(yO-yC),1);
+    ctx.fillRect(x-bw/2,top,bw,hgt);
+  });
+
+  // last price line
+  const lp=nd[n-1].c;
+  const lc=lp>=nd[n-1].o?UP:DN;
+  ctx.strokeStyle=lc; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(padL,py(lp)); ctx.lineTo(W-padR,py(lp)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle=lc; ctx.font='bold 10.5px Cascadia Mono,monospace';
+  ctx.textAlign='right'; ctx.fillText(lp.toFixed(dec),W-padR+6,Math.max(py(lp)-4,12));
+  ctx.textAlign='left';
+
+  // oscillators
+  let oy=volTop+6;
+  if(proInd.rsi){
+    const rv=rsi(closes,14), area=86;
+    oy=drawOsc(ctx,{x0:padL,w:plotW,xw:W-padR,oy,area,px,title:'RSI(14)',vals:rv,dec:0,
+      bands:[[70,'rgba(246,70,93,.25)'],[30,'rgba(34,201,138,.25)']],
+      refs:[70,30],color:'#f7b847'});
+    oy+=area+4;
+  }
+  if(proInd.macd){
+    const mc=macd(closes), area=110;
+    const oy0=oy;
+    ctx.fillStyle='#4a5775'; ctx.font='9.5px Cascadia Mono,monospace'; ctx.textAlign='left';
+    ctx.fillText('MACD(12,26,9)',padL+2,oy0+10);
+    let mmin=Infinity,mmax=-Infinity;
+    closes.forEach((_,i)=>{ ['hist','line','signal'].forEach(k=>{ const v=mc[k][i]; if(v!=null){mmin=Math.min(mmin,v);mmax=Math.max(mmax,v);} }); });
+    const mr=(mmax-mmin)||1; mmin-=mr*0.1; mmax+=mr*0.1;
+    const mpy=v=>oy0+16+(mmax-v)/(mmax-mmin)*(area-22);
+    const mh=Math.max(mr*0.01,1e-9);
+    const zeroY=mpy(0);
+    ctx.strokeStyle='rgba(255,255,255,.15)'; ctx.beginPath(); ctx.moveTo(padL,zeroY); ctx.lineTo(W-padR,zeroY); ctx.stroke();
+    for(let i=0;i<n;i++){
+      const v=mc.hist[i]; if(v==null) continue;
+      const x=px(i), hg=Math.max(Math.abs(mpy(v)-zeroY),1);
+      ctx.fillStyle=v>=0?'rgba(34,201,138,.55)':'rgba(246,70,93,.55)';
+      ctx.fillRect(x-bw/2,Math.min(zeroY,mpy(v)),bw,hg);
+    }
+    [['rgba(255,255,255,.8)',mc.line],['rgba(56,225,196,.9)',mc.signal]].forEach(([col,arr])=>{
+      ctx.strokeStyle=col; ctx.lineWidth=1; ctx.beginPath(); let st=false;
+      arr.forEach((v,i)=>{ if(v==null)return; if(!st){ctx.moveTo(px(i),mpy(v));st=true;} else ctx.lineTo(px(i),mpy(v)); });
+      ctx.stroke();
+    });
+    oy=oy0+area;
+  }
+  if(proInd.stoch){
+    const sk=stochastic(nd.map(d=>d.h),nd.map(d=>d.l),closes,14,3,3), area=86;
+    oy=drawOsc(ctx,{x0:padL,w:plotW,xw:W-padR,oy,area,px,title:'Stoch(14,3,3)',dec:0,
+      vals:sk.k,color:'#38e1c4',second:sk.d,secondColor:'#f7b847',
+      bands:[[80,'rgba(246,70,93,.25)'],[20,'rgba(34,201,138,.25)']],
+      refs:[80,20]});
+    oy+=area+4;
+  }
+
+  // time labels
+  ctx.fillStyle='#4a5775'; ctx.font='9.5px Cascadia Mono,monospace';
+  ctx.fillText(nd[0].t?fmtHM(nd[0].t):'',padL,H-4);
+  ctx.fillText(nd[n-1].t?fmtHM(nd[n-1].t):'',W-padR-70,H-4);
+}
+
+function drawOsc(ctx,{x0,w,xw,oy,area,px,title,vals,dec,color,second,secondColor,bands,refs}){
+  const top=oy+14;
+  ctx.fillStyle='#4a5775'; ctx.font='9.5px Cascadia Mono,monospace'; ctx.textAlign='left';
+  ctx.fillText(title,x0+2,oy+10);
+  let vmin=0,vmax=100;
+  if(!refs){
+    vmin=Infinity;vmax=-Infinity;
+    [vals,second].forEach(arr=>{ arr.forEach(v=>{ if(v!=null){vmin=Math.min(vmin,v);vmax=Math.max(vmax,v);} }); });
+    const r=(vmax-vmin)||1; vmin-=r*0.1; vmax+=r*0.1;
+  }
+  const vy=v=>top+(vmax-v)/(vmax-vmin)*(area-20);
+  (bands||[]).forEach(([level,col])=>{
+    ctx.fillStyle=col; ctx.fillRect(x0,vy(level)-2,w,Math.max(area-20-(area-20)*(0.5),0.5));
+  });
+  (refs||[]).forEach(level=>{
+    ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(x0,vy(level)); ctx.lineTo(xw,vy(level)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle='#4a5775'; ctx.textAlign='right'; ctx.fillText(level, xw+6, vy(level)+3);
+    ctx.textAlign='left';
+  });
+  const line=(arr,col)=>{ ctx.strokeStyle=col; ctx.lineWidth=1.1; ctx.beginPath(); let st=false;
+    arr.forEach((v,i)=>{ if(v==null)return; if(!st){ctx.moveTo(px(i),vy(v));st=true;} else ctx.lineTo(px(i),vy(v)); });
+    ctx.stroke(); };
+  if(second) line(second,secondColor);
+  line(vals,color);
+  return top;
+}
+
 /* ═══════ SVG SEMICIRCLE GAUGE ═══════ */
 function arcPath(cx,cy,r,a0,a1){
   const x0=cx+r*Math.cos(a0),y0=cy+r*Math.sin(a0);
@@ -703,6 +1025,33 @@ document.addEventListener('DOMContentLoaded',()=>{
     document.querySelectorAll('#tfGroup .tf-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     refreshPrice();
+  });
+
+  // ── Chart Pro wiring ──
+  (async()=>{
+    try{
+      const list=await fetchJSON('/api/symbols');
+      const sel=document.getElementById('proSymbol');
+      let cur='frxXAUUSD';
+      try{ const s=await fetchJSON('/api/symbol'); if(s&&s.symbol) cur=s.symbol; }catch(e){}
+      if(sel) sel.innerHTML=list.map(s=>`<option value="${s.symbol}" ${s.symbol===cur?'selected':''}>${s.label}</option>`).join('');
+    }catch(e){}
+  })();
+  document.getElementById('proSymbol')?.addEventListener('change',()=>drawProChart());
+  document.getElementById('proTfGroup')?.addEventListener('click',e=>{
+    const btn=e.target.closest('.tf-btn'); if(!btn) return;
+    document.querySelectorAll('#proTfGroup .tf-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    drawProChart();
+  });
+  document.getElementById('proIndBar')?.addEventListener('click',e=>{
+    const chip=e.target.closest('.ind-chip'); if(!chip) return;
+    chip.classList.toggle('active');
+    proInd[chip.dataset.ind]=chip.classList.contains('active');
+    drawProChart();
+  });
+  document.getElementById('proTheme')?.addEventListener('change',e=>{
+    proTheme=e.target.value; drawProChart();
   });
 });
 
@@ -939,6 +1288,7 @@ async function refreshAll(){
   await Promise.all([
     refreshOverview(),refreshPrice(),refreshGauges(),refreshHeaderSignals(),
     refreshMlTab(),refreshSetupTab(),refreshSetupMini(),refreshJournalTab(),
+    (document.getElementById('tab-pro')?.style.display!=='none')?drawProChart():Promise.resolve(),
   ]);
 }
 
