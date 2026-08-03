@@ -1,0 +1,15 @@
+{
+  "comment": "รายการสินทรัพย์ที่ระบบรองรับ — เครื่องมือดูกราฟ (Chart) เลือกได้ ระบบเทรดอัตโนมัติ (Rule-Based/ML) ยังเทรด DERIV_SYMBOL ใน .env เป็นหลัก",
+  "symbols": [
+    { "symbol": "frxXAUUSD", "label": "XAUUSD · ทองคำ", "kind": "metal" },
+    { "symbol": "frxXAGUSD", "label": "XAGUSD · เงิน", "kind": "metal" },
+    { "symbol": "frxEURUSD", "label": "EURUSD", "kind": "forex" },
+    { "symbol": "frxGBPUSD", "label": "GBPUSD", "kind": "forex" },
+    { "symbol": "frxUSDJPY", "label": "USDJPY", "kind": "forex" },
+    { "symbol": "frxAUDUSD", "label": "AUDUSD", "kind": "forex" },
+    { "symbol": "frxUSDCAD", "label": "USDCAD", "kind": "forex" },
+    { "symbol": "frxUSDCHF", "label": "USDCHF", "kind": "forex" },
+    { "symbol": "frxNZDUSD", "label": "NZDUSD", "kind": "forex" },
+    { "symbol": "R_100", "label": "R_100 · Volatility 100", "kind": "synthetic" }
+  ]
+}

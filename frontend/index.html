@@ -144,6 +144,19 @@
   /* chart */
   .chart-wrap{position:relative; height:330px;}
   canvas.chart{width:100%; height:100%; display:block;}
+  .chart-tools{display:inline-flex; align-items:center; gap:8px; margin-left:auto; margin-top:2px;}
+  .sym-select{
+    background:var(--card); color:var(--text); border:1px solid var(--border);
+    border-radius:8px; padding:4px 8px; font-size:11px; font-weight:700; font-family:inherit; cursor:pointer;
+  }
+  .sym-select:focus{outline:none; border-color:var(--cyan);}
+  .tf-group{display:inline-flex; gap:2px; background:var(--card); border:1px solid var(--border); border-radius:8px; padding:2px;}
+  .tf-btn{
+    background:transparent; border:none; color:var(--muted); cursor:pointer;
+    font-size:10.5px; font-weight:800; font-family:inherit; padding:3px 8px; border-radius:6px;
+  }
+  .tf-btn:hover{color:var(--text);}
+  .tf-btn.active{background:var(--cyan); color:#04121a;}
   .chart-legend{display:flex; gap:14px; font-size:10px; color:var(--muted); margin-top:8px; flex-wrap:wrap;}
   .chart-legend i{width:10px;height:2px;display:inline-block;margin-right:4px;vertical-align:middle;border-radius:2px;}
 
@@ -321,7 +334,19 @@
 
     <div class="cols l2">
       <div class="panel">
-        <h3><span class="ph cyan"></span>กราฟราคา — Candlestick 1 นาที</h3>
+        <h3><span class="ph cyan"></span>กราฟราคา — Candlestick
+          <span class="chart-tools">
+            <select id="chartSymbol" class="sym-select"></select>
+            <span class="tf-group" id="tfGroup">
+              <button class="tf-btn active" data-tf="1m">1m</button>
+              <button class="tf-btn" data-tf="5m">5m</button>
+              <button class="tf-btn" data-tf="15m">15m</button>
+              <button class="tf-btn" data-tf="30m">30m</button>
+              <button class="tf-btn" data-tf="1h">1h</button>
+              <button class="tf-btn" data-tf="4h">4h</button>
+            </span>
+          </span>
+        </h3>
         <div class="chart-wrap"><canvas id="candleChart" class="chart"></canvas></div>
         <div class="chart-legend">
           <span><i style="background:var(--cyan);"></i>EMA20</span>
@@ -473,18 +498,21 @@ function drawCandles(canvas, data){
   if(!data||data.length<2){
     ctx.fillStyle='#4a5775'; ctx.font='13px Segoe UI'; ctx.fillText('รอข้อมูลราคา...',20,H/2); return;
   }
+  // normalise: รองรับทั้ง /api/prices (open/high/low/close/ts) และ /api/candles (o/h/l/c/t)
+  const norm=d=>d.o!=null?{o:d.o,h:d.h,l:d.l,c:d.c,t:d.t}:{o:d.open,h:d.high,l:d.low,c:d.close,t:d.ts||d.t};
+  const nd=data.map(norm);
   const padL=8,padT=10,padB=24;
   const volH=Math.floor(H*0.14), priceBottom=H-padB-volH;
   let min=Infinity,max=-Infinity;
-  data.forEach(d=>{min=Math.min(min,d.low);max=Math.max(max,d.high);});
+  nd.forEach(d=>{min=Math.min(min,d.l);max=Math.max(max,d.h);});
   const range=(max-min)||1; min-=range*0.06; max+=range*0.06;
-  // จำนวนทศนิยมตามขนาดราคา (XAUUSD ~4000 → 2 จุด, R_100 ~600 → 2 จุด)
-  const dec = (max>1000||min>1000)?1:2;
+  // จำนวนทศนิยมตามขนาดราคา (XAUUSD ~4000 → 1 จุด, R_100 ~600 → 2 จุด, EURUSD ~1.1 → 4 จุด)
+  const dec = (max>1000||min>1000)?1:(max>100?2:(max>1?3:4));
   // กันตัวเลขแกนขวาล้น/ชนแท่ง: padR = ความกว้างตัวเลขราคา + ระยะ
   ctx.font='9.5px Cascadia Mono,monospace';
   const labelW=(max.toFixed(dec)).length*6.2+2;
   const padR=Math.max(50,labelW+14);
-  const n=data.length, plotW=W-padL-padR, plotH=priceBottom-padT;
+  const n=nd.length, plotW=W-padL-padR, plotH=priceBottom-padT;
   const step=plotW/(n-1), bw=Math.max(plotW/n*0.55,1);
 
   // grid + price labels (right axis)
@@ -499,7 +527,7 @@ function drawCandles(canvas, data){
   ctx.textAlign='left';
 
   // EMA lines
-  const closes=data.map(d=>d.close);
+  const closes=nd.map(d=>d.c);
   const e20=ema(closes,20), e50=ema(closes,50);
   const py=v=>padT+(max-v)/(max-min)*plotH;
   const px=i=>padL+step*i;
@@ -509,33 +537,33 @@ function drawCandles(canvas, data){
   drawLine(e20,'rgba(56,225,196,.9)'); drawLine(e50,'rgba(167,139,250,.9)');
 
   // volume bars
-  const vmax=Math.max(...data.map(d=>Math.max(d.volume||0,0)),1);
-  data.forEach((d,i)=>{
-    const x=px(i); const v=d.volume||0;
+  const vmax=Math.max(...nd.map(d=>Math.max(d.v||0,0)),1);
+  nd.forEach((d,i)=>{
+    const x=px(i); const v=d.v||0;
     const hh=v/vmax*volH;
-    ctx.fillStyle=(d.close>=d.open)?'rgba(34,201,138,.22)':'rgba(246,70,93,.22)';
+    ctx.fillStyle=(d.c>=d.o)?'rgba(34,201,138,.22)':'rgba(246,70,93,.22)';
     ctx.fillRect(x-bw/2,priceBottom+volH-hh,bw,hh);
   });
 
   // candles
-  data.forEach((d,i)=>{
-    const x=px(i), up=d.close>=d.open;
+  nd.forEach((d,i)=>{
+    const x=px(i), up=d.c>=d.o;
     ctx.strokeStyle=up?'#22c98a':'#f6465d'; ctx.fillStyle=up?'#22c98a':'#f6465d';
-    ctx.beginPath(); ctx.moveTo(x,py(d.high)); ctx.lineTo(x,py(d.low)); ctx.stroke();
-    const yO=py(d.open),yC=py(d.close),top=Math.min(yO,yC),hgt=Math.max(Math.abs(yO-yC),1);
+    ctx.beginPath(); ctx.moveTo(x,py(d.h)); ctx.lineTo(x,py(d.l)); ctx.stroke();
+    const yO=py(d.o),yC=py(d.c),top=Math.min(yO,yC),hgt=Math.max(Math.abs(yO-yC),1);
     ctx.fillRect(x-bw/2,top,bw,hgt);
   });
 
   // last price line + tag
-  const lp=data[data.length-1].close;
-  const lc=lp>=data[data.length-1].open?'#22c98a':'#f6465d';
+  const lp=nd[nd.length-1].c;
+  const lc=lp>=nd[nd.length-1].o?'#22c98a':'#f6465d';
   ctx.strokeStyle=lc; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(padL,py(lp)); ctx.lineTo(W-padR,py(lp)); ctx.stroke(); ctx.setLineDash([]);
   ctx.fillStyle=lc; ctx.font='bold 10.5px Cascadia Mono,monospace';
   ctx.textAlign='right'; ctx.fillText(lp.toFixed(dec),W-padR+6,Math.max(py(lp)-4,12));
   ctx.textAlign='left';
   ctx.fillStyle='#4a5775';
-  ctx.fillText(data[0].t?fmtHM(data[0].t):'',padL,H-6);
-  ctx.fillText(data[data.length-1].t?fmtHM(data[data.length-1].t):'',W-padR-70,H-6);
+  ctx.fillText(nd[0].t?fmtHM(nd[0].t):'',padL,H-6);
+  ctx.fillText(nd[nd.length-1].t?fmtHM(nd[nd.length-1].t):'',W-padR-70,H-6);
 }
 
 /* ═══════ SVG SEMICIRCLE GAUGE ═══════ */
@@ -633,23 +661,50 @@ function drawEquity(points){
 
 async function refreshPrice(){
   try{
-    let sym='frxXAUUSD';
-    try{ const s=await fetchJSON('/api/symbol'); if(s&&s.symbol){sym=s.symbol; document.getElementById('symbolBadge').textContent=s.symbol;} }catch(e){}
-    const prices=await fetchJSON('/api/prices?limit=240&symbol='+encodeURIComponent(sym));
+    const tf=document.querySelector('#tfGroup .tf-btn.active')?.dataset.tf||'1m';
+    let sym='';
+    const symSel=document.getElementById('chartSymbol');
+    if(symSel&&symSel.value) sym=symSel.value;
+    if(!sym){ try{ const s=await fetchJSON('/api/symbol'); if(s&&s.symbol){sym=s.symbol;}}catch(e){} }
+    if(!sym) sym='frxXAUUSD';
+    const badge=document.getElementById('symbolBadge'); if(badge) badge.textContent=sym;
+    const prices=await fetchJSON('/api/candles?tf='+tf+'&count=300&symbol='+encodeURIComponent(sym));
     if(!prices||!prices.length) return;
     const el=document.getElementById('candleChart');
     drawCandles(el,prices);
     const last=prices[prices.length-1], prev=prices[prices.length-2];
-    const chg=prev?last.close-prev.close:0;
-    const chgPct=prev?chg/prev.close*100:0;
+    const chg=prev?last.c-prev.c:0;
+    const chgPct=prev?chg/prev.c*100:0;
     const pe=document.getElementById('tickerPrice');
-    pe.textContent=last.close.toFixed(2);
+    pe.textContent=last.c.toFixed(2);
     pe.className='price '+(chg>=0?'up':'down');
     const ce=document.getElementById('tickerChg');
     ce.textContent=`${chg>=0?'+':''}${chg.toFixed(2)} (${chgPct>=0?'+':''}${chgPct.toFixed(2)}%)`;
     ce.className='chg '+(chg>=0?'up':'down');
   }catch(e){}
 }
+
+async function loadSymbols(){
+  try{
+    const list=await fetchJSON('/api/symbols');
+    const sel=document.getElementById('chartSymbol');
+    if(!sel) return;
+    let cur='frxXAUUSD';
+    try{ const s=await fetchJSON('/api/symbol'); if(s&&s.symbol) cur=s.symbol; }catch(e){}
+    sel.innerHTML=list.map(s=>`<option value="${s.symbol}" ${s.symbol===cur?'selected':''}>${s.label}</option>`).join('');
+    sel.addEventListener('change',()=>refreshPrice());
+  }catch(e){}
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  loadSymbols();
+  document.getElementById('tfGroup')?.addEventListener('click',e=>{
+    const btn=e.target.closest('.tf-btn'); if(!btn) return;
+    document.querySelectorAll('#tfGroup .tf-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    refreshPrice();
+  });
+});
 
 async function refreshGauges(){
   try{

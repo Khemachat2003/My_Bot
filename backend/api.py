@@ -25,6 +25,8 @@ import secrets
 import time
 from pathlib import Path
 
+import pandas as pd
+
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
@@ -38,6 +40,69 @@ from backend.market_hours import choose_symbol, symbol_label
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = ROOT_DIR / "frontend"
+
+# ── TF → Deriv granularity (วินาที) ─────────────────────────────────────────
+TF_GRANULARITY = {
+    "1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400,
+}
+_CANDLE_CACHE: dict = {}        # (symbol, tf) -> (fetch_ts, rows)
+_CANDLE_CACHE_TTL = 30          # กันยิง Deriv API ถี่เกินเมื่อสลับ TF
+
+
+def _fetch_candles(symbol: str, tf: str, count: int) -> list[dict]:
+    """ดึงแท่งเทียน history ตาม TF — cache 30 วิ + fallback resample จาก DB"""
+    key = (symbol, tf)
+    now = time.time()
+    cached = _CANDLE_CACHE.get(key)
+    if cached and now - cached[0] < _CANDLE_CACHE_TTL:
+        return cached[1]
+
+    rows: list[dict] = []
+    try:
+        from backend.data_feed.deriv_feed import fetch_candles_history
+        gran = TF_GRANULARITY[tf]
+        df = fetch_candles_history(symbol=symbol, granularity=gran, count=count)
+        if df is not None and len(df):
+            rows = [{
+                "t": pd.Timestamp(ts).isoformat(),
+                "o": float(r["open"]), "h": float(r["high"]),
+                "l": float(r["low"]), "c": float(r["close"]),
+                "v": float(r.get("volume", 0) or 0),
+            } for ts, r in df.iterrows()]
+    except Exception:
+        pass
+
+    if not rows:
+        # fallback: resample 1m ที่สะสมใน DB ตาม TF
+        minute = TF_GRANULARITY.get(tf, 60) // 60
+        prices = db.fetch_recent_prices(limit=1000, symbol=symbol)
+        if prices:
+            rows = _resample_from_prices(prices, minute)
+
+    _CANDLE_CACHE[key] = (now, rows)
+    return rows
+
+
+def _resample_from_prices(prices: list[dict], minutes: int) -> list[dict]:
+    """resample รายการราคา 1m → แท่งตาม TF (ใช้ fallback เมื่อ Deriv ดึงไม่ได้)"""
+    import pandas as pd
+    if not prices:
+        return []
+    df = pd.DataFrame(prices)
+    df["ts"] = pd.to_datetime(df["ts"])
+    df = df.set_index("ts")[["open", "high", "low", "close"]].sort_index()
+    rule = f"{minutes}min"
+    o = df["open"].resample(rule, closed="left", label="left", origin="epoch").first()
+    h = df["high"].resample(rule, closed="left", label="left", origin="epoch").max()
+    l = df["low"].resample(rule, closed="left", label="left", origin="epoch").min()
+    c = df["close"].resample(rule, closed="left", label="left", origin="epoch").last()
+    out = pd.concat([o, h, l, c], axis=1).dropna()
+    return [{
+        "t": pd.Timestamp(ts).isoformat(),
+        "o": float(r["open"]), "h": float(r["high"]),
+        "l": float(r["low"]), "c": float(r["close"]), "v": 0,
+    } for ts, r in out.iterrows()]
+
 
 load_dotenv(ROOT_DIR / ".env")
 DASHBOARD_USER = os.getenv("DASHBOARD_USER")
@@ -224,6 +289,33 @@ def get_symbol(_auth=Depends(require_auth)):
     """สัญลักษณ์ที่ระบบกำลังใช้อยู่จริง (สลับ R_100 อัตโนมัติเมื่อตลาดทองปิด)"""
     sym = choose_symbol()
     return {"symbol": sym, "label": symbol_label(sym)}
+
+
+_SYMBOLS_CACHE = {"ts": 0.0, "data": None}
+
+
+@app.get("/api/symbols")
+def get_symbols(_auth=Depends(require_auth)):
+    """รายการสินทรัพย์ที่รองรับ (forex major + ทอง/เงิน + synthetic) สำหรับ dropdown กราฟ"""
+    if _SYMBOLS_CACHE["data"] and time.time() - _SYMBOLS_CACHE["ts"] < 60:
+        return _SYMBOLS_CACHE["data"]
+    try:
+        data = json.loads((ROOT_DIR / "backend" / "symbols.json").read_text(encoding="utf-8"))
+        lst = data.get("symbols", [])
+    except Exception:
+        lst = []
+    _SYMBOLS_CACHE.update(ts=time.time(), data=lst)
+    return lst
+
+
+@app.get("/api/candles")
+def get_candles(tf: str = Query("1m", pattern="^(1m|5m|15m|30m|1h|4h)$"),
+                count: int = Query(300, ge=10, le=1000),
+                symbol: str = Query("", description="เช่น frxXAUUSD / R_100 / frxEURUSD"),
+                _auth=Depends(require_auth)):
+    """แท่งเทียน history ตาม TF สำหรับกราฟ (1m/5m/15m/30m/1h/4h) — cache 30 วิ"""
+    sym = symbol or db.DEFAULT_SYMBOL
+    return _fetch_candles(sym, tf, count)
 
 
 @app.get("/api/prices")
