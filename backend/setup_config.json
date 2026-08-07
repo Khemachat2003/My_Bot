@@ -1,14 +1,34 @@
 {
-  "comment": "ตั้งค่า Rule-Based Checklist V3 — Trend-Aligned EMA200 Rejection ตาม Setup101.txt (เทรดตามเทรนใหญ่ ไม่สวนเทรน)",
-  "max_score": 15,
-  "fire_score": 12,
-  "watch_score": 9,
-  "cooldown_minutes": 30,
-  "daily_cap": 0,
+  "comment": "Rule-Based Checklist V4 — Trend-Aligned EMA200 Rejection ตาม Setup101.txt (เทรดตามเทรนใหญ่ ไม่สวนเทรน / Hard-gate: ราคาต้องแตะ-ใกล้ EMA200, ไม่ sideway, โครงสร้าง Zigzag HH/HL, BB ไม่บีบ, อยู่ในโซน S/R, Reject ต้อง double-touch เท่านั้น)",
+  "max_score": 18,
+  "fire_score": 13,
+  "watch_score": 10,
+  "cooldown_minutes": 45,
+  "daily_cap": 6,
   "adx_min": 20,
-  "ema200_tol_pct": 0.12,
+  "ema200_tol_pct": 0.15,
+  "ema200_near_tol_pct": 0.35,
   "ema100_tol_pct": 0.08,
-  "rejection_lookback": 6,
+  "rejection_lookback": 10,
+  "zigzag": {
+    "mode": "atr",
+    "atr_period": 14,
+    "atr_multiplier": 2.0,
+    "depth": 10,
+    "backstep": 3
+  },
+  "sma5": {
+    "period": 5,
+    "distance_pct": 0.30,
+    "weight": 1
+  },
+  "hard_gates": {
+    "ema200_touch": true,
+    "no_sideway": true,
+    "structure": true,
+    "bb": true,
+    "sr": true
+  },
   "rsi": {
     "overbought": 70,
     "oversold": 30
@@ -36,6 +56,7 @@
     "structure": 1,
     "pullback": 3,
     "sr": 1,
-    "rejection": 3
+    "rejection": 3,
+    "sma5": 1
   }
 }

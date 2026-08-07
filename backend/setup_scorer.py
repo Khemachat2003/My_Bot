@@ -124,18 +124,41 @@ def _calc_adx(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 1
     return dx.ewm(alpha=1 / period, adjust=False).mean()
 
 
-# ── Swing Pivot (Fractal) ─────────────────────────────────────────────────────
-def _find_pivots(high: pd.Series, low: pd.Series, left: int = 2, right: int = 2):
+# ── Zigzag Swing Detection (depth=10, backstep=3, deviation=ATR-based) ───────
+def _find_pivots(high: pd.Series, low: pd.Series, deviation_abs: float = 1.0,
+                 depth: int = 10, backstep: int = 3):
+    """Zigzag แบบ classic (สลับ high/low ตามลำดับ)
+    deviation_abs คือระยะขั้นต่ำ (เป็นหน่วยราคา เช่น 2x ATR) ที่ราคาต้องเดิน
+    ไปทิศตรงข้ามจาก pivot ก่อน จึงจะปัก pivot ใหม่"""
     n = len(high)
-    piv_highs: list[tuple[int, float]] = []
-    piv_lows: list[tuple[int, float]] = []
-    for i in range(left, n - right):
-        window_h = high.iloc[i - left: i + right + 1]
-        if high.iloc[i] == window_h.max() and window_h.max() > window_h.min():
-            piv_highs.append((i, float(high.iloc[i])))
-        window_l = low.iloc[i - left: i + right + 1]
-        if low.iloc[i] == window_l.min() and window_l.max() > window_l.min():
-            piv_lows.append((i, float(low.iloc[i])))
+    pivots: list[tuple[int, float, str]] = []  # (idx, price, 'h'|'l')
+    last_price = float('nan')
+    last_idx = -1
+    last_type = ""
+
+    for i in range(n):
+        h = float(high.iloc[i])
+        l = float(low.iloc[i])
+        if last_type == "":
+            last_price, last_idx, last_type = l, i, "l"
+            continue
+
+        if last_type == "l":
+            if l <= last_price:
+                last_price, last_idx = l, i
+            elif h >= last_price + deviation_abs:
+                pivots.append((last_idx, last_price, "l"))
+                last_price, last_idx, last_type = h, i, "h"
+        else:  # last_type == "h"
+            if h >= last_price:
+                last_price, last_idx = h, i
+            elif l <= last_price - deviation_abs:
+                pivots.append((last_idx, last_price, "h"))
+                last_price, last_idx, last_type = l, i, "l"
+
+    # แยกเป็น piv_highs / piv_lows ตามลำดับเวลา
+    piv_highs = [(i, p) for i, p, t in pivots if t == "h"]
+    piv_lows = [(i, p) for i, p, t in pivots if t == "l"]
     return piv_highs, piv_lows
 
 
@@ -186,7 +209,17 @@ def _cluster_levels(prices: list[float], tol_pct: float) -> list[dict]:
 def _find_levels(df: pd.DataFrame, cfg: dict, lookback: int = 200) -> tuple[list[dict], list[dict]]:
     sl = min(lookback, len(df))
     seg = df.iloc[-sl:]
-    piv_h, piv_l = _find_pivots(seg["high"], seg["low"], left=2, right=2)
+    # S/R ใช้ fractal ละเอียด (left/right=2) เพื่อเก็บแนวรับ/ต้านจำนวนมาก
+    n = len(seg)
+    piv_h = []
+    piv_l = []
+    for i in range(2, n - 2):
+        wh = seg["high"].iloc[i - 2: i + 3]
+        if seg["high"].iloc[i] == wh.max() and wh.max() > wh.min():
+            piv_h.append((i, float(seg["high"].iloc[i])))
+        wl = seg["low"].iloc[i - 2: i + 3]
+        if seg["low"].iloc[i] == wl.min() and wl.max() > wl.min():
+            piv_l.append((i, float(seg["low"].iloc[i])))
     tol = cfg.get("sr", {}).get("tolerance_pct", 0.20)
     supports = _cluster_levels([p for _, p in piv_l], tol)
     resistances = _cluster_levels([p for _, p in piv_h], tol)
@@ -312,12 +345,13 @@ def _rejection_frac(df: pd.DataFrame, direction: str, lookback: int = 3) -> tupl
     return 0.0, f"ยังไม่เห็น Rejection ชัดเจนใน {lookback} แท่งย้อนหลัง"
 
 
-# ── Rejection ที่ EMA200 (ตามนิยาม Setup101: แตะ→ดีด→แตะซ้ำ) ────────────────
+# ── Rejection ที่ EMA200 (ตามนิยาม Setup101: แตะ→ดีด→แตะซ้ำ เท่านั้น) ────────
 def _ema200_rejection_frac(df: pd.DataFrame, ema200: pd.Series, direction: str, cfg: dict) -> tuple[float, str]:
-    """ราคาแตะ EMA200 แล้วถูกดีดกลับ (wick / engulfing) หรือ แตะ-ดีด-แตะซ้ำ
-    → ถือว่า 'Reject ที่ EMA200' ตาม Setup101 ข้อ 10"""
-    tol = float(cfg.get("ema200_tol_pct", 0.12))
-    lookback = int(cfg.get("rejection_lookback", 6))
+    """Reject ตาม Setup101 ข้อ 10 เฉพาะนิยามเดียว:
+    ราคาแตะ EMA200 → ถูกดีดกลับ → กลับมาแตะซ้ำ (Double-touch) = ผ่านเท่านั้น
+    ไม่มี double-touch = ไม่ผ่าน (ตัดกรณี 'แค่เคยแตะแล้วดีดออก' ออก)"""
+    tol = float(cfg.get("ema200_tol_pct", 0.15))
+    lookback = int(cfg.get("rejection_lookback", 10))
     n = len(df)
     e200 = float(ema200.iloc[-1])
 
@@ -337,19 +371,12 @@ def _ema200_rejection_frac(df: pd.DataFrame, ema200: pd.Series, direction: str, 
     if not touches:
         return 0.0, f"ราคายังไม่แตะโซน EMA200 ({tol:.2f}%) ใน {lookback} แท่ง"
 
-    rfrac, rnote = _rejection_frac(df, direction, min(lookback, 3))
-
+    # นิยามเดียวที่ผ่าน: แท่งล่าสุดกำลังแตะ + เคยแตะมาก่อน (แตะ→ดีด→แตะซ้ำ)
     if len(touches) >= 2 and touches[0] == 0 and touches[1] > 0:
-        return 1.0, f"Double-touch EMA200: แตะ-ดีด-แตะซ้ำ (แท่งที่ {touches[1] + 1}) = Reject ตามนิยาม"
+        return 1.0, f"Double-touch EMA200: แตะ-ดีด-แตะซ้ำ (แท่งก่อน {touches[1] + 1}) = Reject ตามนิยาม"
     if touches[0] == 0:
-        # กำลังแตะอยู่ตอนนี้ → ดู rejection candle
-        if rfrac >= 1.0:
-            return 1.0, f"ราคาแตะ EMA200 ตรงนี้ + {rnote} → Reject"
-        if rfrac >= 0.6:
-            return 0.7, f"ราคาแตะ EMA200 + สัญญาณอ่อน: {rnote}"
-        return 0.5, "กำลังแตะโซน EMA200 (ยังรอ Reject ชัดเจน)"
-    # แตะในอดีต แต่ตอนนี้ดีดออกไปแล้ว
-    return 0.6, f"เคยแตะ EMA200 ใน {touches[0] + 1} แท่งก่อน (ดีดกลับแล้ว)"
+        return 0.0, "กำลังแตะ EMA200 แต่ยังไม่ครบรูปแบบ แตะ→ดีด→แตะซ้ำ (รอ double-touch)"
+    return 0.0, f"เคยแตะ EMA200 ใน {touches[0] + 1} แท่งก่อน แต่ตอนนี้ดีดออกไปแล้ว — ไม่ใช่ double-touch ตามนิยาม"
 
 
 # ── คะแนนตามเทรนเดียว (Trend-Aligned) ───────────────────────────────────────
@@ -509,6 +536,29 @@ def _score_trend_setup(df: pd.DataFrame, direction: str, ctx: dict, cfg: dict) -
     rfrac, rnote = _ema200_rejection_frac(df, ema200, direction, cfg)
     add("rejection", rfrac, rnote)
 
+    # 11) SMA5 — ราคาไกลจากเส้น = มีแรงหุบกลับหาเส้นค่าเฉลี่ย (Setup101 ข้อ 1.5)
+    sma_cfg = cfg.get("sma5", {})
+    sma5 = _calc_sma(close, int(sma_cfg.get("period", 5)))
+    last_sma5 = float(sma5.iloc[-1])
+    gap_pct = (last_close - last_sma5) / last_sma5 * 100.0
+    sdist = float(sma_cfg.get("distance_pct", 0.30))
+    if direction == "CALL":
+        # จุดกลับตัวขึ้น: ราคาควรย่อต่ำกว่า SMA5 (gap ติดลบ) → จะหุบกลับขึ้น
+        if gap_pct <= -sdist:
+            sma_frac, sma_note = 1.0, f"ราคา {last_close:.2f} ย่อต่ำกว่า SMA5 {last_sma5:.2f} ({gap_pct:.2f}%) — มีแรงดีดกลับ"
+        elif gap_pct < 0:
+            sma_frac, sma_note = 0.5, f"ราคา {last_close:.2f} เริ่มย่อใต้ SMA5 {last_sma5:.2f} ({gap_pct:.2f}%)"
+        else:
+            sma_frac, sma_note = 0.0, f"ราคา {last_close:.2f} อยู่เหนือ SMA5 {last_sma5:.2f} ({gap_pct:.2f}%) — ยังไม่ใช่จุดย่อ"
+    else:
+        if gap_pct >= sdist:
+            sma_frac, sma_note = 1.0, f"ราคา {last_close:.2f} ย่อสูงกว่า SMA5 {last_sma5:.2f} ({gap_pct:.2f}%) — มีแรงกดกลับ"
+        elif gap_pct > 0:
+            sma_frac, sma_note = 0.5, f"ราคา {last_close:.2f} เริ่มดีดเหนือ SMA5 {last_sma5:.2f} ({gap_pct:.2f}%)"
+        else:
+            sma_frac, sma_note = 0.0, f"ราคา {last_close:.2f} อยู่ใต้ SMA5 {last_sma5:.2f} ({gap_pct:.2f}%) — ยังไม่ใช่จุดดีด"
+    add("sma5", sma_frac, sma_note)
+
     return round(score, 2), details, grip_hits
 
 
@@ -542,7 +592,15 @@ def score_setup(
 
     sr_cfg = cfg.get("sr", {})
     lookback_sr = int(sr_cfg.get("lookback", 200))
-    piv_h, piv_l = _find_pivots(high.tail(lookback_sr), low.tail(lookback_sr), left=2, right=2)
+    # Zigzag: ATR-based deviation (mode=atr) → ใช้ 2x ATR เป็นระยะขั้นต่ำ
+    zz_cfg = cfg.get("zigzag", {})
+    zz_dev = float(zz_cfg.get("atr_multiplier", 2.0)) * float(atr.iloc[-1])
+    piv_h, piv_l = _find_pivots(
+        high.tail(lookback_sr), low.tail(lookback_sr),
+        deviation_abs=zz_dev,
+        depth=int(zz_cfg.get("depth", 10)),
+        backstep=int(zz_cfg.get("backstep", 3)),
+    )
     supports, resistances = _find_levels(df, cfg, lookback_sr)
     structure = _zigzag_structure(piv_h, piv_l)
 
@@ -588,16 +646,40 @@ def score_setup(
     score, details, grip_hits = _score_trend_setup(df, direction, ctx, cfg)
     score = round(score, 1)
 
-    # ── Tier (Setup101 ข้อ 3: กรณี 1/2/3) ──
-    fire_score = float(cfg.get("fire_score", 12))
-    watch_score = float(cfg.get("watch_score", 9))
-    pullback_ok = details.get("pullback", {}).get("frac", 0.0) >= 0.5
-    reject_frac = details.get("rejection", {}).get("frac", 0.0)
-    trend_ok = details.get("trend_ema", {}).get("ok", False)
+    # ── Tier (Setup101 ข้อ 3: กรณี 1/2/3) + Hard-gates ──
+    fire_score = float(cfg.get("fire_score", 13))
+    watch_score = float(cfg.get("watch_score", 10))
+    hg = cfg.get("hard_gates", {})
 
-    if trend_ok and pullback_ok and reject_frac >= 0.7 and score >= fire_score:
+    def _ok(name: str, threshold: float = 0.5) -> bool:
+        return details.get(name, {}).get("frac", 0.0) >= threshold
+
+    trend_ok = _ok("trend_ema")
+    pullback_ok = _ok("pullback", 0.5)          # ราคาแตะ/ใกล้ EMA200 (หัวใจของ setup)
+    reject_frac = details.get("rejection", {}).get("frac", 0.0)
+    structure_ok = _ok("structure", 0.99)        # Zigzag HH/HL ตามเทรน
+    bb_ok = _ok("bb", 0.5)                        # ไม่บีบ (ขยาย/ทรงตัว)
+    sr_ok = _ok("sr", 0.5)                        # อยู่ในโซนแนวรับ/ต้าน
+    no_sideway = ctx["structure"] != "SIDEWAYS"   # ราคาไม่ sideway
+
+    # Hard-gates ตาม config (ค่า default: เปิดหมด) — บังคับก่อนได้ tier
+    hg_blocked: list[str] = []
+    if hg.get("ema200_touch", True) and not pullback_ok:
+        hg_blocked.append("ราคายังไม่แตะ/ใกล้โซน EMA200")
+    if hg.get("no_sideway", True) and not no_sideway:
+        hg_blocked.append("ราคากำลัง sideway")
+    if hg.get("structure", True) and not structure_ok:
+        hg_blocked.append("Zigzag ยังไม่ทำ HH/HL ตามเทรน")
+    if hg.get("bb", True) and not bb_ok:
+        hg_blocked.append("BB กำลังบีบตัว")
+    if hg.get("sr", True) and not sr_ok:
+        hg_blocked.append("ไม่อยู่ในโซนแนวรับ/ต้าน")
+
+    hard_ok = not hg_blocked
+
+    if trend_ok and pullback_ok and reject_frac >= 1.0 and score >= fire_score and hard_ok:
         tier = "FIRE"
-    elif trend_ok and (pullback_ok or reject_frac >= 0.5) and score >= watch_score:
+    elif trend_ok and pullback_ok and hard_ok and score >= watch_score:
         tier = "WATCH"
     else:
         tier = "NONE"
@@ -605,11 +687,18 @@ def score_setup(
     entry_trigger = tier == "FIRE"
     note_parts = [f"Setup {score:.1f}/{max_score} → {tier}"]
     if tier == "FIRE":
-        note_parts.append(f"เทรน {direction} ชัดเจน + ราคาย่อแตะ EMA200 + Reject เกิด → เข้าตามเทรน {direction}")
+        note_parts.append(f"เทรน {direction} ชัดเจน + แตะ EMA200 + Double-touch Reject + ผ่าน hard-gate → เข้าตามเทรน {direction}")
     elif tier == "WATCH":
-        note_parts.append(f"เทรน {direction} ชัดเจน + ราคากำลังเข้าใกล้ EMA200 — รอ Reject ยืนยันก่อนเข้า (Setup101 ข้อ 10)")
+        note_parts.append(f"เทรน {direction} ชัดเจน + แตะ EMA200 + ผ่าน hard-gate — ยังรอ Double-touch Reject (Setup101 ข้อ 10)")
     else:
-        note_parts.append(f"สกอร์ {score:.1f} ต่ำกว่าเกณฑ์ / ยังไม่ถึงจุดย่อ EMA200 / ไม่มี Reject (ทิศเทรน {direction})")
+        reason = f"สกอร์ {score:.1f} ต่ำกว่าเกณฑ์ {fire_score:.0f}/{watch_score:.0f}"
+        if hg_blocked:
+            reason = " / ".join(hg_blocked)
+        elif reject_frac < 1.0:
+            reason = "ยังไม่ครบ Double-touch Reject (แตะ→ดีด→แตะซ้ำ)"
+        elif not pullback_ok:
+            reason = "ราคายังไม่ย่อมาหา EMA200"
+        note_parts.append(reason)
 
     score_breakdown = {name: round(d["weight"] * d["frac"], 2)
                        for name, d in details.items()}
