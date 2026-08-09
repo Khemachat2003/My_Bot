@@ -51,10 +51,23 @@ BUFFER_MAX = 5000
 FETCH_HISTORY_COUNT = 3500
 POLL_SECONDS = int(os.getenv("SETUP_POLL_SECONDS", "15"))
 
-SETUP_TIMEFRAMES = [
-    ("M1", 15, 1),    # (timeframe label, hold minutes, resample minutes)
-    ("M5", 30, 5),
-]
+# Timeframe ที่รัน (label, hold_minutes, resample_minutes)
+#   ตั้งผ่าน env SETUP_TIMEFRAMES เช่น "M5:30:5" หรือ "M1:15:1,M5:30:5" (คั่นด้วย ,)
+#   default: M5 เท่านั้น (จาก backtest 122 วัน M5 = 59.3% กำไร | M1 = 48% ขาดทุน)
+_DEFAULT_TF = [("M5", 30, 5)]
+_tf_env = os.getenv("SETUP_TIMEFRAMES", "").strip()
+if _tf_env:
+    _parsed_tf = []
+    for part in _tf_env.split(","):
+        bits = [b.strip() for b in part.split(":")]
+        if len(bits) == 3:
+            try:
+                _parsed_tf.append((bits[0], int(bits[1]), int(bits[2])))
+            except ValueError:
+                pass
+    SETUP_TIMEFRAMES = _parsed_tf or _DEFAULT_TF
+else:
+    SETUP_TIMEFRAMES = _DEFAULT_TF
 
 SETUP_MIN_BARS = 30
 

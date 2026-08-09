@@ -95,9 +95,6 @@ def fetch_history(symbol: str, granularity: int, target_days: int,
         if span_now >= target_seconds:
             print(f"  ครบ {target_days} วันตามที่ขอแล้ว หยุดดึง")
             break
-        if len(batch) < batch_size:
-            print("  ได้แท่งน้อยกว่าที่ขอ (แปลว่าน่าจะสุดประวัติของ symbol นี้แล้ว) — หยุดดึง")
-            break
 
         end_epoch = int(earliest.timestamp()) - granularity
         time.sleep(pause_sec)
