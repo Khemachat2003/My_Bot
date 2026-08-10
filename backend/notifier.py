@@ -202,10 +202,19 @@ class MLFeedEngine:
         else:
             signal, confidence = "NEUTRAL", max(prob_up, prob_down)
 
+        # เก็บ feature vector ตอนยิงไว้ 2 จุดประสงค์:
+        #   1. log ตอนยิงสัญญาณว่ามองเห็นอะไร
+        #   2. auto_retrain เรียนจากสัญญาณจริงที่แพ้/ชนะพร้อม features ตอนนั้น
+        features = {
+            k: (float(v) if hasattr(v, "item") else v)
+            for k, v in features_df.iloc[-1].to_dict().items()
+        }
+
         return {
             "signal": signal, "confidence": confidence,
             "prob_up": prob_up, "prob_down": prob_down,
             "threshold": thresh, "model_version": cfg["model_file"],
+            "features": features,
         }
 
     # 🏁 ตรวจสัญญาณ PENDING ที่ครบเวลาถือออเดอร์ → ประเมิน WIN/LOSE
@@ -346,6 +355,7 @@ class MLFeedEngine:
                             prob_down=res["prob_down"],
                             threshold_used=res["threshold"],
                             model_version=res["model_version"],
+                            features=res.get("features"),
                         )
                         print(f"[MLFeed] บันทึกสัญญาณ ID #{new_sig_id} [{cfg['label']}] ลง ml_signals "
                               f"(รอวัดผลในอีก {hold_min} นาที)")

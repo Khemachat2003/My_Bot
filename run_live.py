@@ -50,6 +50,10 @@ PROCESSES = [
      "restart": True},
     {"name": "setup_feed", "cmd": ["-m", "backend.setup_feed"], "restart": True},
     {"name": "notifier", "cmd": ["-m", "backend.notifier"], "restart": True},
+    # เรียนรู้จากสัญญาณจริง: ตรวจทุก N ชม. (env AUTO_RETRAIN_INTERVAL_HOURS)
+    # ถ้ามีสัญญาณจริงใหม่พอ → เทรนใหม่ → ทับ model_m5 ถ้าดีกว่าโมเดลเดิม
+    {"name": "auto_retrain", "cmd": ["-m", "backend.ml_forecaster.auto_retrain"],
+     "restart": True},
 ]
 
 BACKUP_ENABLED = os.getenv("BACKUP_ENABLED", "true").lower() not in ("0", "false", "no")

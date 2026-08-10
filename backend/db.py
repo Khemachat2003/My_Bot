@@ -10,6 +10,7 @@ ML แตะเฉพาะ ml_* functions เท่านั้น เพื่
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -89,7 +90,8 @@ def init_db() -> None:
             horizon_min INTEGER NOT NULL,
             target_time TEXT NOT NULL,
             exit_price REAL,
-            result TEXT DEFAULT 'PENDING'
+            result TEXT DEFAULT 'PENDING',
+            features_json TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_ml_signals_time ON ml_signals(signal_time);
         CREATE INDEX IF NOT EXISTS idx_ml_signals_tf ON ml_signals(timeframe);
@@ -183,6 +185,12 @@ def init_db() -> None:
         conn.execute("ALTER TABLE setup_signals ADD COLUMN total INTEGER")
     if "tier" not in cols:
         conn.execute("ALTER TABLE setup_signals ADD COLUMN tier TEXT DEFAULT 'NONE'")
+
+    # Migration: ml_signals เก่า (ยุคก่อนเก็บ features ตอนยิง) → เพิ่ม features_json
+    # เพื่อให้ auto_retrain เรียนจากสัญญาณจริงที่แพ้/ชนะพร้อม features ตอนนั้นได้
+    mcols = {r["name"] for r in conn.execute("PRAGMA table_info(ml_signals)").fetchall()}
+    if "features_json" not in mcols:
+        conn.execute("ALTER TABLE ml_signals ADD COLUMN features_json TEXT")
 
     # Migration: ตาราง prices เก่า (ยุคก่อนมีคอลัมน์ symbol) → เพิ่ม symbol
     # แล้วสมมติว่าแถวเก่าทั้งหมดเป็น frxXAUUSD (ข้อมูลกราฟเดิม)
@@ -307,17 +315,19 @@ def insert_ml_signal(signal_time: str, entry_price: float, direction: str,
                       timeframe: str = "M1", prob_up: Optional[float] = None,
                       prob_down: Optional[float] = None,
                       threshold_used: Optional[float] = None,
-                      model_version: Optional[str] = None) -> int:
+                      model_version: Optional[str] = None,
+                      features: Optional[dict] = None) -> int:
     conn = get_conn()
     cur = conn.execute(
         """INSERT INTO ml_signals
            (signal_time, timeframe, entry_price, direction, confidence,
             prob_up, prob_down, threshold_used, model_version,
-            horizon_min, target_time, result)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')""",
+            horizon_min, target_time, result, features_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)""",
         (signal_time, timeframe, entry_price, direction, confidence,
          prob_up, prob_down, threshold_used, model_version,
-         horizon_min, target_time),
+         horizon_min, target_time,
+         json.dumps(features) if features is not None else None),
     )
     conn.commit()
     new_id = cur.lastrowid
