@@ -49,8 +49,12 @@ if str(ROOT) not in sys.path:
 
 from backend import db
 from backend.ml_forecaster.features_v2 import FEATURE_COLUMNS_V2, build_dataset_v2
+from backend.ml_forecaster.setup_features import (
+    SETUP_FEATURE_COLUMNS, flatten_setup_dict,
+)
 from backend.notifier import _conf_threshold
 from backend.telegram import send_telegram
+from backend import setup_db
 
 MODEL_DIR = Path(__file__).resolve().parent
 MODEL_FILE_M5 = MODEL_DIR / "model_m5.joblib"
@@ -63,6 +67,26 @@ CONF_GRID = [0.52, 0.55, 0.58, 0.60, 0.62, 0.65]
 STATE_FILE = ROOT / "data" / "auto_retrain_state.json"
 CHECK_INTERVAL_SEC = 6 * 3600   # ตรวจทุก 6 ชม. (เปลี่ยนได้ด้วย env AUTO_RETRAIN_INTERVAL_HOURS)
 MIN_NEW_SIGNALS = 5             # มีสัญญาณจริงใหม่ (resolved) ≥ นี้จึงเริ่มเทรน
+
+# ── Setup-context features (Hybrid): ML เรียนรู้บริบทเดียวกับ Rule-Based ──
+# (SETUP_FEATURE_COLUMNS / flatten_setup_dict import จาก setup_features.py)
+# 10 checklist ใน details ของ score_setup → flatten เป็นคอลัมน์ตัวเลข
+
+
+def load_setup_features(timeframe: str = "M5") -> pd.DataFrame:
+    """ดึง setup_scores ทั้งหมด → DataFrame[index=ts, columns=setup features]
+    (index เป็น bar time — ใช้ merge_asof กับราคา M5 ได้)"""
+    setup_db.init_setup_db()
+    rows = setup_db.fetch_setup_scores_range(timeframe)
+    if not rows:
+        return pd.DataFrame(columns=SETUP_FEATURE_COLUMNS)
+    recs = []
+    for r in rows:
+        rec = flatten_setup_dict(r)
+        rec["ts"] = pd.to_datetime(r["ts"], utc=True)
+        recs.append(rec)
+    df = pd.DataFrame(recs).set_index("ts").sort_index()
+    return df[SETUP_FEATURE_COLUMNS].drop_duplicates(keep="last")
 
 try:
     import lightgbm as lgb
@@ -302,7 +326,28 @@ def run_auto_retrain(min_new_signals: int = 5) -> dict:
     valid = X.notna().all(axis=1) & y.notna()
     X_full, y_full = X[valid], y[valid]
 
-    print(f"  Dataset M5: {len(X_full)} แถว | {df_tf.index[0]} → {df_tf.index[-1]}")
+    # ── Hybrid: merge setup-context features (10 checklist + score/direction/tier)
+    # ML เรียนบริบทเดียวกับ Rule-Based ที่ชนะ 59% — ไม่ใช่แค่ราคาล้วน
+    setup_feats = load_setup_features(timeframe="M5")
+    if not setup_feats.empty and len(X_full):
+        merged = pd.merge_asof(
+            X_full.sort_index(), setup_feats.sort_index(),
+            left_index=True, right_index=True, direction="backward",
+            tolerance=pd.Timedelta(minutes=6),
+        )
+        n_hit = merged[SETUP_FEATURE_COLUMNS].notna().sum().sum()
+        merged[SETUP_FEATURE_COLUMNS] = merged[SETUP_FEATURE_COLUMNS].fillna(0.0)
+        X_full = merged
+        print(f"  [Hybrid] ผสาน setup features เข้า dataset: {n_hit} ค่า "
+              f"({len(setup_feats)} แถว setup)")
+
+    MODEL_FEATURES = list(FEATURE_COLUMNS_V2)
+    if not setup_feats.empty:
+        MODEL_FEATURES = list(X_full.columns)
+    MODEL_FEATURES = [c for c in MODEL_FEATURES if c in X_full.columns]
+
+    print(f"  Dataset M5: {len(X_full)} แถว | {df_tf.index[0]} → {df_tf.index[-1]} "
+          f"| features: {len(MODEL_FEATURES)} (price+setup)")
     res = _walkforward_with_real(feat_df, X_full, y_full, HORIZON_M5, real_m5)
 
     print("\n" + "=" * 70)
@@ -357,7 +402,7 @@ def run_auto_retrain(min_new_signals: int = 5) -> dict:
 
     joblib.dump({
         "model": final_model,
-        "features": FEATURE_COLUMNS_V2,
+        "features": MODEL_FEATURES,
         "horizon": HORIZON_M5,
         "deadzone_atr_mult": DEADZONE,
         "chosen_conf": float(best_c),
@@ -365,11 +410,12 @@ def run_auto_retrain(min_new_signals: int = 5) -> dict:
         "auc_test": None,
         "n_rows": len(X_full),
         "n_real_signals": len(real_m5),
-        "version": "auto_retrain",
-        "feature_set": "v2_meanrev",
+        "n_setup_features": len(SETUP_FEATURE_COLUMNS) if "setup_feats" in dir() else 0,
+        "version": "auto_retrain_hybrid",
+        "feature_set": "v2_meanrev+setup_context",
         "conf_grid": CONF_GRID,
         "retrained_at": pd.Timestamp.now(tz="UTC").isoformat(),
-        "note": "auto_retrain — เรียนรู้จากสัญญาณจริง + walk-forward",
+        "note": "auto_retrain — เรียนรู้จากสัญญาณจริง + setup context (Hybrid)",
     }, MODEL_FILE_M5)
     print(f"  💾 บันทึก {MODEL_FILE_M5.name} เรียบร้อย (conf={best_c})")
 

@@ -294,6 +294,9 @@ def get_latest_features(
     """
     feat_df = build_features_v2(df)
     cols = feature_columns or FEATURE_COLUMNS_V2
+    # กัน feature mismatch: โมเดล hybrid (มี st_* จาก setup_scorer) ส่ง feature_columns
+    # ครบชุด แต่ cột setup ถูก merge เพิ่มทีหลังใน notifier — กรองเฉพาะ cộtราคาที่มี
+    cols = [c for c in cols if c in feat_df.columns] or FEATURE_COLUMNS_V2
 
     f = feat_df[cols].dropna()
     if f.empty:

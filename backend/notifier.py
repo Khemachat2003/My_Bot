@@ -50,6 +50,9 @@ from backend import db
 from backend.telegram import send_telegram
 from backend.market_hours import choose_symbol, symbol_label
 from backend.ml_forecaster.features_v2 import get_latest_features
+from backend.ml_forecaster.setup_features import (
+    SETUP_FEATURE_COLUMNS, flatten_setup_result,
+)
 
 MODEL_DIR = Path(__file__).resolve().parent / "ml_forecaster"
 DATA_DIR = ROOT_DIR / "data"
@@ -182,15 +185,44 @@ class MLFeedEngine:
     def _evaluate_timeframe(self, df_tf: pd.DataFrame, cfg: dict) -> dict | None:
         """ทำนาย probability ของแท่งล่าสุดด้วยโมเดลของ timeframe นี้"""
         model_cfg = MODELS[cfg["label"]]
+        model_features = list(model_cfg.get("features") or [])
         features_df = get_latest_features(
             df_tf,
-            feature_columns=model_cfg["features"],
+            feature_columns=model_features,
             floor_minutes=cfg["resample_min"],
         )
         if features_df is None or features_df.empty:
             return None
 
+        # Hybrid: ถ้าโมเดลถูกเทรนด้วย setup-context features (st_*) ต้องคำนวณ
+        # score_setup ณ ตอนนี้ แล้ว merge เข้า feature vector — กัน feature mismatch
+        has_setup = any(c.startswith("st_") for c in model_features)
+        if has_setup:
+            try:
+                from backend.setup_scorer import score_setup
+                setup_result = score_setup(
+                    df_tf, timeframe=cfg["label"],
+                    target_hold_minutes=cfg["hold_min"],
+                )
+                setup_vec = flatten_setup_result(setup_result)
+                for c in model_features:
+                    if c.startswith("st_"):
+                        if c not in features_df.columns:
+                            features_df[c] = 0.0
+                        features_df.loc[features_df.index[-1], c] = setup_vec.get(c, 0.0)
+            except Exception:
+                import traceback
+                print("[MLFeed] setup features error:")
+                traceback.print_exc()
+                # ถ้าคำนวณ setup ไม่ได้ → กัน prediction ผิด ให้ข้ามรอบนี้
+                return None
+
         model = model_cfg["model"]
+        # จัดคอลัมน์ให้ตรงกับ model ที่เทรน (เรียงตาม features list) — กัน mismatch
+        for c in model_features:
+            if c not in features_df.columns:
+                features_df[c] = 0.0
+        features_df = features_df[model_features]
         prob_up = float(model.predict_proba(features_df)[0][1])
         prob_down = 1.0 - prob_up
         thresh = _conf_threshold(cfg["label"])

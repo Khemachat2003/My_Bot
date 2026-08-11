@@ -125,3 +125,22 @@ def fetch_recent_setup_scores(timeframe: str, limit: int = 50) -> list[dict]:
     """, (timeframe, limit)).fetchall()
     conn.close()
     return [_row_to_dict(r) for r in reversed(rows)]
+
+
+def fetch_setup_scores_range(timeframe: str, start: str | None = None,
+                             end: str | None = None) -> list[dict]:
+    """ดึง setup_scores ทั้งหมดของ timeframe ในช่วงเวลา (สำหรับ auto_retrain)
+    — flatten details (10 checklist) ให้เป็นคอลัมน์ง่าย ๆ สำหรับ merge กับราคา"""
+    q = "SELECT * FROM setup_scores WHERE timeframe = ?"
+    params: list = [timeframe]
+    if start:
+        q += " AND ts >= ?"
+        params.append(start)
+    if end:
+        q += " AND ts <= ?"
+        params.append(end)
+    q += " ORDER BY ts ASC"
+    conn = _connect()
+    rows = conn.execute(q, params).fetchall()
+    conn.close()
+    return [_row_to_dict(r) for r in rows]
