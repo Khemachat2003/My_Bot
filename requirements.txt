@@ -14,3 +14,4 @@ uvicorn[standard]>=0.29
 scikit-learn==1.7.2
 joblib
 websocket-client
+openpyxl>=3.1

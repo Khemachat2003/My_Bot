@@ -158,6 +158,20 @@
   }
   .tf-btn:hover{color:var(--text);}
   .tf-btn.active{background:var(--cyan); color:#04121a;}
+  .btn{
+    background:var(--card); border:1px solid var(--border); color:var(--text); cursor:pointer;
+    font-size:11.5px; font-weight:800; font-family:inherit; padding:7px 14px; border-radius:8px; transition:.15s;
+  }
+  .btn:hover{border-color:var(--purple); color:var(--purple);}
+  .btn.accent{background:var(--purple); border-color:var(--purple); color:#fff;}
+  .btn.accent:hover{filter:brightness(1.15); color:#fff;}
+  .sett-row{display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap;}
+  .sett-row label{display:flex; flex-direction:column; gap:4px; font-size:10px; color:var(--muted); font-weight:800; letter-spacing:.05em;}
+  .sett-row input{
+    background:var(--card); border:1px solid var(--border); color:var(--text); border-radius:8px;
+    font-family:var(--num); font-size:14px; font-weight:800; padding:7px 10px; width:110px;
+  }
+  .sett-row input:focus{outline:none; border-color:var(--purple);}
   .ind-bar{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin:10px 0 8px;}
   .ind-chip{
     background:var(--card); border:1px solid var(--border); color:var(--muted); cursor:pointer;
@@ -516,6 +530,22 @@
 
   <!-- ─── JOURNAL ─── -->
   <section id="tab-journal" style="display:none;">
+    <div class="panel">
+      <h3><span class="ph purple"></span>ตั้งค่าการเทรดจริง + ดาวน์โหลดรายงาน</h3>
+      <div class="sett-row">
+        <label>ทุนเริ่มต้น<input type="number" id="setCapital" min="1" step="100"></label>
+        <label>ขนาดต่อไม้<input type="number" id="setStake" min="1" step="10"></label>
+        <label>สกุลเงิน<input type="text" id="setCurrency" maxlength="5" style="width:70px;"></label>
+        <button class="btn" id="btnSaveSettings">บันทึกตั้งค่า</button>
+        <span id="settStatus" style="font-size:11px;color:var(--green);align-self:center;"></span>
+      </div>
+      <div class="sett-row" style="margin-top:10px;align-items:flex-end;">
+        <label>Export จากวัน<input type="date" id="expStart"></label>
+        <label>ถึงวัน<input type="date" id="expEnd"></label>
+        <button class="btn accent" id="btnExport">ดาวน์โหลด Excel</button>
+        <span style="font-size:10px;color:var(--muted);align-self:center;">ไม่เลือก = export ข้อมูลทั้งหมด</span>
+      </div>
+    </div>
     <div class="kpi-row">
       <div class="kpi"><div class="lbl">Trades ที่สรุปผล</div><div class="val" id="jn">–</div><div class="sub" id="jnSub">–</div></div>
       <div class="kpi yellow"><div class="lbl">Total P&amp;L</div><div class="val yellow" id="jPnl">–</div><div class="sub">กำไร = +payout, ขาดทุน = −1</div></div>
@@ -523,6 +553,14 @@
       <div class="kpi blue"><div class="lbl">Breakeven</div><div class="val blue" id="jBe">–</div><div class="sub">ต้องชนะเกินนี้ถึงกำไร</div></div>
       <div class="kpi"><div class="lbl">Margin vs BE</div><div class="val" id="jMargin">–</div><div class="sub">CI ล่าง − Breakeven</div></div>
       <div class="kpi"><div class="lbl">95% CI</div><div class="val" id="jCi" style="font-size:15px;">–</div><div class="sub">ช่วงเชื่อมั่น winrate</div></div>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi green"><div class="lbl">P&amp;L รวม (เงินจริง)</div><div class="val" id="mPnlAll">–</div><div class="sub" id="mPnlAllSub">–</div></div>
+      <div class="kpi"><div class="lbl">ROI รวม</div><div class="val" id="mRoiAll">–</div><div class="sub">เทียบกับทุนเริ่มต้น</div></div>
+      <div class="kpi purple"><div class="lbl">ML P&amp;L</div><div class="val" id="mPnlMl">–</div><div class="sub" id="mRoiMl">ROI –</div></div>
+      <div class="kpi blue"><div class="lbl">Rule-Based P&amp;L</div><div class="val" id="mPnlSt">–</div><div class="sub" id="mRoiSt">ROI –</div></div>
+      <div class="kpi cyan"><div class="lbl">EV ต่อไม้</div><div class="val" id="mEv">–</div><div class="sub">กำไรเฉลี่ยต่อ 1 ไม้</div></div>
+      <div class="kpi yellow"><div class="lbl">ยอดคงเหลือ</div><div class="val" id="mBalance">–</div><div class="sub" id="mBalanceSub">–</div></div>
     </div>
     <div class="cols l2">
       <div class="panel">
@@ -537,6 +575,33 @@
             <tbody></tbody>
           </table>
         </div>
+      </div>
+    </div>
+    <div class="panel">
+      <h3><span class="ph purple"></span>สรุป P&amp;L แยก ML / Rule-Based
+        <span style="float:right;display:inline-flex;align-items:center;gap:6px;">
+          ช่วงเวลา
+          <select id="periodSel" style="background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:6px 10px;font-size:11.5px;font-weight:800;font-family:inherit;">
+            <option value="daily">รายวัน</option>
+            <option value="weekly">รายสัปดาห์</option>
+            <option value="monthly">รายเดือน</option>
+            <option value="yearly">รายปี</option>
+          </select>
+        </span>
+      </h3>
+      <div class="tbl-wrap">
+        <table id="periodTable">
+          <thead>
+            <tr>
+              <th>ช่วงเวลา</th>
+              <th>รวม เทรด</th><th>รวม WR</th><th>รวม P&amp;L</th><th>รวม ROI</th>
+              <th>ML เทรด</th><th>ML WR</th><th>ML P&amp;L</th><th>ML ROI</th>
+              <th>RB เทรด</th><th>RB WR</th><th>RB P&amp;L</th><th>RB ROI</th>
+              <th>ยอดคงเหลือ</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
       </div>
     </div>
     <div class="panel">
@@ -1396,6 +1461,59 @@ async function refreshJournalTab(){
   }catch(e){}
 }
 
+let moneyReport=null;
+function setKpi(id,val,cls){const el=document.getElementById(id); if(!el)return; el.textContent=val; el.className='val '+(cls||'muted');}
+function fmtMoney(v,cur){ return (v>0?'+':'')+Number(v).toLocaleString('th-TH',{maximumFractionDigits:2})+' '+cur; }
+
+async function refreshJournalMoney(){
+  try{
+    const r=await fetchJSON('/api/journal/report');
+    moneyReport=r;
+    const cur=r.settings.currency||'THB';
+    const active=document.activeElement;
+    if(active!==document.getElementById('setCapital')) document.getElementById('setCapital').value=r.settings.capital;
+    if(active!==document.getElementById('setStake')) document.getElementById('setStake').value=r.settings.stake;
+    if(active!==document.getElementById('setCurrency')) document.getElementById('setCurrency').value=cur;
+    const A=r.summary.ALL, ML=r.summary.ML, ST=r.summary.SETUP;
+    setKpi('mPnlAll',fmtMoney(A.pnl_money,cur),A.pnl_money>0?'green':(A.pnl_money<0?'red':'muted'));
+    document.getElementById('mPnlAllSub').textContent=`${A.n} ไม้ · winrate ${A.winrate}%`;
+    setKpi('mRoiAll',A.roi+'%',A.roi>0?'green':(A.roi<0?'red':'muted'));
+    setKpi('mPnlMl',fmtMoney(ML.pnl_money,cur),ML.pnl_money>0?'green':(ML.pnl_money<0?'red':'muted'));
+    document.getElementById('mRoiMl').textContent=`${ML.n} ไม้ · ROI ${ML.roi}%`;
+    setKpi('mPnlSt',fmtMoney(ST.pnl_money,cur),ST.pnl_money>0?'green':(ST.pnl_money<0?'red':'muted'));
+    document.getElementById('mRoiSt').textContent=`${ST.n} ไม้ · ROI ${ST.roi}%`;
+    const ev=A.n?A.pnl_money/A.n:0;
+    setKpi('mEv',fmtMoney(ev,cur),ev>0?'green':(ev<0?'red':'muted'));
+    const bal=r.daily.length?r.daily[r.daily.length-1].balance:r.settings.capital;
+    document.getElementById('mBalance').textContent=Number(bal).toLocaleString('th-TH',{maximumFractionDigits:2})+' '+cur;
+    document.getElementById('mBalanceSub').textContent='ทุน '+Number(r.settings.capital).toLocaleString('th-TH')+' '+cur;
+    renderPeriodTable();
+  }catch(e){}
+}
+
+function renderPeriodTable(){
+  if(!moneyReport) return;
+  const kind=document.getElementById('periodSel').value;
+  const rows=moneyReport[kind]||[];
+  const cur=moneyReport.settings.currency||'THB';
+  const pnl=(v)=>`${v>0?'+':''}${Number(v).toLocaleString('th-TH',{maximumFractionDigits:2})} ${cur}`;
+  const body=document.querySelector('#periodTable tbody');
+  body.innerHTML=rows.slice().reverse().map(d=>`
+    <tr>
+      <td class="mono"><b>${d.period}</b></td>
+      <td class="mono">${d.ALL.n}</td><td class="mono ${d.ALL.winrate>=50?'dir-call':'dir-put'}">${d.ALL.n?d.ALL.winrate+'%':'–'}</td>
+      <td class="mono ${d.ALL.pnl_money>0?'dir-call':(d.ALL.pnl_money<0?'dir-put':'')}">${d.ALL.n?pnl(d.ALL.pnl_money):'–'}</td>
+      <td class="mono">${d.ALL.n?d.ALL.roi+'%':'–'}</td>
+      <td class="mono">${d.ML.n}</td><td class="mono">${d.ML.n?d.ML.winrate+'%':'–'}</td>
+      <td class="mono ${d.ML.pnl_money>0?'dir-call':(d.ML.pnl_money<0?'dir-put':'')}">${d.ML.n?pnl(d.ML.pnl_money):'–'}</td>
+      <td class="mono">${d.ML.n?d.ML.roi+'%':'–'}</td>
+      <td class="mono">${d.SETUP.n}</td><td class="mono">${d.SETUP.n?d.SETUP.winrate+'%':'–'}</td>
+      <td class="mono ${d.SETUP.pnl_money>0?'dir-call':(d.SETUP.pnl_money<0?'dir-put':'')}">${d.SETUP.n?pnl(d.SETUP.pnl_money):'–'}</td>
+      <td class="mono">${d.SETUP.n?d.SETUP.roi+'%':'–'}</td>
+      <td class="mono">${Number(d.balance).toLocaleString('th-TH',{maximumFractionDigits:2})}</td>
+    </tr>`).join('') || '<tr><td colspan="14" class="empty">ยังไม่มีข้อมูล</td></tr>';
+}
+
 function drawEquityFull(points){
   const el=document.getElementById('equityFullChart'); if(!el) return;
   const labels=points.map(p=>p.t), values=points.map(p=>p.equity);
@@ -1416,11 +1534,37 @@ function updateClock(){
   document.getElementById('hSession').textContent=h>=12&&h<21?'NY':(h>=7&&h<16?'London':(h>=0&&h<8?'Asia':'อื่นๆ'));
 }
 
+document.getElementById('periodSel').addEventListener('change', renderPeriodTable);
+document.getElementById('btnSaveSettings').addEventListener('click', async ()=>{
+  const st=document.getElementById('settStatus');
+  try{
+    const res=await fetch('/api/journal/settings',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        capital:parseFloat(document.getElementById('setCapital').value),
+        stake:parseFloat(document.getElementById('setStake').value),
+        currency:document.getElementById('setCurrency').value,
+      })});
+    if(res.ok){ st.textContent='บันทึกแล้ว ✓'; await refreshJournalMoney(); }
+    else st.textContent='บันทึกไม่สำเร็จ — ตรวจข้อมูล';
+  }catch(e){ st.textContent='บันทึกไม่สำเร็จ — connection error'; }
+  setTimeout(()=>st.textContent='',3000);
+});
+document.getElementById('btnExport').addEventListener('click', ()=>{
+  const s=document.getElementById('expStart').value, e=document.getElementById('expEnd').value;
+  const q=new URLSearchParams();
+  if(s) q.set('start',s);
+  if(e) q.set('end',e);
+  const qs=q.toString();
+  window.location.href='/api/journal/export'+(qs?'?'+qs:'');
+});
+
 async function refreshAll(){
   updateClock();
   await Promise.all([
     refreshOverview(),refreshPrice(),refreshGauges(),refreshHeaderSignals(),
     refreshMlTab(),refreshSetupTab(),refreshSetupMini(),refreshJournalTab(),
+    refreshJournalMoney(),
     (document.getElementById('tab-pro')?.style.display!=='none')?drawProChart():Promise.resolve(),
   ]);
 }
