@@ -332,8 +332,9 @@ def get_prices(limit: int = Query(500, ge=1, le=5000),
 
 # ── 🔵 RULE-BASED SETUP ENGINE (System 1) ───────────────────────────────
 @app.get("/api/signals")
-def get_signals(limit: int = Query(100, ge=1, le=1000), _auth=Depends(require_auth)):
-    return db.fetch_recent_setup_signals(limit=limit)
+def get_signals(limit: int = Query(100, ge=1, le=1000),
+                symbol: str | None = Query(None), _auth=Depends(require_auth)):
+    return db.fetch_recent_setup_signals(limit=limit, symbol=symbol)
 
 
 @app.get("/api/stats")
@@ -348,18 +349,20 @@ def get_stats_by_timeframe(payout: float = Query(0.82, ge=0.0, le=5.0), _auth=De
 
 
 @app.get("/api/setup/latest")
-def get_setup_latest(_auth=Depends(require_auth)):
-    """ผลล่าสุดของ setup_scorer checklist ต่อ timeframe → {"1m": {...}, "5m": {...}}"""
-    return setup_db.fetch_latest_setup_scores()
+def get_setup_latest(symbol: str = Query("frxXAUUSD"), _auth=Depends(require_auth)):
+    """ผลล่าสุดของ setup_scorer checklist ต่อ timeframe ของสัญลักษณ์
+    → {"1m": {...}, "5m": {...}}"""
+    return setup_db.fetch_latest_setup_scores(symbol=symbol)
 
 
 @app.get("/api/setup/history")
 def get_setup_history(
     timeframe: str = Query("M1", pattern="^(M1|M5)$"),
     limit: int = Query(50, ge=1, le=500),
+    symbol: str = Query("frxXAUUSD"),
     _auth=Depends(require_auth),
 ):
-    return setup_db.fetch_recent_setup_scores(timeframe, limit=limit)
+    return setup_db.fetch_recent_setup_scores(timeframe, limit=limit, symbol=symbol)
 
 
 # ── 🟢 ML MODEL ENGINE (System 2) ────────────────────────────────────────

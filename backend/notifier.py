@@ -48,7 +48,7 @@ import pandas as pd
 
 from backend import db
 from backend.telegram import send_telegram
-from backend.market_hours import choose_symbol, symbol_label
+from backend.market_hours import is_forex_like, market_open_now, symbol_label
 from backend.ml_forecaster.features_v2 import get_latest_features
 from backend.ml_forecaster.setup_features import (
     SETUP_FEATURE_COLUMNS, flatten_setup_result,
@@ -181,6 +181,7 @@ class MLFeedEngine:
         self._last_signal_state: dict[str, str] = {}
         self._active_symbol: str | None = None
         self._symbol_switch_notified = False
+        self._last_price: float | None = None
 
     def _evaluate_timeframe(self, df_tf: pd.DataFrame, cfg: dict) -> dict | None:
         """ทำนาย probability ของแท่งล่าสุดด้วยโมเดลของ timeframe นี้"""
@@ -305,13 +306,15 @@ class MLFeedEngine:
         send_telegram(msg)
 
     def run_once(self):
-        symbol = choose_symbol()
-        if symbol != self._active_symbol:
-            if self._active_symbol is not None and not self._symbol_switch_notified:
-                self._notify_symbol_switch(self._active_symbol, symbol)
-            print(f"[MLFeed] ใช้สัญลักษณ์: {symbol}")
-            self._active_symbol = symbol
-            self._last_signal_state = {}   # รีเซ็ตกันสแปมเมื่อสลับ symbol
+        # ML เทรนจากข้อมูล XAUUSD เท่านั้น → เทรดเฉพาะ symbol หลัก ไม่สลับไป R_100
+        # (R_100 เป็นสินทรัพย์สังเคราะห์คนละประเภท — ยกเลิกการสลับตามที่ตกลง)
+        symbol = DERIV_SYMBOL
+        if is_forex_like(symbol) and not market_open_now():
+            now = pd.Timestamp.now(tz="UTC")
+            self._resolve_pending(now, self._last_price or 0.0)
+            return
+        self._active_symbol = symbol
+        self._last_signal_state = {}   # รีเซ็ตกันสแปม
 
         raw_df = fetch_live_or_cache_candles(symbol, count=500)
         if raw_df.empty or len(raw_df) < 100:
@@ -319,6 +322,7 @@ class MLFeedEngine:
             return
 
         last_price = float(raw_df["close"].iloc[-1])
+        self._last_price = last_price
         candle_time = raw_df.index[-1]
         now = pd.Timestamp.now(tz="UTC")
 

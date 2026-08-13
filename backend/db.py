@@ -198,6 +198,13 @@ def init_db() -> None:
     if "features_json" not in mcols:
         conn.execute("ALTER TABLE ml_signals ADD COLUMN features_json TEXT")
 
+    # Migration: รองรับการเทรดหลายสัญลักษณ์ (major pairs) → เพิ่มคอลัมน์ symbol
+    # ข้อมูลเก่าถือเป็น frxXAUUSD (สัญลักษณ์เดิมที่ระบบเคยเทรด)
+    scols = {r["name"] for r in conn.execute("PRAGMA table_info(setup_signals)").fetchall()}
+    if "symbol" not in scols:
+        conn.execute("ALTER TABLE setup_signals ADD COLUMN symbol TEXT NOT NULL DEFAULT 'frxXAUUSD'")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_setup_signals_symbol ON setup_signals(symbol)")
+
     # Migration: ตาราง prices เก่า (ยุคก่อนมีคอลัมน์ symbol) → เพิ่ม symbol
     # แล้วสมมติว่าแถวเก่าทั้งหมดเป็น frxXAUUSD (ข้อมูลกราฟเดิม)
     try:
@@ -238,15 +245,16 @@ def init_db() -> None:
 def insert_setup_signal(signal_time: str, entry_price: float, direction: str,
                          confidence: float, horizon_min: int, target_time: str,
                          timeframe: str = "M1", score: Optional[float] = None,
-                         total: Optional[int] = None, tier: str = "NONE") -> int:
+                         total: Optional[int] = None, tier: str = "NONE",
+                         symbol: str = "frxXAUUSD") -> int:
     conn = get_conn()
     cur = conn.execute(
         """INSERT INTO setup_signals
            (signal_time, timeframe, entry_price, direction, confidence,
-            score, total, tier, horizon_min, target_time, result)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')""",
+            score, total, tier, horizon_min, target_time, result, symbol)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)""",
         (signal_time, timeframe, entry_price, direction, confidence,
-         score, total, tier, horizon_min, target_time),
+         score, total, tier, horizon_min, target_time, symbol),
     )
     conn.commit()
     new_id = cur.lastrowid
@@ -264,43 +272,69 @@ def update_setup_signal_result(signal_id: int, exit_price: float, result: str) -
     conn.close()
 
 
-def fetch_pending_setup_signals() -> list[dict]:
+def fetch_pending_setup_signals(symbol: str | None = None) -> list[dict]:
     conn = get_conn()
-    rows = conn.execute(
-        "SELECT * FROM setup_signals WHERE result = 'PENDING'"
-    ).fetchall()
+    if symbol:
+        rows = conn.execute(
+            "SELECT * FROM setup_signals WHERE result = 'PENDING' AND symbol = ?",
+            (symbol,),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM setup_signals WHERE result = 'PENDING'"
+        ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
-def fetch_recent_setup_signals(limit: int = 100) -> list[dict]:
+def fetch_recent_setup_signals(limit: int = 100, symbol: str | None = None) -> list[dict]:
     conn = get_conn()
-    rows = conn.execute(
-        "SELECT * FROM setup_signals ORDER BY signal_time DESC LIMIT ?", (limit,)
-    ).fetchall()
+    if symbol:
+        rows = conn.execute(
+            "SELECT * FROM setup_signals WHERE symbol = ? ORDER BY signal_time DESC LIMIT ?",
+            (symbol, limit),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM setup_signals ORDER BY signal_time DESC LIMIT ?", (limit,)
+        ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
-def fetch_last_setup_signal(timeframe: str) -> dict | None:
+def fetch_last_setup_signal(timeframe: str, symbol: str | None = None) -> dict | None:
     """สัญญาณล่าสุดของ TF นี้ (สำหรับ cooldown — กันยิงซ้ำหลัง restart)"""
     conn = get_conn()
-    row = conn.execute(
-        "SELECT * FROM setup_signals WHERE timeframe = ? ORDER BY signal_time DESC LIMIT 1",
-        (timeframe,),
-    ).fetchone()
+    if symbol:
+        row = conn.execute(
+            "SELECT * FROM setup_signals WHERE timeframe = ? AND symbol = ? "
+            "ORDER BY signal_time DESC LIMIT 1",
+            (timeframe, symbol),
+        ).fetchone()
+    else:
+        row = conn.execute(
+            "SELECT * FROM setup_signals WHERE timeframe = ? ORDER BY signal_time DESC LIMIT 1",
+            (timeframe,),
+        ).fetchone()
     conn.close()
     return dict(row) if row else None
 
 
-def count_setup_signals_since(start_iso: str) -> int:
+def count_setup_signals_since(start_iso: str, symbol: str | None = None) -> int:
     """จำนวนสัญญาณที่ยิงตั้งแต่เวลา start_iso (ใช้สำหรับ daily cap)"""
     conn = get_conn()
     if start_iso:
-        row = conn.execute(
-            "SELECT COUNT(*) AS c FROM setup_signals WHERE signal_time >= ?",
-            (start_iso,),
-        ).fetchone()
+        if symbol:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM setup_signals "
+                "WHERE signal_time >= ? AND symbol = ?",
+                (start_iso, symbol),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM setup_signals WHERE signal_time >= ?",
+                (start_iso,),
+            ).fetchone()
     else:
         row = conn.execute("SELECT COUNT(*) AS c FROM setup_signals").fetchone()
     conn.close()

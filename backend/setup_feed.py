@@ -38,7 +38,7 @@ import pandas as pd
 
 from backend import db, setup_db
 from backend.telegram import send_telegram
-from backend.market_hours import choose_symbol, symbol_label
+from backend.market_hours import is_forex_like, market_open_now, symbol_label
 from backend.setup_scorer import score_setup
 
 try:
@@ -50,6 +50,16 @@ SYMBOL = DEFAULT_SYMBOL
 BUFFER_MAX = 5000
 FETCH_HISTORY_COUNT = 3500
 POLL_SECONDS = int(os.getenv("SETUP_POLL_SECONDS", "15"))
+
+# สัญลักษณ์ที่ระบบเทรดพร้อมกัน (คั่นด้วย ,) — default: ทอง + 7 คู่ major
+# ตั้งใน .env เช่น: TRADE_SYMBOLS=frxXAUUSD,frxEURUSD,frxGBPUSD
+_DEFAULT_TRADE_SYMBOLS = (
+    "frxXAUUSD,frxEURUSD,frxGBPUSD,frxUSDJPY,"
+    "frxAUDUSD,frxUSDCAD,frxUSDCHF,frxNZDUSD"
+)
+TRADE_SYMBOLS = [s.strip() for s in
+                 os.getenv("TRADE_SYMBOLS", _DEFAULT_TRADE_SYMBOLS).split(",")
+                 if s.strip()]
 
 # Timeframe ที่รัน (label, hold_minutes, resample_minutes)
 #   ตั้งผ่าน env SETUP_TIMEFRAMES เช่น "M5:30:5" หรือ "M1:15:1,M5:30:5" (คั่นด้วย ,)
@@ -95,26 +105,25 @@ DAILY_CAP = _int_env("SETUP_DAILY_CAP", DAILY_CAP)
 
 
 class SetupFeedEngine:
-    def __init__(self):
+    def __init__(self, symbol: str = SYMBOL):
         db.init_db()
         setup_db.init_setup_db()
 
         self._last_entry_trigger: dict[str, bool] = {}
         self.last_price: float = 0.0
-        self.symbol = choose_symbol()
-        self._symbol_switch_notified = False
+        self.symbol = symbol
         self.buffer = pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
         self._last_processed_ts: pd.Timestamp | None = None
 
         self._seed_buffer()
-        print(f"[SetupFeed] poll={POLL_SECONDS}s | symbol={self.symbol} | "
+        print(f"[SetupFeed:{self.symbol}] poll={POLL_SECONDS}s | "
               f"buffer={len(self.buffer)} แท่ง")
 
     # ── การจัดการข้อมูล ──────────────────────────────────────────────────────
 
     def _seed_buffer(self):
-        """เริ่ม buffer ใหม่จาก history ของ symbol ที่กำลังใช้ (reset เมื่อสลับ symbol)"""
-        print(f"[SetupFeed] กำลังดึงข้อมูลย้อนหลัง {FETCH_HISTORY_COUNT} แท่ง (1m, {self.symbol})...")
+        """เริ่ม buffer ใหม่จาก history ของ symbol นี้ (ดึงครั้งแรก/หลัง error)"""
+        print(f"[SetupFeed:{self.symbol}] กำลังดึงข้อมูลย้อนหลัง {FETCH_HISTORY_COUNT} แท่ง (1m)...")
         try:
             df_init = fetch_candles_history(symbol=self.symbol, granularity=60,
                                             count=FETCH_HISTORY_COUNT)
@@ -126,10 +135,10 @@ class SetupFeedEngine:
                 # backfill ราคาย้อนหลังลงตาราง prices ให้กราฟ Dashboard เต็มทันที
                 # (ไม่ต้องรอ poll สะสมทีละแท่งหลายชั่วโมง)
                 n = db.backfill_prices(self.buffer, symbol=self.symbol)
-                print(f"[SetupFeed] Backfill ราคาย้อนหลัง {n} แท่งลง prices (กราฟ Dashboard)")
-            print(f"[SetupFeed] Buffer พร้อมใช้งาน: {len(self.buffer)} แท่ง (1m, {self.symbol})")
+                print(f"[SetupFeed:{self.symbol}] Backfill ราคาย้อนหลัง {n} แท่งลง prices")
+            print(f"[SetupFeed:{self.symbol}] Buffer พร้อมใช้งาน: {len(self.buffer)} แท่ง")
         except Exception as e:
-            print(f"[SetupFeed] WARNING: ดึง History ไม่สำเร็จ ({e}) — รอรอบถัดไป")
+            print(f"[SetupFeed:{self.symbol}] WARNING: ดึง History ไม่สำเร็จ ({e}) — รอรอบถัดไป")
             self.buffer = pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
 
     def _merge_candles(self, df: pd.DataFrame):
@@ -148,16 +157,16 @@ class SetupFeedEngine:
         self.buffer = self.buffer.sort_index().iloc[-BUFFER_MAX:]
 
     def _poll_update(self, now: pd.Timestamp):
-        """หนึ่งรอบ poll: สลับ symbol ถ้าตลาดเปลี่ยน → ดึงราคา → merge → ประเมินสัญญาณ"""
-        # 1. เช็คว่าต้องสลับ symbol หรือไม่ (เสาร์-อาทิตย์ / ตลาดเปิดใหม่)
-        new_symbol = choose_symbol(now)
-        if new_symbol != self.symbol:
-            self._notify_symbol_switch(self.symbol, new_symbol)
-            self._seed_buffer()
-            self._last_processed_ts = None
+        """หนึ่งรอบ poll ของ symbol นี้: ถ้าตลาดปิด → ข้ามดึงราคา (ยังสรุปผลสัญญาณค้าง)
+        ถ้าตลาดเปิด → ดึงราคา → merge → ประเมินสัญญาณ"""
+
+        # ตลาด forex/commodity ปิด (เสาร์-อาทิตย์ / ช่วงปิดรายวัน) → ข้าม poll
+        # แต่ยังต้องสรุปผลสัญญาณ PENDING ที่ค้างจากช่วงตลาดเปิด (ใช้ราคาสุดท้าย)
+        if is_forex_like(self.symbol) and not market_open_now(now):
+            self._resolve_pending_signals(now)
             return
 
-        # 2. ดึงแท่งล่าสุด (count เล็กพอสำหรับ poll บ่อยๆ)
+        # ดึงแท่งล่าสุด (count เล็กพอสำหรับ poll บ่อยๆ)
         try:
             df = fetch_candles_history(symbol=self.symbol, granularity=60, count=15)
         except Exception as e:
@@ -192,20 +201,10 @@ class SetupFeedEngine:
             self._check_setup_scorer(now)
             self._resolve_pending_signals(now)
 
-    def _notify_symbol_switch(self, old_symbol: str, new_symbol: str):
-        self._symbol_switch_notified = True
-        self.symbol = new_symbol
-        msg = (
-            f"🔄 [SYMBOL SWITCH] ระบบ Rule-Based สลับสัญลักษณ์อัตโนมัติ\n"
-            f"จาก: {symbol_label(old_symbol)} → เป็น: {symbol_label(new_symbol)}\n"
-            f"เหตุผล: ตลาดหลักปิดหรือไม่สามารถรับราคาได้ — ระบบยังทำงานต่อด้วยสัญลักษณ์สำรอง"
-        )
-        send_telegram(msg)
-
     # 🏁 ตรวจสัญญาณ PENDING ที่ครบเวลาถือออเดอร์ → ประเมิน WIN/LOSE
     def _resolve_pending_signals(self, now: pd.Timestamp):
         try:
-            pending = db.fetch_pending_setup_signals()
+            pending = db.fetch_pending_setup_signals(symbol=self.symbol)
             for row in pending:
                 sig_time = pd.to_datetime(row["signal_time"])
                 elapsed_min = (now - sig_time).total_seconds() / 60.0
@@ -238,15 +237,15 @@ class SetupFeedEngine:
                 msg = (
                     f"🏁 [RESULT] [RULE-BASED] | ID #{row['id']} | TF: {row['timeframe']}\n"
                     f"Symbol: {sym_text} | ทิศทาง: {direction} | ผลลัพธ์: {result_icon}\n"
-                    f"Entry: {entry_price:.2f} ➔ Exit: {exit_price:.2f} "
-                    f"({'+' if res == 'WIN' else '-'}{pips_diff:.2f})\n"
+                    f"Entry: {entry_price:.5f} ➔ Exit: {exit_price:.5f} "
+                    f"({'+' if res == 'WIN' else '-'}{pips_diff:.5f})\n"
                     f"ระยะเวลาที่ถือ: {row['horizon_min']} นาที\n"
                     f"เวลาสรุปผล: {now.strftime('%H:%M:%S')} UTC"
                 )
                 send_telegram(msg)
-                print(f"[SetupFeed] สรุปผล ID #{row['id']} → {res}")
+                print(f"[SetupFeed:{self.symbol}] สรุปผล ID #{row['id']} → {res}")
         except Exception:
-            print("[SetupFeed] Error ในการสรุปผล PENDING signals:")
+            print(f"[SetupFeed:{self.symbol}] Error ในการสรุปผล PENDING signals:")
             traceback.print_exc()
 
     # 🎯 ตรวจ 9 Checklist ต่อ timeframe → บันทึก setup_scores เสมอ, ยิงสัญญาณเมื่อ trigger ใหม่
@@ -258,21 +257,21 @@ class SetupFeedEngine:
 
             try:
                 result = score_setup(df_tf, timeframe=tf_label, target_hold_minutes=hold_min)
-                setup_db.insert_setup_score(now.isoformat(), result)
+                setup_db.insert_setup_score(now.isoformat(), result, symbol=self.symbol)
             except Exception:
-                print(f"[SetupFeed] setup_scorer error ({tf_label}):")
+                print(f"[SetupFeed:{self.symbol}] setup_scorer error ({tf_label}):")
                 traceback.print_exc()
                 continue
 
             was_triggered = self._last_entry_trigger.get(tf_label, False)
             if result.entry_trigger and not was_triggered:
                 # 🚦 cooldown: ข้ามถ้ายังไม่ครบเวลาจากสัญญาณล่าสุดของ TF นี้ (อิง DB — กัน restart ยิงซ้ำ)
-                last_sig = db.fetch_last_setup_signal(timeframe=tf_label)
+                last_sig = db.fetch_last_setup_signal(timeframe=tf_label, symbol=self.symbol)
                 if last_sig:
                     last_time = pd.to_datetime(last_sig["signal_time"])
                     elapsed = (now - last_time).total_seconds() / 60.0
                     if elapsed < COOLDOWN_MIN:
-                        print(f"[SetupFeed] ข้ามสัญญาณ [{tf_label}] — ยังอยู่ใน cooldown "
+                        print(f"[SetupFeed:{self.symbol}] ข้ามสัญญาณ [{tf_label}] — ยังอยู่ใน cooldown "
                               f"{elapsed:.0f}/{COOLDOWN_MIN} นาที (ID#{last_sig['id']})")
                         self._last_entry_trigger[tf_label] = result.entry_trigger
                         continue
@@ -282,9 +281,10 @@ class SetupFeedEngine:
                     start_of_day = pd.Timestamp(
                         now.tz_localize(None) if now.tz is not None else now
                     ).normalize().isoformat()
-                    day_count = db.count_setup_signals_since(start_iso=start_of_day)
+                    day_count = db.count_setup_signals_since(start_iso=start_of_day,
+                                                             symbol=self.symbol)
                     if day_count >= DAILY_CAP:
-                        print(f"[SetupFeed] ข้ามสัญญาณ [{tf_label}] — ถึง daily cap {DAILY_CAP} แล้ว")
+                        print(f"[SetupFeed:{self.symbol}] ข้ามสัญญาณ [{tf_label}] — ถึง daily cap {DAILY_CAP} แล้ว")
                         self._last_entry_trigger[tf_label] = result.entry_trigger
                         continue
 
@@ -301,26 +301,26 @@ class SetupFeedEngine:
                         score=result.score,
                         total=result.max_score,
                         tier=result.tier,
+                        symbol=self.symbol,
                     )
-                    print(f"[SetupFeed] บันทึกสัญญาณ ID #{new_sig_id} [{tf_label}] ลง setup_signals "
-                          f"(รอวัดผลในอีก {hold_min} นาที)")
+                    print(f"[SetupFeed:{self.symbol}] บันทึกสัญญาณ ID #{new_sig_id} [{tf_label}] "
+                          f"ลง setup_signals (รอวัดผลในอีก {hold_min} นาที)")
                 except Exception:
-                    print("[SetupFeed] ไม่สามารถบันทึกสัญญาณลง DB ได้:")
+                    print(f"[SetupFeed:{self.symbol}] ไม่สามารถบันทึกสัญญาณลง DB ได้:")
                     traceback.print_exc()
 
                 sym_text = symbol_label(self.symbol)
-                if self.symbol != SYMBOL:
-                    sym_text = f"{sym_text} (สำรอง — ตลาดทองปิด)"
                 msg_trigger = (
                     f"🔵 [RULE-BASED ALERT]\n"
                     f"Symbol: {sym_text} | TF: {tf_label} | Tier: {result.tier}\n"
-                    f"Direction: {result.direction} | Entry: {self.last_price:.2f}\n"
+                    f"Direction: {result.direction} | Entry: {self.last_price:.5f}\n"
                     f"Score: {result.score}/{result.max_score} | Hold: {hold_min}m\n"
                     f"เหตุผล: {result.entry_trigger_note}\n"
                     f"เวลาเข้า: {now.strftime('%H:%M:%S')} UTC"
                 )
                 ok = send_telegram(msg_trigger)
-                print(f"[SetupFeed] Telegram ALERT [{tf_label}] {'ส่งสำเร็จ' if ok else 'ส่งไม่สำเร็จ (ดู log ด้านบน)'}")
+                print(f"[SetupFeed:{self.symbol}] Telegram ALERT [{tf_label}] "
+                      f"{'ส่งสำเร็จ' if ok else 'ส่งไม่สำเร็จ (ดู log ด้านบน)'}")
 
             self._last_entry_trigger[tf_label] = result.entry_trigger
 
@@ -340,7 +340,8 @@ class SetupFeedEngine:
         return out.dropna()
 
     def run(self):
-        print(f"[SetupFeed] 🔵 เริ่มต้นระบบ Rule-Based Setup Engine (polling {POLL_SECONDS}s, {self.symbol})...")
+        print(f"[SetupFeed:{self.symbol}] 🔵 เริ่ม Rule-Based Setup Engine "
+              f"(polling {POLL_SECONDS}s) ...")
 
         now_ts = pd.Timestamp(datetime.now(timezone.utc))
         self._check_setup_scorer(now_ts)
@@ -350,17 +351,45 @@ class SetupFeedEngine:
                 now_ts = pd.Timestamp(datetime.now(timezone.utc))
                 self._poll_update(now_ts)
             except KeyboardInterrupt:
-                print("\n[SetupFeed] หยุดการทำงานของระบบเรียบร้อยแล้ว")
+                print(f"\n[SetupFeed:{self.symbol}] หยุดการทำงานเรียบร้อยแล้ว")
                 break
             except Exception:
-                print("[SetupFeed] Error ในรอบ poll:")
+                print(f"[SetupFeed:{self.symbol}] Error ในรอบ poll:")
                 traceback.print_exc()
             time.sleep(POLL_SECONDS)
 
 
+def _run_one_symbol(symbol: str):
+    """รัน engine สำหรับ 1 สัญลักษณ์ — ถ้า engine ล่ม (เช่น API error รุนแรง) ให้ลองใหม่"""
+    tag = f"[SetupFeed:{symbol}]"
+    while True:
+        try:
+            engine = SetupFeedEngine(symbol)
+            engine.run()
+            return  # run() ออกเฉพาะ KeyboardInterrupt
+        except KeyboardInterrupt:
+            return
+        except Exception:
+            print(f"{tag} Engine ผิดพลาดรุนแรง — restart ใหม่ใน 10 วิ:")
+            traceback.print_exc()
+            time.sleep(10)
+
+
 if __name__ == "__main__":
-    engine = SetupFeedEngine()
-    try:
-        engine.run()
-    except KeyboardInterrupt:
-        print("\n[SetupFeed] ปิดโปรแกรม")
+    if not TRADE_SYMBOLS:
+        print("[SetupFeed] ไม่พบ TRADE_SYMBOLS ที่ใช้ได้ — ปิดระบบ")
+    else:
+        import threading
+
+        print(f"[SetupFeed] เริ่ม Rule-Based สำหรับ {len(TRADE_SYMBOLS)} สัญลักษณ์: "
+              f"{', '.join(TRADE_SYMBOLS)}")
+        threads = []
+        for sym in TRADE_SYMBOLS:
+            t = threading.Thread(target=_run_one_symbol, args=(sym,), daemon=True)
+            t.start()
+            threads.append(t)
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\n[SetupFeed] ปิดโปรแกรม")

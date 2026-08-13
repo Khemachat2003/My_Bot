@@ -77,7 +77,7 @@ def load_setup_features(timeframe: str = "M5") -> pd.DataFrame:
     """ดึง setup_scores ทั้งหมด → DataFrame[index=ts, columns=setup features]
     (index เป็น bar time — ใช้ merge_asof กับราคา M5 ได้)"""
     setup_db.init_setup_db()
-    rows = setup_db.fetch_setup_scores_range(timeframe)
+    rows = setup_db.fetch_setup_scores_range(timeframe, symbol="frxXAUUSD")
     if not rows:
         return pd.DataFrame(columns=SETUP_FEATURE_COLUMNS)
     recs = []

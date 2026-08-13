@@ -56,6 +56,10 @@ def init_setup_db() -> None:
         conn.execute("ALTER TABLE setup_scores ADD COLUMN tier TEXT DEFAULT 'NONE'")
     if "max_score" not in cols:
         conn.execute("ALTER TABLE setup_scores ADD COLUMN max_score INTEGER DEFAULT 15")
+    # รองรับหลายสัญลักษณ์ (major pairs) — ข้อมูลเก่าเป็น frxXAUUSD
+    if "symbol" not in cols:
+        conn.execute("ALTER TABLE setup_scores ADD COLUMN symbol TEXT NOT NULL DEFAULT 'frxXAUUSD'")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_setup_scores_symbol ON setup_scores(symbol)")
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_setup_scores_tf_ts
         ON setup_scores (timeframe, id DESC)
@@ -64,7 +68,8 @@ def init_setup_db() -> None:
     conn.close()
 
 
-def insert_setup_score(ts: str, result: "SetupResult") -> int:
+def insert_setup_score(ts: str, result: "SetupResult",
+                       symbol: str = "frxXAUUSD") -> int:
     """result: SetupResult ที่ได้จาก setup_scorer.score_setup(...)"""
     details_serializable = result.details
     conn = _connect()
@@ -72,8 +77,8 @@ def insert_setup_score(ts: str, result: "SetupResult") -> int:
         INSERT INTO setup_scores
             (ts, timeframe, score, total, direction, bias,
              entry_trigger, entry_trigger_note, details_json, grip_json,
-             tier, max_score)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             tier, max_score, symbol)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         ts, result.timeframe, result.score, result.max_score,
         result.direction, result.bias,
@@ -81,6 +86,7 @@ def insert_setup_score(ts: str, result: "SetupResult") -> int:
         json.dumps(to_json_safe(details_serializable), ensure_ascii=False),
         json.dumps(to_json_safe(result.grip_hits), ensure_ascii=False),
         result.tier, result.max_score,
+        symbol,
     ))
     conn.commit()
     row_id = cur.lastrowid
@@ -102,37 +108,60 @@ def _row_to_dict(r: sqlite3.Row) -> dict:
         "grip_hits": json.loads(r["grip_json"]) if r["grip_json"] else [],
         "tier": r["tier"],
         "max_score": r["max_score"],
+        "symbol": r["symbol"],
     }
 
 
-def fetch_latest_setup_scores() -> dict:
-    """คืนค่าล่าสุดของแต่ละ timeframe → {"1m": {...}, "5m": {...}}"""
+def fetch_latest_setup_scores(symbol: str | None = None) -> dict:
+    """คืนค่าล่าสุดของแต่ละ timeframe ของ symbol → {"1m": {...}, "5m": {...}}
+    (ไม่ระบุ symbol = เอาล่าสุดข้ามทุกสัญลักษณ์)"""
     conn = _connect()
-    rows = conn.execute("""
-        SELECT * FROM setup_scores
-        WHERE id IN (SELECT MAX(id) FROM setup_scores GROUP BY timeframe)
-    """).fetchall()
+    if symbol:
+        rows = conn.execute("""
+            SELECT * FROM setup_scores
+            WHERE symbol = ?
+              AND id IN (SELECT MAX(id) FROM setup_scores
+                         WHERE symbol = ? GROUP BY timeframe)
+        """, (symbol, symbol)).fetchall()
+    else:
+        rows = conn.execute("""
+            SELECT * FROM setup_scores
+            WHERE id IN (SELECT MAX(id) FROM setup_scores GROUP BY timeframe)
+        """).fetchall()
     conn.close()
     return {r["timeframe"]: _row_to_dict(r) for r in rows}
 
 
-def fetch_recent_setup_scores(timeframe: str, limit: int = 50) -> list[dict]:
+def fetch_recent_setup_scores(timeframe: str, limit: int = 50,
+                              symbol: str | None = None) -> list[dict]:
     conn = _connect()
-    rows = conn.execute("""
-        SELECT * FROM setup_scores
-        WHERE timeframe = ?
-        ORDER BY id DESC LIMIT ?
-    """, (timeframe, limit)).fetchall()
+    if symbol:
+        rows = conn.execute("""
+            SELECT * FROM setup_scores
+            WHERE timeframe = ? AND symbol = ?
+            ORDER BY id DESC LIMIT ?
+        """, (timeframe, symbol, limit)).fetchall()
+    else:
+        rows = conn.execute("""
+            SELECT * FROM setup_scores
+            WHERE timeframe = ?
+            ORDER BY id DESC LIMIT ?
+        """, (timeframe, limit)).fetchall()
     conn.close()
     return [_row_to_dict(r) for r in reversed(rows)]
 
 
 def fetch_setup_scores_range(timeframe: str, start: str | None = None,
-                             end: str | None = None) -> list[dict]:
+                             end: str | None = None,
+                             symbol: str | None = None) -> list[dict]:
     """ดึง setup_scores ทั้งหมดของ timeframe ในช่วงเวลา (สำหรับ auto_retrain)
-    — flatten details (10 checklist) ให้เป็นคอลัมน์ง่าย ๆ สำหรับ merge กับราคา"""
+    — flatten details (10 checklist) ให้เป็นคอลัมน์ง่าย ๆ สำหรับ merge กับราคา
+    default symbol=None = ทุกสัญลักษณ์ (แต่ auto_retrain ควรส่ง symbol=frxXAUUSD)"""
     q = "SELECT * FROM setup_scores WHERE timeframe = ?"
     params: list = [timeframe]
+    if symbol:
+        q += " AND symbol = ?"
+        params.append(symbol)
     if start:
         q += " AND ts >= ?"
         params.append(start)
