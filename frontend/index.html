@@ -753,9 +753,10 @@ function drawCandles(canvas, data){
   const step=plotW/(chartView.count-1), bw=Math.max(plotW/chartView.count*0.55,1);
   const pxForData=i=>padL+(i-start)*step;
   const py=v=>padT+(max-v)/(max-min)*plotH;
-  const drawLine=(arr,color,width)=>{ ctx.strokeStyle=color; ctx.lineWidth=width||1.2; ctx.beginPath(); let started=false;
+  const drawLine=(arr,color,width,yFn)=>{ ctx.strokeStyle=color; ctx.lineWidth=width||1.2; ctx.beginPath(); let started=false;
     for(let i=start;i<=end;i++){ const v=arr[i]; if(v==null) continue; const x=pxForData(i);
-      if(!started){ctx.moveTo(x,py(v));started=true;} else ctx.lineTo(x,py(v)); }
+      const y=(yFn||py)(v);
+      if(!started){ctx.moveTo(x,y);started=true;} else ctx.lineTo(x,y); }
     ctx.stroke(); };
 
   // ── Grip: เส้นประที่ราคากลมๆ ──
@@ -881,7 +882,7 @@ function drawCandles(canvas, data){
     ctx.fillStyle='rgba(246,70,93,.10)'; ctx.fillRect(padL,vy(100),plotW,vy(70)-vy(100));
     ctx.fillStyle='rgba(34,201,138,.10)'; ctx.fillRect(padL,vy(30),plotW,vy(0)-vy(30));
     ctx.save(); ctx.beginPath(); ctx.rect(padL,pTop,plotW,pBot-pTop); ctx.clip();
-    drawLine(rv,'#f7b847');
+    drawLine(rv,'#f7b847',1.2,vy);
     ctx.restore();
     oy+=90;
   }
@@ -899,9 +900,9 @@ function drawCandles(canvas, data){
     ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(padL,y20); ctx.lineTo(W-padR,y20); ctx.stroke(); ctx.setLineDash([]);
     ctx.fillStyle='#4a5775'; ctx.textAlign='right'; ctx.fillText('20',W-6,y20+3); ctx.textAlign='left';
     ctx.save(); ctx.beginPath(); ctx.rect(padL,pTop,plotW,pBot-pTop); ctx.clip();
-    drawLine(a.pdi,'rgba(34,201,138,.75)');
-    drawLine(a.ndi,'rgba(246,70,93,.75)');
-    drawLine(a.adx,'#f7b847');
+    drawLine(a.pdi,'rgba(34,201,138,.75)',1.2,vy);
+    drawLine(a.ndi,'rgba(246,70,93,.75)',1.2,vy);
+    drawLine(a.adx,'#f7b847',1.2,vy);
     ctx.restore();
   }
 
@@ -921,18 +922,16 @@ function zoomChartAt(factor, frac){
   const oldFuture=Math.max(3,Math.round(chartView.count*0.15));
   const oldReal=Math.max(5,chartView.count-oldFuture);
   let end=(chartView.end<0||chartView.end>=nAll)?nAll-1:chartView.end;
-  const wasLatest=(chartView.end<0)||(end===nAll-1);
   const oldStart=Math.max(0,end-oldReal+1);
-  const anchor=oldStart+Math.round(frac*(oldReal-1));
+  // แท่งที่อยู่ใต้ cursor: map frac ข้ามช่องทั้งหมด (count-1) ให้ตรงกับ pxForData
+  const anchor=Math.min(end,oldStart+Math.round(frac*(chartView.count-1)));
   const newCount=Math.min(300,Math.max(30,Math.round(chartView.count*factor)));
   const newFuture=Math.max(3,Math.round(newCount*0.15));
   const newReal=Math.max(5,newCount-newFuture);
+  // ยึดแท่งใต้ cursor ให้อยู่ตำแหน่ง frac เดิมของหน้าต่างใหม่ (เหมือน TradingView)
   let newStart=Math.round(anchor-frac*(newReal-1));
   newStart=Math.max(0,Math.min(newStart,nAll-newReal));
-  let newEnd=newStart+newReal-1;
-  if(wasLatest) newEnd=nAll-1;
-  else newEnd=Math.min(newEnd,nAll-1);
-  if(newStart>newEnd-newReal+1) newStart=newEnd-newReal+1;
+  const newEnd=newStart+newReal-1;
   chartView.count=newCount; chartView.end=newEnd;
   drawCandles(document.getElementById('candleChart'),lastCandles);
 }
