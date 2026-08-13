@@ -1,5 +1,5 @@
 {
-  "comment": "Rule-Based Checklist V4 — Trend-Aligned EMA200 Rejection ตาม Setup101.txt (เทรดตามเทรนใหญ่ ไม่สวนเทรน / Hard-gate: ราคาต้องแตะ-ใกล้ EMA200, ไม่ sideway, โครงสร้าง Zigzag HH/HL, BB ไม่บีบ, อยู่ในโซน S/R, Reject ต้อง double-touch เท่านั้น)",
+  "comment": "Rule-Based Checklist V4 — Trend-Aligned EMA200 Rejection ตาม Setup101.txt (เทรดตามเทรนใหญ่ ไม่สวนเทรน / Hard-gate: ราคาต้องแตะ-ใกล้ EMA200, ไม่ sideway, โครงสร้าง Fractal (depth 15) HH/HL, BB ไม่บีบ, อยู่ในโซน S/R, Reject ต้อง double-touch เท่านั้น)",
   "max_score": 18,
   "fire_score": 13,
   "watch_score": 10,
@@ -10,12 +10,9 @@
   "ema200_near_tol_pct": 0.35,
   "ema100_tol_pct": 0.08,
   "rejection_lookback": 10,
-  "zigzag": {
-    "mode": "atr",
-    "atr_period": 14,
-    "atr_multiplier": 2.0,
-    "depth": 10,
-    "backstep": 3
+  "fractal": {
+    "left": 7,
+    "right": 7
   },
   "sma5": {
     "period": 5,
@@ -39,7 +36,9 @@
     "tolerance_pct": 0.20,
     "major_tests": 3,
     "minor_tests": 2,
-    "zone_pct": 0.35
+    "zone_pct": 0.35,
+    "fractal_left": 2,
+    "fractal_right": 2
   },
   "grip": {
     "auto_scale": true,

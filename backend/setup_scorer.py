@@ -6,17 +6,17 @@ setup_scorer.py — 🔵 Trend-Aligned EMA200 Rejection Checklist V3 (Rule-Based
   🎯 หลักการ: เทรด "ตามเทรนใหญ่" รอให้ราคาย่อกลับมาหา EMA 200 แล้วเกิด Reject → เข้า
      ตามทิศทางเทรน ไม่ใช่สวนเทรน (ไม่ fade)
 
-  ลำดับตรวจ (ตรง Setup101 ข้อ 2.1-2.10):
-    1) เทรนด์ใหญ่: EMA50/100/200 เรียงตามทิศ + Zigzag HH/HL (หรือ LH/LL)
-    2) ADX > 20 → เทรนด์แข็งแรง
-    3) RSI อยู่ในโซน (y่อลึกในเทรนด์ขึ้น = overbought อ่อนตัว / oversold)
-    4) ราคาเคยทะลุ EMA100 ขึ้นไปแล้ว (ยืนยันว่าเป็นเทรนด์จริง ไม่ใช่แค่สวิง)
-    5) BB ขยายตัว (มีวอลุ่มสนับสนุน) — บีบตัว = ไม่เหมาะ
-    6) Zigzag ยังทำยอดตามทิศเทรนด์ต่อเนื่อง
-    7) ราคาย่อลงมาอยู่โซน EMA200 (อย่างน้อยต้องผ่าน EMA100 มาแล้ว)
-    8) จุดย่อตรงแนวรับ/ต้านสำคัญ (หลัก/ย่อย) + มีเส้น Grip ซ้อน = ยิ่งมั่นใจ
-    9) Rejection ที่ EMA200: ราคาแตะ EMA200 แล้วถูกดีดกลับ (wick) หรือ
-       แตะ-ดีด-แตะซ้ำ (double-touch ตามนิยามใน Setup101) → จุดชี้ขาด
+   ลำดับตรวจ (ตรง Setup101 ข้อ 2.1-2.10):
+     1) เทรนด์ใหญ่: EMA50/100/200 เรียงตามทิศ + Fractal HH/HL (หรือ LH/LL)
+     2) ADX > 20 → เทรนด์แข็งแรง
+     3) RSI อยู่ในโซน (y่อลึกในเทรนด์ขึ้น = overbought อ่อนตัว / oversold)
+     4) ราคาเคยทะลุ EMA100 ขึ้นไปแล้ว (ยืนยันว่าเป็นเทรนด์จริง ไม่ใช่แค่สวิง)
+     5) BB ขยายตัว (มีวอลุ่มสนับสนุน) — บีบตัว = ไม่เหมาะ
+     6) Fractal (depth 15, ยอดแท่งที่ 8) ยังทำยอดตามทิศเทรนด์ต่อเนื่อง
+     7) ราคาย่อลงมาอยู่โซน EMA200 (อย่างน้อยต้องผ่าน EMA100 มาแล้ว)
+     8) จุดย่อตรงแนวรับ/ต้านสำคัญ (หลัก/ย่อย) + มีเส้น Grip ซ้อน = ยิ่งมั่นใจ
+     9) Rejection ที่ EMA200: ราคาแตะ EMA200 แล้วถูกดีดกลับ (wick) หรือ
+        แตะ-ดีด-แตะซ้ำ (double-touch ตามนิยามใน Setup101) → จุดชี้ขาด
 
   Tier:
     FIRE  = เทรนด์ชัดเจน + ราคาแตะโซน EMA200 + Reject เกิด → เข้าตามเทรน
@@ -124,45 +124,31 @@ def _calc_adx(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 1
     return dx.ewm(alpha=1 / period, adjust=False).mean()
 
 
-# ── Zigzag Swing Detection (depth=10, backstep=3, deviation=ATR-based) ───────
-def _find_pivots(high: pd.Series, low: pd.Series, deviation_abs: float = 1.0,
-                 depth: int = 10, backstep: int = 3):
-    """Zigzag แบบ classic (สลับ high/low ตามลำดับ)
-    deviation_abs คือระยะขั้นต่ำ (เป็นหน่วยราคา เช่น 2x ATR) ที่ราคาต้องเดิน
-    ไปทิศตรงข้ามจาก pivot ก่อน จึงจะปัก pivot ใหม่"""
+# ── Fractal Swing Detection (Bill Williams / TradingView ta.pivothigh-low, 15 แท่ง) ──
+def _find_fractals(high: pd.Series, low: pd.Series, left: int = 7, right: int = 7):
+    """Fractal ตรงมาตรฐาน TradingView ta.pivothigh/pivotlow:
+    แท่งกลาง (i) ต้องเป็นยอดสูงสุดในหน้าต่าง [i-left, i+right] โดยแท่งซ้าย left และขวา right
+    ทั้งหมดต้องต่ำกว่า (ถ้าเป็นยอดสูง) หรือสูงกว่า (ถ้าเป็นยอดต่ำ) อย่างเคร่งครัด
+    → กับ left=7, right=7 ได้ยอดแท่งที่ 8 จาก 15 แท่ง (ตามที่ตั้งไว้)
+    คืน piv_highs / piv_lows = [(index, price), ...] เรียงตามเวลา"""
     n = len(high)
-    pivots: list[tuple[int, float, str]] = []  # (idx, price, 'h'|'l')
-    last_price = float('nan')
-    last_idx = -1
-    last_type = ""
-
-    for i in range(n):
-        h = float(high.iloc[i])
-        l = float(low.iloc[i])
-        if last_type == "":
-            last_price, last_idx, last_type = l, i, "l"
-            continue
-
-        if last_type == "l":
-            if l <= last_price:
-                last_price, last_idx = l, i
-            elif h >= last_price + deviation_abs:
-                pivots.append((last_idx, last_price, "l"))
-                last_price, last_idx, last_type = h, i, "h"
-        else:  # last_type == "h"
-            if h >= last_price:
-                last_price, last_idx = h, i
-            elif l <= last_price - deviation_abs:
-                pivots.append((last_idx, last_price, "h"))
-                last_price, last_idx, last_type = l, i, "l"
-
-    # แยกเป็น piv_highs / piv_lows ตามลำดับเวลา
-    piv_highs = [(i, p) for i, p, t in pivots if t == "h"]
-    piv_lows = [(i, p) for i, p, t in pivots if t == "l"]
+    H = [float(x) for x in high]
+    L = [float(x) for x in low]
+    piv_highs: list[tuple[int, float]] = []
+    piv_lows: list[tuple[int, float]] = []
+    for i in range(left, n - right):
+        h, l = H[i], L[i]
+        is_h = h > max(H[i - left:i]) and h > max(H[i + 1:i + right + 1])
+        is_l = l < min(L[i - left:i]) and l < min(L[i + 1:i + right + 1])
+        if is_h:
+            piv_highs.append((i, h))
+        elif is_l:
+            piv_lows.append((i, l))
     return piv_highs, piv_lows
 
 
-def _zigzag_structure(piv_highs, piv_lows) -> str:
+def _fractal_structure(piv_highs, piv_lows) -> str:
+    """โครงสร้างจาก fractal ล่าสุด: HH+HL = UPTREND, LH+LL = DOWNTREND, อื่น = SIDEWAYS"""
     if len(piv_highs) >= 2 and piv_highs[-1][1] > piv_highs[-2][1]:
         hh = True
     elif len(piv_highs) >= 2:
@@ -209,18 +195,21 @@ def _cluster_levels(prices: list[float], tol_pct: float) -> list[dict]:
 def _find_levels(df: pd.DataFrame, cfg: dict, lookback: int = 200) -> tuple[list[dict], list[dict]]:
     sl = min(lookback, len(df))
     seg = df.iloc[-sl:]
-    # S/R ใช้ fractal ละเอียด (left/right=2) เพื่อเก็บแนวรับ/ต้านจำนวนมาก
+    # S/R ใช้ fractal ละเอียด (left/right=2) เพื่อเก็บแนวรับ/ต้านจำนวนมาก (ตั้งค่าได้ sr.fractal_left/right)
+    sr_cfg = cfg.get("sr", {})
+    fleft = int(sr_cfg.get("fractal_left", 2))
+    fright = int(sr_cfg.get("fractal_right", 2))
     n = len(seg)
     piv_h = []
     piv_l = []
-    for i in range(2, n - 2):
-        wh = seg["high"].iloc[i - 2: i + 3]
+    for i in range(fleft, n - fright):
+        wh = seg["high"].iloc[i - fleft: i + fright + 1]
         if seg["high"].iloc[i] == wh.max() and wh.max() > wh.min():
             piv_h.append((i, float(seg["high"].iloc[i])))
-        wl = seg["low"].iloc[i - 2: i + 3]
+        wl = seg["low"].iloc[i - fleft: i + fright + 1]
         if seg["low"].iloc[i] == wl.min() and wl.max() > wl.min():
             piv_l.append((i, float(seg["low"].iloc[i])))
-    tol = cfg.get("sr", {}).get("tolerance_pct", 0.20)
+    tol = sr_cfg.get("tolerance_pct", 0.20)
     supports = _cluster_levels([p for _, p in piv_l], tol)
     resistances = _cluster_levels([p for _, p in piv_h], tol)
     return supports, resistances
@@ -476,15 +465,15 @@ def _score_trend_setup(df: pd.DataFrame, direction: str, ctx: dict, cfg: dict) -
         bb_frac = 0.0
     add("bb", bb_frac, bb_note)
 
-    # 7) Zigzag — ทำยอดตามทิศเทรน (Setup101 ข้อ 6)
+    # 7) Fractal (depth 15) — ทำยอดตามทิศเทรน (Setup101 ข้อ 6)
     struct = ctx["structure"]
     if direction == "CALL":
         ok = struct == "UPTREND"
-        zz_note = f"Zigzag: {struct} — HH/HL ตามเทรนขึ้น" if ok else f"Zigzag: {struct} — ขัด/ยังไม่ยืนยันเทรนขึ้น"
+        fr_note = f"Fractal: {struct} — HH/HL ตามเทรนขึ้น" if ok else f"Fractal: {struct} — ขัด/ยังไม่ยืนยันเทรนขึ้น"
     else:
         ok = struct == "DOWNTREND"
-        zz_note = f"Zigzag: {struct} — LH/LL ตามเทรนลง" if ok else f"Zigzag: {struct} — ขัด/ยังไม่ยืนยันเทรนลง"
-    add("structure", 1.0 if ok else 0.0, zz_note)
+        fr_note = f"Fractal: {struct} — LH/LL ตามเทรนลง" if ok else f"Fractal: {struct} — ขัด/ยังไม่ยืนยันเทรนลง"
+    add("structure", 1.0 if ok else 0.0, fr_note)
 
     # 8) Pullback — ราคาย่อมาอยู่โซน EMA200 (Setup101 ข้อ 8: อย่างน้อยผ่าน EMA100)
     tol200 = float(cfg.get("ema200_tol_pct", 0.12))
@@ -592,17 +581,16 @@ def score_setup(
 
     sr_cfg = cfg.get("sr", {})
     lookback_sr = int(sr_cfg.get("lookback", 200))
-    # Zigzag: ATR-based deviation (mode=atr) → ใช้ 2x ATR เป็นระยะขั้นต่ำ
-    zz_cfg = cfg.get("zigzag", {})
-    zz_dev = float(zz_cfg.get("atr_multiplier", 2.0)) * float(atr.iloc[-1])
-    piv_h, piv_l = _find_pivots(
+    # Fractal: โครงสร้างเทรนใช้ depth 15 (left=7, right=7) → ยอดแท่งที่ 8 (ตรง TradingView ta.pivothigh)
+    frac_cfg = cfg.get("fractal", {})
+    frac_left = int(frac_cfg.get("left", 7))
+    frac_right = int(frac_cfg.get("right", 7))
+    piv_h, piv_l = _find_fractals(
         high.tail(lookback_sr), low.tail(lookback_sr),
-        deviation_abs=zz_dev,
-        depth=int(zz_cfg.get("depth", 10)),
-        backstep=int(zz_cfg.get("backstep", 3)),
+        left=frac_left, right=frac_right,
     )
     supports, resistances = _find_levels(df, cfg, lookback_sr)
-    structure = _zigzag_structure(piv_h, piv_l)
+    structure = _fractal_structure(piv_h, piv_l)
 
     last_atr = atr.iloc[-1]
     if last_atr == 0 or np.isnan(last_atr):
@@ -657,7 +645,7 @@ def score_setup(
     trend_ok = _ok("trend_ema")
     pullback_ok = _ok("pullback", 0.5)          # ราคาแตะ/ใกล้ EMA200 (หัวใจของ setup)
     reject_frac = details.get("rejection", {}).get("frac", 0.0)
-    structure_ok = _ok("structure", 0.99)        # Zigzag HH/HL ตามเทรน
+    structure_ok = _ok("structure", 0.99)        # Fractal HH/HL ตามเทรน
     bb_ok = _ok("bb", 0.5)                        # ไม่บีบ (ขยาย/ทรงตัว)
     sr_ok = _ok("sr", 0.5)                        # อยู่ในโซนแนวรับ/ต้าน
     no_sideway = ctx["structure"] != "SIDEWAYS"   # ราคาไม่ sideway
@@ -669,7 +657,7 @@ def score_setup(
     if hg.get("no_sideway", True) and not no_sideway:
         hg_blocked.append("ราคากำลัง sideway")
     if hg.get("structure", True) and not structure_ok:
-        hg_blocked.append("Zigzag ยังไม่ทำ HH/HL ตามเทรน")
+        hg_blocked.append("Fractal ยังไม่ทำ HH/HL ตามเทรน")
     if hg.get("bb", True) and not bb_ok:
         hg_blocked.append("BB กำลังบีบตัว")
     if hg.get("sr", True) and not sr_ok:

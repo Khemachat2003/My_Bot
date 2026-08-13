@@ -158,6 +158,14 @@
   }
   .tf-btn:hover{color:var(--text);}
   .tf-btn.active{background:var(--cyan); color:#04121a;}
+  .ind-bar{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin:10px 0 8px;}
+  .ind-chip{
+    background:var(--card); border:1px solid var(--border); color:var(--muted); cursor:pointer;
+    font-size:10.5px; font-weight:800; font-family:inherit; padding:4px 10px; border-radius:20px; transition:.15s;
+  }
+  .ind-chip:hover{color:var(--text); border-color:var(--purple);}
+  .ind-chip.active{background:var(--purple); color:#fff; border-color:var(--purple);}
+  .ind-spacer{flex:1;}
   .btn{
     background:var(--card); border:1px solid var(--border); color:var(--text); cursor:pointer;
     font-size:11.5px; font-weight:800; font-family:inherit; padding:7px 14px; border-radius:8px; transition:.15s;
@@ -378,11 +386,25 @@
             </span>
           </span>
         </h3>
-        <div class="chart-wrap"><canvas id="candleChart" class="chart"></canvas></div>
+        <div class="chart-wrap" style="height:400px;"><canvas id="candleChart" class="chart"></canvas></div>
+        <div class="ind-bar" id="chartIndBar">
+          <span class="ind-chip active" data-ind="bb">BB (20,2)</span>
+          <span class="ind-chip active" data-ind="ema">EMA 50/100/200</span>
+          <span class="ind-chip active" data-ind="sma5">SMA5</span>
+          <span class="ind-chip active" data-ind="rsi">RSI(14)</span>
+          <span class="ind-chip active" data-ind="adx">ADX(14)</span>
+          <span class="ind-chip active" data-ind="fractal">Fractal</span>
+          <span class="ind-chip" data-ind="vol">Volume</span>
+          <span class="ind-spacer"></span>
+          <span class="ind-chip" data-ind="grip">Grid</span>
+        </div>
         <div class="chart-legend">
-          <span><i style="background:var(--cyan);"></i>EMA20</span>
-          <span><i style="background:var(--purple);"></i>EMA50</span>
+          <span><i style="background:var(--cyan);"></i>EMA50</span>
+          <span><i style="background:var(--purple);"></i>EMA100</span>
           <span><i style="background:var(--yellow);"></i>EMA200</span>
+          <span><i style="background:#8ca0c8;"></i>BB</span>
+          <span><i style="background:var(--green);"></i>Fractal Low</span>
+          <span><i style="background:var(--red);"></i>Fractal High</span>
           <span><i style="background:var(--green);"></i>CALL zone</span>
           <span><i style="background:var(--red);"></i>PUT zone</span>
         </div>
@@ -603,6 +625,94 @@ function ema(vals, period){
 }
 const chartView={count:300,end:-1}; // end=-1 = ล็อกกับแท่งล่าสุด; แก้ด้วย zoom/pan
 let lastCandles=[];
+let chartInd={bb:true,ema:true,sma5:true,rsi:true,adx:true,fractal:true,vol:false,grip:false};
+
+// ── indicator helpers ──
+function sma(vals, period){
+  const out=new Array(vals.length).fill(null); let sum=0;
+  for(let i=0;i<vals.length;i++){
+    sum+=vals[i];
+    if(i>=period) sum-=vals[i-period];
+    if(i>=period-1) out[i]=sum/period;
+  }
+  return out;
+}
+function stdev(vals, period){
+  const out=new Array(vals.length).fill(null);
+  for(let i=period-1;i<vals.length;i++){
+    const slice=vals.slice(i-period+1,i+1);
+    const mean=slice.reduce((a,b)=>a+b,0)/period;
+    out[i]=Math.sqrt(slice.reduce((a,b)=>a+(b-mean)**2,0)/period);
+  }
+  return out;
+}
+function bollinger(closes, period=20, mult=2){
+  const mid=sma(closes,period), sd=stdev(closes,period);
+  return { mid, up:closes.map((_,i)=>mid[i]==null?null:mid[i]+mult*sd[i]), low:closes.map((_,i)=>mid[i]==null?null:mid[i]-mult*sd[i]) };
+}
+function rsi(closes, period=14){
+  const out=new Array(closes.length).fill(null);
+  let g=0,l=0;
+  for(let i=1;i<closes.length;i++){
+    const ch=closes[i]-closes[i-1];
+    if(i===period+1){
+      let ag=0,al=0;
+      for(let j=1;j<=period;j++){ const d=closes[j]-closes[j-1]; if(d>0)ag+=d; else al-=d; }
+      g=ag/period; l=al/period;
+    } else if(i>period+1){
+      g=(g*(period-1)+Math.max(ch,0))/period;
+      l=(l*(period-1)+Math.max(-ch,0))/period;
+    } else continue;
+    out[i]=l===0?100:100-100/(1+g/l);
+  }
+  return out;
+}
+function adx(h,l,c,period=14){
+  const n=h.length, tr=new Array(n).fill(0), pdm=new Array(n).fill(0), ndm=new Array(n).fill(0);
+  for(let i=1;i<n;i++){
+    tr[i]=Math.max(h[i]-l[i],Math.abs(h[i]-c[i-1]),Math.abs(l[i]-c[i-1]));
+    const up=h[i]-h[i-1], dn=l[i-1]-l[i];
+    pdm[i]=(up>dn&&up>0)?up:0; ndm[i]=(dn>up&&dn>0)?dn:0;
+  }
+  const atr=new Array(n).fill(null), sp=new Array(n).fill(null), sn=new Array(n).fill(null);
+  for(let i=period;i<n;i++){
+    if(i===period){ let at=0,ap=0,an=0;
+      for(let j=1;j<=period;j++){ at+=tr[j]; ap+=pdm[j]; an+=ndm[j]; }
+      atr[i]=at/period; sp[i]=ap/period; sn[i]=an/period;
+    } else {
+      atr[i]=(atr[i-1]*(period-1)+tr[i])/period;
+      sp[i]=(sp[i-1]*(period-1)+pdm[i])/period;
+      sn[i]=(sn[i-1]*(period-1)+ndm[i])/period;
+    }
+  }
+  const pdi=new Array(n).fill(null), ndi=new Array(n).fill(null), dx=new Array(n).fill(null);
+  for(let i=period;i<n;i++){
+    pdi[i]=atr[i]?100*sp[i]/atr[i]:0;
+    ndi[i]=atr[i]?100*sn[i]/atr[i]:0;
+    dx[i]=(pdi[i]+ndi[i])?100*Math.abs(pdi[i]-ndi[i])/(pdi[i]+ndi[i]):0;
+  }
+  const adxv=new Array(n).fill(null);
+  for(let i=2*period-1;i<n;i++){
+    if(i===2*period-1){ let acc=0; for(let j=period;j<=2*period-1;j++) acc+=dx[j]; adxv[i]=acc/period; }
+    else adxv[i]=(adxv[i-1]*(period-1)+dx[i])/period;
+  }
+  return {adx:adxv, pdi, ndi};
+}
+function fractal(nd, l=7, r=7){
+  // fractal: แท่งกลางต้องเป็นยอดสูง/ต่ำสุด โดยแท่งซ้าย l แท่งและขวา r แท่งต่ำ/สูงกว่า (ยอดแท่งที่ 8 ใน 15 แท่ง)
+  const out=[];
+  for(let i=l;i<nd.length-r;i++){
+    let isH=true,isL=true;
+    for(let j=i-l;j<=i+r;j++){ if(j===i) continue;
+      if(nd[j].h>=nd[i].h) isH=false;
+      if(nd[j].l<=nd[i].l) isL=false;
+    }
+    if(isH) out.push({i,v:nd[i].h,t:'H'});
+    else if(isL) out.push({i,v:nd[i].l,t:'L'});
+  }
+  return out;
+}
+
 function drawCandles(canvas, data){
   const dpr=window.devicePixelRatio||1;
   const rect=canvas.getBoundingClientRect();
@@ -615,74 +725,122 @@ function drawCandles(canvas, data){
   }
   lastCandles=data;
   // normalise: รองรับทั้ง /api/prices (open/high/low/close/ts) และ /api/candles (o/h/l/c/t)
-  const norm=d=>d.o!=null?{o:d.o,h:d.h,l:d.l,c:d.c,t:d.t}:{o:d.open,h:d.high,l:d.low,c:d.close,t:d.ts||d.t};
+  const norm=d=>d.o!=null?{o:d.o,h:d.h,l:d.l,c:d.c,t:d.t,v:d.v||0}:{o:d.open,h:d.high,l:d.low,c:d.close,t:d.ts||d.t,v:d.volume||0};
   const nd=data.map(norm);
   const nAll=nd.length;
-  // ── กำหนดหน้าต่างที่มอง (zoom/pan) ──
-  let end=chartView.end;
-  if(end<0||end>=nAll) end=nAll-1;
-  let start=end-chartView.count+1; if(start<0) start=0;
+  const closes=nd.map(d=>d.c);
+
+  // ── layout: price + (volume strip) + (RSI/ADX sub-panels) ──
+  const subCount=(chartInd.rsi?1:0)+(chartInd.adx?1:0);
+  const subH=subCount*90, volH=chartInd.vol?30:0, padL=8, padT=10;
+  const priceH=H-subH-volH-6, plotH=priceH-padT;
+
+  // ── หน้าต่าง + ช่องว่างขวา (future gap เหมือนโบรกเกอร์) ──
+  const future=Math.max(3,Math.round(chartView.count*0.15));
+  const realSlots=Math.max(5,chartView.count-future);
+  let end=chartView.end; if(end<0||end>=nAll) end=nAll-1;
+  let start=end-realSlots+1; if(start<0) start=0;
   const view=nd.slice(start,end+1);
-  const padL=8,padT=10,padB=24;
-  const volH=Math.floor(H*0.14), priceBottom=H-padB-volH;
+
   let min=Infinity,max=-Infinity;
   view.forEach(d=>{min=Math.min(min,d.l);max=Math.max(max,d.h);});
   const range=(max-min)||1; min-=range*0.06; max+=range*0.06;
-  // จำนวนทศนิยมตามขนาดราคา (XAUUSD ~4000 → 1 จุด, R_100 ~600 → 2 จุด, EURUSD ~1.1 → 4 จุด)
-  const dec = (max>1000||min>1000)?1:(max>100?2:(max>1?3:4));
-  // กันตัวเลขแกนขวาล้น/ชนแท่ง: padR = ความกว้างตัวเลขราคา + ระยะ
+  const dec=(max>1000||min>1000)?1:(max>100?2:(max>1?3:4));
   ctx.font='9.5px Cascadia Mono,monospace';
   const labelW=(max.toFixed(dec)).length*6.2+2;
   const padR=Math.max(50,labelW+14);
-  const n=view.length, plotW=W-padL-padR, plotH=priceBottom-padT;
-  const step=plotW/(n-1), bw=Math.max(plotW/n*0.55,1);
+  const plotW=W-padL-padR;
+  const step=plotW/(chartView.count-1), bw=Math.max(plotW/chartView.count*0.55,1);
+  const pxForData=i=>padL+(i-start)*step;
+  const py=v=>padT+(max-v)/(max-min)*plotH;
+  const drawLine=(arr,color,width)=>{ ctx.strokeStyle=color; ctx.lineWidth=width||1.2; ctx.beginPath(); let started=false;
+    for(let i=start;i<=end;i++){ const v=arr[i]; if(v==null) continue; const x=pxForData(i);
+      if(!started){ctx.moveTo(x,py(v));started=true;} else ctx.lineTo(x,py(v)); }
+    ctx.stroke(); };
 
-  // grid + price labels (right axis) — label อยู่ใน gutter, ไม่ล้นเข้า plot
+  // ── Grip: เส้นประที่ราคากลมๆ ──
+  if(chartInd.grip){
+    const rough=range/7, mag=Math.pow(10,Math.floor(Math.log10(rough)));
+    const nv=rough/mag, gstep=(nv<1.5?1:nv<3.5?2:nv<7.5?5:10)*mag;
+    ctx.setLineDash([2,4]); ctx.strokeStyle='rgba(255,255,255,.07)'; ctx.lineWidth=1;
+    for(let v=Math.ceil(min/gstep)*gstep; v<=max; v+=gstep){
+      ctx.beginPath(); ctx.moveTo(padL,py(v)); ctx.lineTo(W-padR,py(v)); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+
+  // ── BB (20,2) ──
+  if(chartInd.bb){
+    const bb=bollinger(closes,20,2);
+    ctx.strokeStyle='rgba(140,160,200,.6)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+    [bb.up,bb.mid,bb.low].forEach(arr=>{ ctx.beginPath(); let st=false;
+      for(let i=start;i<=end;i++){ const v=arr[i]; if(v==null) continue; const x=pxForData(i);
+        if(!st){ctx.moveTo(x,py(v));st=true;} else ctx.lineTo(x,py(v)); }
+      ctx.stroke(); });
+    ctx.setLineDash([]);
+  }
+
+  // ── EMA 50/100/200 (แทน EMA20 เดิม → EMA100) ──
+  if(chartInd.ema){
+    drawLine(ema(closes,200),'rgba(243,168,70,.95)',1.6);
+    drawLine(ema(closes,100),'rgba(167,139,250,.9)',1.2);
+    drawLine(ema(closes,50),'rgba(56,225,196,.9)',1.2);
+  }
+
+  // ── SMA5 ──
+  if(chartInd.sma5) drawLine(sma(closes,5),'rgba(232,238,251,.9)',1);
+
+  // ── Fractal: ยอดแท่งที่ 8 ใน 15 แท่ง (ซ้าย/ขวา 7 แท่งต้องต่ำลงถ้ายอดสูง, สูงขึ้นถ้ายอดต่ำ) ──
+  if(chartInd.fractal){
+    const fr=fractal(nd,7,7).filter(p=>p.i>=start&&p.i<=end);
+    // แนวรับ/ต้าน: เส้นประที่ fractal สูง/ต่ำล่าสุดที่ยืนยันแล้ว
+    const lastH=fr.filter(p=>p.t==='H').pop(), lastL=fr.filter(p=>p.t==='L').pop();
+    if(lastH){
+      ctx.setLineDash([3,4]); ctx.strokeStyle='rgba(246,70,93,.4)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(padL,py(lastH.v)); ctx.lineTo(W-padR,py(lastH.v)); ctx.stroke();
+      ctx.setLineDash([]); ctx.fillStyle='rgba(246,70,93,.8)';
+      ctx.textAlign='right'; ctx.fillText('R '+lastH.v.toFixed(dec),W-6,py(lastH.v)-4);
+    }
+    if(lastL){
+      ctx.setLineDash([3,4]); ctx.strokeStyle='rgba(34,201,138,.4)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(padL,py(lastL.v)); ctx.lineTo(W-padR,py(lastL.v)); ctx.stroke();
+      ctx.setLineDash([]); ctx.fillStyle='rgba(34,201,138,.8)';
+      ctx.textAlign='right'; ctx.fillText('S '+lastL.v.toFixed(dec),W-6,py(lastL.v)+12);
+    }
+    ctx.textAlign='left';
+    fr.forEach(p=>{
+      const x=pxForData(p.i), y=py(p.v);
+      if(p.t==='H'){
+        ctx.fillStyle='#f6465d';
+        ctx.beginPath(); ctx.moveTo(x,y-7); ctx.lineTo(x-4,y); ctx.lineTo(x+4,y); ctx.closePath(); ctx.fill();
+      } else {
+        ctx.fillStyle='#22c98a';
+        ctx.beginPath(); ctx.moveTo(x,y+7); ctx.lineTo(x-4,y); ctx.lineTo(x+4,y); ctx.closePath(); ctx.fill();
+      }
+    });
+  }
+
+  // ── grid + price labels (right axis) ──
   ctx.strokeStyle='#131c30'; ctx.fillStyle='#4a5775'; ctx.font='9.5px Cascadia Mono,monospace';
   const GRID=5;
   for(let i=0;i<=GRID;i++){
     const y=padT+plotH*i/GRID;
     ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
-    const val=max-(max-min)*i/GRID;
-    ctx.textAlign='right'; ctx.fillText(val.toFixed(dec),W-6,y+3);
+    ctx.textAlign='right'; ctx.fillText((max-(max-min)*i/GRID).toFixed(dec),W-6,y+3);
   }
   ctx.textAlign='left';
 
-  // EMA lines — คำนวณบนข้อมูลเต็มแล้วตัดเฉพาะหน้าต่างที่มอง (กันเส้นขาด)
-  const closes=nd.map(d=>d.c);
-  const e20=ema(closes,20).slice(start,end+1);
-  const e50=ema(closes,50).slice(start,end+1);
-  const e200=ema(closes,200).slice(start,end+1);
-  const py=v=>padT+(max-v)/(max-min)*plotH;
-  const px=i=>padL+step*i;
-  const drawLine=(arr,color,width)=>{ ctx.strokeStyle=color; ctx.lineWidth=width||1.2; ctx.beginPath(); let started=false;
-    arr.forEach((v,i)=>{ if(v==null) return; if(!started){ctx.moveTo(px(i),py(v));started=true;} else ctx.lineTo(px(i),py(v)); });
-    ctx.stroke(); };
-  drawLine(e200,'rgba(243,168,70,.95)',1.6);
-  drawLine(e20,'rgba(56,225,196,.9)',1.2);
-  drawLine(e50,'rgba(167,139,250,.9)',1.2);
-
-  // volume bars
-  const vmax=Math.max(...view.map(d=>Math.max(d.v||0,0)),1);
+  // ── candles ──
   view.forEach((d,i)=>{
-    const x=px(i); const v=d.v||0;
-    const hh=v/vmax*volH;
-    ctx.fillStyle=(d.c>=d.o)?'rgba(34,201,138,.22)':'rgba(246,70,93,.22)';
-    ctx.fillRect(x-bw/2,priceBottom+volH-hh,bw,hh);
-  });
-
-  // candles
-  view.forEach((d,i)=>{
-    const x=px(i), up=d.c>=d.o;
+    const x=pxForData(i+start), up=d.c>=d.o;
     ctx.strokeStyle=up?'#22c98a':'#f6465d'; ctx.fillStyle=up?'#22c98a':'#f6465d';
     ctx.beginPath(); ctx.moveTo(x,py(d.h)); ctx.lineTo(x,py(d.l)); ctx.stroke();
     const yO=py(d.o),yC=py(d.c),top=Math.min(yO,yC),hgt=Math.max(Math.abs(yO-yC),1);
     ctx.fillRect(x-bw/2,top,bw,hgt);
   });
 
-  // last price: เส้น + tag pill (ปิดทับ grid label ที่ชนกันได้)
-  const lp=view[view.length-1].c;
-  const lc=lp>=view[view.length-1].o?'#22c98a':'#f6465d';
+  // ── last price: เส้น + tag pill ──
+  const lp=view[view.length-1].c, lc=lp>=view[view.length-1].o?'#22c98a':'#f6465d';
   ctx.strokeStyle=lc; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(padL,py(lp)); ctx.lineTo(W-padR,py(lp)); ctx.stroke(); ctx.setLineDash([]);
   const tag=lp.toFixed(dec);
   ctx.font='bold 10px Cascadia Mono,monospace';
@@ -690,25 +848,101 @@ function drawCandles(canvas, data){
   const ty=Math.min(Math.max(py(lp)-8,6),H-24);
   ctx.fillStyle=lc; ctx.beginPath(); ctx.roundRect(W-tw-2,ty,tw,16,3); ctx.fill();
   ctx.fillStyle='#0a0f1c'; ctx.textAlign='left'; ctx.fillText(tag,W-tw+4,ty+12); ctx.textAlign='left';
-  ctx.fillStyle='#4a5775';
+
+  // ── volume strip ──
+  let volTop=priceH;
+  if(chartInd.vol){
+    const vh=volH-4, vmax=Math.max(...view.map(d=>d.v),1);
+    ctx.fillStyle='#0e1526'; ctx.fillRect(0,volTop,W,volH);
+    ctx.fillStyle='#4a5775'; ctx.font='9.5px Cascadia Mono,monospace'; ctx.textAlign='left';
+    ctx.fillText('VOL',padL+2,volTop+10);
+    view.forEach((d,i)=>{
+      const x=pxForData(i+start), hh=d.v/vmax*(vh-6);
+      ctx.fillStyle=(d.c>=d.o)?'rgba(34,201,138,.25)':'rgba(246,70,93,.25)';
+      ctx.fillRect(x-bw/2,volTop+vh-2-hh,bw,hh);
+    });
+    volTop+=volH;
+  }
+
+  // ── RSI panel (frame + clip กันเส้นหลุดกรอบ) ──
+  let oy=volTop+4;
+  if(chartInd.rsi){
+    const rv=rsi(closes,14), pTop=oy+14, pBot=oy+88, pArea=pBot-pTop;
+    ctx.fillStyle='#0e1526'; ctx.fillRect(padL,oy,plotW,90);
+    ctx.strokeStyle='rgba(255,255,255,.07)'; ctx.strokeRect(padL,oy,plotW,90);
+    ctx.fillStyle='#4a5775'; ctx.font='9.5px Cascadia Mono,monospace'; ctx.textAlign='left';
+    ctx.fillText('RSI(14)',padL+3,oy+11);
+    const vy=v=>pTop+(100-v)/100*(pArea-6);
+    [70,30].forEach(lv=>{
+      const y=vy(lv);
+      ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle='#4a5775'; ctx.textAlign='right'; ctx.fillText(lv,W-6,y+3); ctx.textAlign='left';
+    });
+    ctx.fillStyle='rgba(246,70,93,.10)'; ctx.fillRect(padL,vy(100),plotW,vy(70)-vy(100));
+    ctx.fillStyle='rgba(34,201,138,.10)'; ctx.fillRect(padL,vy(30),plotW,vy(0)-vy(30));
+    ctx.save(); ctx.beginPath(); ctx.rect(padL,pTop,plotW,pBot-pTop); ctx.clip();
+    drawLine(rv,'#f7b847');
+    ctx.restore();
+    oy+=90;
+  }
+
+  // ── ADX panel ──
+  if(chartInd.adx){
+    const a=adx(nd.map(d=>d.h),nd.map(d=>d.l),closes,14), pTop=oy+14, pBot=oy+88, pArea=pBot-pTop;
+    ctx.fillStyle='#0e1526'; ctx.fillRect(padL,oy,plotW,90);
+    ctx.strokeStyle='rgba(255,255,255,.07)'; ctx.strokeRect(padL,oy,plotW,90);
+    ctx.fillStyle='#4a5775'; ctx.font='9.5px Cascadia Mono,monospace'; ctx.textAlign='left';
+    ctx.fillText('ADX(14) — ADX>20 = เทรนด์แข็ง',padL+3,oy+11);
+    const vy=v=>pTop+(100-v)/100*(pArea-6);
+    const y20=vy(20);
+    ctx.fillStyle='rgba(34,201,138,.10)'; ctx.fillRect(padL,vy(100),plotW,y20-vy(100));
+    ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(padL,y20); ctx.lineTo(W-padR,y20); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle='#4a5775'; ctx.textAlign='right'; ctx.fillText('20',W-6,y20+3); ctx.textAlign='left';
+    ctx.save(); ctx.beginPath(); ctx.rect(padL,pTop,plotW,pBot-pTop); ctx.clip();
+    drawLine(a.pdi,'rgba(34,201,138,.75)');
+    drawLine(a.ndi,'rgba(246,70,93,.75)');
+    drawLine(a.adx,'#f7b847');
+    ctx.restore();
+  }
+
+  // ── time labels + ระดับ zoom ──
+  ctx.fillStyle='#4a5775'; ctx.font='9.5px Cascadia Mono,monospace';
+  ctx.textAlign='left';
   ctx.fillText(view[0].t?fmtHM(view[0].t):'',padL,H-6);
-  ctx.fillText(view[view.length-1].t?fmtHM(view[view.length-1].t):'',W-padR-70,H-6);
-  // ตัวบอกโหมดซูม (เช่น ×0.5 = 150 แท่ง)
-  ctx.font='9.5px Cascadia Mono,monospace';
-  ctx.fillStyle='rgba(74,87,117,.8)';
+  ctx.fillText(view[view.length-1].t?fmtHM(view[view.length-1].t):'',Math.min(pxForData(end),W-padR-70),H-6);
   ctx.textAlign='right';
-  ctx.fillText(chartView.count>=nAll?'ALL':chartView.count+' แท่ง',W-padR+4,H-6);
+  ctx.fillStyle='rgba(74,87,117,.8)';
+  ctx.fillText(realSlots>=nAll?'ALL':realSlots+' แท่ง',W-6,H-6);
   ctx.textAlign='left';
 }
-function zoomChart(factor){
-  chartView.count=Math.min(300,Math.max(30,Math.round(chartView.count*factor)));
-  if(lastCandles.length) drawCandles(document.getElementById('candleChart'),lastCandles);
+function zoomChartAt(factor, frac){
+  if(!lastCandles.length) return;
+  const nAll=lastCandles.length;
+  const oldFuture=Math.max(3,Math.round(chartView.count*0.15));
+  const oldReal=Math.max(5,chartView.count-oldFuture);
+  let end=(chartView.end<0||chartView.end>=nAll)?nAll-1:chartView.end;
+  const wasLatest=(chartView.end<0)||(end===nAll-1);
+  const oldStart=Math.max(0,end-oldReal+1);
+  const anchor=oldStart+Math.round(frac*(oldReal-1));
+  const newCount=Math.min(300,Math.max(30,Math.round(chartView.count*factor)));
+  const newFuture=Math.max(3,Math.round(newCount*0.15));
+  const newReal=Math.max(5,newCount-newFuture);
+  let newStart=Math.round(anchor-frac*(newReal-1));
+  newStart=Math.max(0,Math.min(newStart,nAll-newReal));
+  let newEnd=newStart+newReal-1;
+  if(wasLatest) newEnd=nAll-1;
+  else newEnd=Math.min(newEnd,nAll-1);
+  if(newStart>newEnd-newReal+1) newStart=newEnd-newReal+1;
+  chartView.count=newCount; chartView.end=newEnd;
+  drawCandles(document.getElementById('candleChart'),lastCandles);
 }
 function panChart(deltaIdx){
   if(!lastCandles.length) return;
   const nAll=lastCandles.length;
+  const future=Math.max(3,Math.round(chartView.count*0.15));
+  const realSlots=Math.max(5,chartView.count-future);
   let end=(chartView.end<0||chartView.end>=nAll)?nAll-1:chartView.end;
-  end=Math.min(nAll-1,Math.max(chartView.count-1,end+deltaIdx));
+  end=Math.min(nAll-1,Math.max(realSlots-1,end+deltaIdx));
   chartView.end=end;
   drawCandles(document.getElementById('candleChart'),lastCandles);
 }
@@ -856,14 +1090,23 @@ document.addEventListener('DOMContentLoaded',()=>{
     resetChartView();
     refreshPrice();
   });
-  document.getElementById('zoomIn')?.addEventListener('click',()=>zoomChart(0.6));
-  document.getElementById('zoomOut')?.addEventListener('click',()=>zoomChart(1.6));
+  document.getElementById('zoomIn')?.addEventListener('click',()=>zoomChartAt(0.6,0.5));
+  document.getElementById('zoomOut')?.addEventListener('click',()=>zoomChartAt(1.6,0.5));
   document.getElementById('zoomReset')?.addEventListener('click',resetChartView);
+  document.getElementById('chartIndBar')?.addEventListener('click',e=>{
+    const chip=e.target.closest('.ind-chip'); if(!chip) return;
+    chip.classList.toggle('active');
+    chartInd[chip.dataset.ind]=chip.classList.contains('active');
+    if(lastCandles.length) drawCandles(document.getElementById('candleChart'),lastCandles);
+  });
   const cvs=document.getElementById('candleChart');
   if(cvs){
     cvs.addEventListener('wheel',e=>{
       e.preventDefault();
-      zoomChart(e.deltaY<0?0.8:1.25);
+      const rect=cvs.getBoundingClientRect();
+      const x=e.clientX-rect.left;
+      const frac=Math.max(0,Math.min(1,(x-8)/(Math.max(rect.width-8-58,1))));
+      zoomChartAt(e.deltaY<0?0.8:1.25, frac);
     },{passive:false});
     let drag=null;
     cvs.addEventListener('mousedown',e=>{ drag={x:e.clientX}; e.preventDefault(); });
@@ -994,7 +1237,7 @@ async function refreshSetupTab(){
 
 const SETUP_STEPS=[
   ['trend_ema','1. เทรนใหญ่ EMA50>100>200'],
-  ['structure','2. โครงสร้าง Zigzag HH/HL'],
+  ['structure','2. โครงสร้าง Fractal (15) HH/HL'],
   ['adx','3. ADX > 20 (แรงเทรน)'],
   ['rsi_zone','4. RSI ย่อในโซนเทรน'],
   ['rsi_div','5. Divergence / Convergence'],
