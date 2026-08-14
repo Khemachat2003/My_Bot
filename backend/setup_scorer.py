@@ -1,27 +1,31 @@
 """
-setup_scorer.py — 🔵 Trend-Aligned EMA200 Rejection Checklist V3 (Rule-Based Setup Engine)
-===================================================================================
-ปรับใหม่ตาม Setup101.txt ฉบับเต็ม (หลักการที่เจ้าของระบบเทรดจริง):
+setup_scorer.py — 🔵 EMA200-is-the-Heart Rule-Based Setup Engine V5 (ตามหลักการเจ้าของระบบ)
+====================================================================================
+ปรับตามหลักการจริงของเจ้าของระบบ:
 
-  🎯 หลักการ: เทรด "ตามเทรนใหญ่" รอให้ราคาย่อกลับมาหา EMA 200 แล้วเกิด Reject → เข้า
-     ตามทิศทางเทรน ไม่ใช่สวนเทรน (ไม่ fade)
+  🎯 ใจหลักของระบบ: ราคาปัจจุบันต้อง "แตะหรือใกล้ EMA200" เท่านั้น — ห่างเมื่อไหร่ = ไม่ส่งเด็ดขาด
+     ยกเว้น 2 ทาง:
+       A) ราคาทะลุ EMA100 มาแล้ว (ย่อมาอยู่ระหว่าง EMA100–EMA200 ตามทิศเทรน) แต่ยังไม่แตะ EMA200
+          → ส่งได้ถ้า setup รวม >= fire_score (13)
+       B) ราคาแตะ/อยู่ในโซน EMA200 แล้ว (ใจหลัก) → ส่งได้แม้สกอร์ไม่ถึงเกณฑ์
+          แต่ต้องตามเทรนหลัก (สวนเทรนย่อยได้) + มีแนวรับ/ต้านใกล้จุดแตะ
 
    ลำดับตรวจ (ตรง Setup101 ข้อ 2.1-2.10):
-     1) เทรนด์ใหญ่: EMA50/100/200 เรียงตามทิศ + Fractal HH/HL (หรือ LH/LL)
+     1) เทรนด์ใหญ่: EMA50/100/200 เรียงตามทิศ (ห้ามสวนเทรนหลัก)
      2) ADX > 20 → เทรนด์แข็งแรง
-     3) RSI อยู่ในโซน (y่อลึกในเทรนด์ขึ้น = overbought อ่อนตัว / oversold)
-     4) ราคาเคยทะลุ EMA100 ขึ้นไปแล้ว (ยืนยันว่าเป็นเทรนด์จริง ไม่ใช่แค่สวิง)
-     5) BB ขยายตัว (มีวอลุ่มสนับสนุน) — บีบตัว = ไม่เหมาะ
-     6) Fractal (depth 15, ยอดแท่งที่ 8) ยังทำยอดตามทิศเทรนด์ต่อเนื่อง
-     7) ราคาย่อลงมาอยู่โซน EMA200 (อย่างน้อยต้องผ่าน EMA100 มาแล้ว)
-     8) จุดย่อตรงแนวรับ/ต้านสำคัญ (หลัก/ย่อย) + มีเส้น Grip ซ้อน = ยิ่งมั่นใจ
-     9) Rejection ที่ EMA200: ราคาแตะ EMA200 แล้วถูกดีดกลับ (wick) หรือ
-        แตะ-ดีด-แตะซ้ำ (double-touch ตามนิยามใน Setup101) → จุดชี้ขาด
+     3) RSI อยู่ในโซน (ย่อลึกในเทรนด์ขึ้น = overbought อ่อนตัว / oversold)
+     4) RSI Divergence/Convergence เพิ่มความมั่นใจ
+     5) ราคาเคยทะลุ EMA100 ขึ้นไปแล้ว (ยืนยันว่าเป็นเทรนด์จริง)
+     6) BB ขยายตัว (มีวอลุ่มสนับสนุน) — บีบตัว = ไม่เหมาะ
+     7) Fractal (depth 15, ยอดแท่งที่ 8) ทำยอดตามทิศ — ไม่ใช่ hard gate (สวนเทรนย่อยได้)
+     8) ราคาย่อลงมาอยู่โซน EMA200 (ใจหลัก)
+     9) จุดย่อตรงแนวรับ/ต้านสำคัญ (หลัก/ย่อย) + มีเส้น Grip ซ้อน = ยิ่งมั่นใจ
+    10) Rejection ที่ EMA200: แตะ-ดีด-แตะซ้ำ (double-touch ตามนิยามใน Setup101) → เพิ่มสกอร์
 
   Tier:
-    FIRE  = เทรนด์ชัดเจน + ราคาแตะโซน EMA200 + Reject เกิด → เข้าตามเทรน
-    WATCH = เทรนด์ชัดเจน + ราคากำลังเข้าใกล้โซน EMA200 (รอ Reject ยืนยัน)
-    NONE  = ไม่มีเทรนด์ชัดเจน / ยังห่าง EMA200
+    FIRE  = (B) แตะ EMA200 + ตามเทรนหลัก + มีแนวใกล้จุดแตะ  |  (A) ทะลุ EMA100 + สกอร์>=13
+    WATCH = ทะลุ EMA100 กำลังย่อหา EMA200 + สกอร์>=watch_score
+    NONE  = ห่าง EMA200 เกินโซน (ใจหลักไม่ผ่าน) หรือสวนเทรนหลัก หรือสกอร์ไม่ถึงเกณฑ์
 
   ตั้งค่าได้ใน setup_config.json (โหลด auto ทุก poll)
 """
@@ -605,6 +609,7 @@ def score_setup(
     }
 
     # ── กำหนดเทรนด์ใหญ่จาก EMA ก่อน → direction จะผูกกับเทรนเท่านั้น ──
+    last_close = float(close.iloc[-1])
     e50, e100, e200 = ema50.iloc[-1], ema100.iloc[-1], ema200.iloc[-1]
     trend_align_up = e50 > e100 > e200
     trend_align_down = e50 < e100 < e200
@@ -634,7 +639,13 @@ def score_setup(
     score, details, grip_hits = _score_trend_setup(df, direction, ctx, cfg)
     score = round(score, 1)
 
-    # ── Tier (Setup101 ข้อ 3: กรณี 1/2/3) + Hard-gates ──
+    # ── Tier ตามหลักการ "EMA200 คือใจหลักของระบบ" ──
+    #  (owner: ราคาต้องแตะ/ใกล้ EMA200 เท่านั้นถึงจะเข้า; ข้อยกเว้น 2 ทางตามเงื่อนไข)
+    #  กรณีที่ 1 (ข้อยกเว้น A): ราคาทะลุ EMA100 ไปแล้ว (ย่อมาอยู่ระหว่าง EMA100–EMA200)
+    #    ยังไม่แตะ EMA200 → ส่งได้ถ้า setup รวม >= fire_score (13)
+    #  กรณีที่ 2 (ข้อยกเว้น B): ราคาแตะ/อยู่ในโซน EMA200 (ใจหลัก) → ส่งได้แม้สกอร์ต่ำ
+    #    แต่ต้องตามเทรนหลัก (สวนเทรนย่อยได้) + มีแนวรับ/ต้านใกล้จุดแตะ
+    #  กรณีอื่น (ห่าง EMA200 เกินโซน + ยังไม่ทะลุ EMA100) → ไม่ส่งเด็ดขาด
     fire_score = float(cfg.get("fire_score", 13))
     watch_score = float(cfg.get("watch_score", 10))
     hg = cfg.get("hard_gates", {})
@@ -642,32 +653,59 @@ def score_setup(
     def _ok(name: str, threshold: float = 0.5) -> bool:
         return details.get(name, {}).get("frac", 0.0) >= threshold
 
-    trend_ok = _ok("trend_ema")
-    pullback_ok = _ok("pullback", 0.5)          # ราคาแตะ/ใกล้ EMA200 (หัวใจของ setup)
-    reject_frac = details.get("rejection", {}).get("frac", 0.0)
-    structure_ok = _ok("structure", 0.99)        # Fractal HH/HL ตามเทรน
+    trend_ok = _ok("trend_ema")                 # ตามเทรนหลัก (EMA50/100/200 เรียงทิศ)
+    sr_ok = _ok("sr", 0.5)                       # อยู่ในโซนแนวรับ/ต้าน
     bb_ok = _ok("bb", 0.5)                        # ไม่บีบ (ขยาย/ทรงตัว)
-    sr_ok = _ok("sr", 0.5)                        # อยู่ในโซนแนวรับ/ต้าน
     no_sideway = ctx["structure"] != "SIDEWAYS"   # ราคาไม่ sideway
 
-    # Hard-gates ตาม config (ค่า default: เปิดหมด) — บังคับก่อนได้ tier
+    # สถานะราคาเทียบ EMA200 / EMA100 (โซนแตะ = ema200_tol_pct, โซนใกล้/ใจหลัก = ema200_near_tol_pct)
+    tol_touch = float(cfg.get("ema200_tol_pct", 0.15))
+    tol_near = float(cfg.get("ema200_near_tol_pct", 0.35))
+    dist200_pct = abs(last_close - e200) / e200 * 100.0
+    touching_ema200 = dist200_pct <= tol_touch      # แตะจริง (ย่อยของใจหลัก)
+    near_ema200 = dist200_pct <= tol_near           # แตะหรือใกล้ = ใจหลักของระบบ
+    # ทะลุ EMA100: ย่อมาอยู่ระหว่าง EMA100 กับโซน EMA200 ตามทิศเทรน (ข้อยกเว้น A)
+    if direction == "CALL":
+        crossed_ema100 = last_close < e100 * (1 + float(cfg.get("ema100_tol_pct", 0.08)) / 100.0)
+    else:
+        crossed_ema100 = last_close > e100 * (1 - float(cfg.get("ema100_tol_pct", 0.08)) / 100.0)
+    # กลางทาง: ทะลุ EMA100 แล้วแต่ยังไม่ถึงโซนใกล้ EMA200 (ข้อยกเว้น A ยังต้องสกอร์สูง)
+    between_ema = crossed_ema100 and not near_ema200
+
+    # Hard-gate ใจหลัก: ไม่แตะ/ไม่ใกล้ EMA200 และยังไม่ทะลุ EMA100 เลย → ห้ามส่งทุกกรณี
+    # (ถ้าทะลุ EMA100 แล้วถือว่ากำลังย่อหา EMA200 → เข้าข่ายข้อยกเว้น A ให้สกอร์สูงตัดสิน)
+    heart_blocked = not (near_ema200 or crossed_ema100)
+    if heart_blocked:
+        return SetupResult(
+            timeframe=timeframe,
+            target_hold_minutes=target_hold_minutes,
+            score=score, max_score=max_score, tier="NONE",
+            direction=direction, bias=bias, entry_trigger=False,
+            entry_trigger_note=(
+                f"ราคา {last_close:.2f} ห่าง EMA200 {e200:.2f} ({dist200_pct:.2f}% > {tol_near:.2f}%) "
+                f"และยังไม่ทะลุ EMA100 — ใจหลักของระบบไม่ผ่าน (ต้องแตะ/ใกล้ EMA200 หรืออย่างน้อยทะลุ EMA100)"),
+            details=details, grip_hits=grip_hits,
+            score_breakdown={name: round(d["weight"] * d["frac"], 2) for name, d in details.items()},
+            model_prob=None,
+        )
+
+    # Gate รอบคอบเพิ่ม (เฉพาะกรณีสกอร์สูง / ข้อยกเว้น A) — fractal ไม่เป็น hard gate (สวนเทรนย่อยได้)
     hg_blocked: list[str] = []
-    if hg.get("ema200_touch", True) and not pullback_ok:
-        hg_blocked.append("ราคายังไม่แตะ/ใกล้โซน EMA200")
     if hg.get("no_sideway", True) and not no_sideway:
         hg_blocked.append("ราคากำลัง sideway")
-    if hg.get("structure", True) and not structure_ok:
-        hg_blocked.append("Fractal ยังไม่ทำ HH/HL ตามเทรน")
     if hg.get("bb", True) and not bb_ok:
         hg_blocked.append("BB กำลังบีบตัว")
     if hg.get("sr", True) and not sr_ok:
         hg_blocked.append("ไม่อยู่ในโซนแนวรับ/ต้าน")
-
     hard_ok = not hg_blocked
 
-    if trend_ok and pullback_ok and reject_frac >= 1.0 and score >= fire_score and hard_ok:
+    if near_ema200 and trend_ok and sr_ok:
+        # ข้อยกเว้น B (ใจหลัก): แตะ/ใกล้ EMA200 + ตามเทรนหลัก + มีแนวรับ/ต้านใกล้จุดแตะ → ส่งได้แม้สกอร์ต่ำ
         tier = "FIRE"
-    elif trend_ok and pullback_ok and hard_ok and score >= watch_score:
+    elif between_ema and trend_ok and score >= fire_score and hard_ok:
+        # ข้อยกเว้น A: ทะลุ EMA100 แล้ว (ยังห่างโซนแตะ) + setup รวม >= 13 + ผ่าน gate → ส่งได้
+        tier = "FIRE"
+    elif between_ema and trend_ok and score >= watch_score and hard_ok:
         tier = "WATCH"
     else:
         tier = "NONE"
@@ -675,17 +713,29 @@ def score_setup(
     entry_trigger = tier == "FIRE"
     note_parts = [f"Setup {score:.1f}/{max_score} → {tier}"]
     if tier == "FIRE":
-        note_parts.append(f"เทรน {direction} ชัดเจน + แตะ EMA200 + Double-touch Reject + ผ่าน hard-gate → เข้าตามเทรน {direction}")
+        if near_ema200:
+            note_parts.append(
+                f"ใจหลักผ่าน: ราคา {last_close:.2f} แตะ/ใกล้ EMA200 {e200:.2f} "
+                f"({dist200_pct:.2f}%) + เทรน {direction} หลัก + แนวรับ/ต้านใกล้จุดแตะ → เข้าตามเทรน {direction}")
+        else:
+            note_parts.append(
+                f"ทะลุ EMA100 มาแล้ว ({last_close:.2f}) ย่อเข้าหา EMA200 {e200:.2f} + setup {score:.1f} ≥ {fire_score:.0f} "
+                f"+ เทรน {direction} → เข้าตามเทรน {direction}")
     elif tier == "WATCH":
-        note_parts.append(f"เทรน {direction} ชัดเจน + แตะ EMA200 + ผ่าน hard-gate — ยังรอ Double-touch Reject (Setup101 ข้อ 10)")
+        note_parts.append(
+            f"ทะลุ EMA100 มาแล้วกำลังย่อหา EMA200 {e200:.2f} ({dist200_pct:.2f}%) — รอแตะโซน/สกอร์ ≥ {fire_score:.0f}")
     else:
-        reason = f"สกอร์ {score:.1f} ต่ำกว่าเกณฑ์ {fire_score:.0f}/{watch_score:.0f}"
-        if hg_blocked:
+        reason = f"สกอร์ {score:.1f} ต่ำกว่าเกณฑ์ {fire_score:.0f}"
+        if not trend_ok:
+            reason = f"สวนเทรนหลัก {direction} (EMA ยังไม่เรียงตามทิศ)"
+        elif near_ema200 and not sr_ok:
+            reason = "แตะ/ใกล้ EMA200 แล้วแต่ไม่มีแนวรับ/ต้านใกล้จุดแตะ"
+        elif hg_blocked:
             reason = " / ".join(hg_blocked)
-        elif reject_frac < 1.0:
-            reason = "ยังไม่ครบ Double-touch Reject (แตะ→ดีด→แตะซ้ำ)"
-        elif not pullback_ok:
-            reason = "ราคายังไม่ย่อมาหา EMA200"
+        elif not between_ema:
+            reason = f"ราคายังไม่ทะลุ EMA100 ({last_close:.2f} vs EMA100 {e100:.2f})"
+        else:
+            reason = f"สกอร์ {score:.1f} ยังต่ำกว่า {fire_score:.0f}"
         note_parts.append(reason)
 
     score_breakdown = {name: round(d["weight"] * d["frac"], 2)

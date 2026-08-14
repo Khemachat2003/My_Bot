@@ -1,5 +1,5 @@
 {
-  "comment": "Rule-Based Checklist V4 — Trend-Aligned EMA200 Rejection ตาม Setup101.txt (เทรดตามเทรนใหญ่ ไม่สวนเทรน / Hard-gate: ราคาต้องแตะ-ใกล้ EMA200, ไม่ sideway, โครงสร้าง Fractal (depth 15) HH/HL, BB ไม่บีบ, อยู่ในโซน S/R, Reject ต้อง double-touch เท่านั้น)",
+  "comment": "Rule-Based Checklist V5 — หลักการ 'EMA200 คือใจหลัก': ราคาต้องแตะ/ใกล้ EMA200 (heart gate, ห้ามส่งถ้าห่าง) · ข้อยกเว้น A: ทะลุ EMA100 แล้วยังไม่แตะ EMA200 → ส่งได้ถ้า setup >= fire_score(13) · ข้อยกเว้น B: แตะ EMA200 แล้ว → ส่งได้แม้สกอร์ต่ำ แต่ต้องตามเทรนหลัก (สวนเทรนย่อยได้) + มีแนวรับ/ต้านใกล้จุดแตะ",
   "max_score": 18,
   "fire_score": 13,
   "watch_score": 10,
@@ -20,9 +20,7 @@
     "weight": 1
   },
   "hard_gates": {
-    "ema200_touch": true,
     "no_sideway": true,
-    "structure": true,
     "bb": true,
     "sr": true
   },
