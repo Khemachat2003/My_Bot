@@ -302,6 +302,10 @@ class SetupFeedEngine:
                         total=result.max_score,
                         tier=result.tier,
                         symbol=self.symbol,
+                        ema200_price=result.ema200_price,
+                        dist200_pct=result.dist200_pct,
+                        near_ema200=result.near_ema200,
+                        crossed_ema100=result.crossed_ema100,
                     )
                     print(f"[SetupFeed:{self.symbol}] บันทึกสัญญาณ ID #{new_sig_id} [{tf_label}] "
                           f"ลง setup_signals (รอวัดผลในอีก {hold_min} นาที)")

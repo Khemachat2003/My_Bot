@@ -205,6 +205,13 @@ def init_db() -> None:
         conn.execute("ALTER TABLE setup_signals ADD COLUMN symbol TEXT NOT NULL DEFAULT 'frxXAUUSD'")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_setup_signals_symbol ON setup_signals(symbol)")
 
+    # Migration: บันทึกตำแหน่งราคาเทียบ EMA200 ตอนยิงสัญญาณ (ไว้วิเคราะห์ว่า
+    # band ไหนของ EMA200 ให้ winrate ดีที่สุด และยืนยัน "ไม้ชนะ = แตะ EMA200")
+    if "ema200_price" not in scols:
+        for _c in ("ema200_price", "dist200_pct", "near_ema200", "crossed_ema100"):
+            conn.execute(f"ALTER TABLE setup_signals ADD COLUMN {_c} REAL")
+        conn.commit()
+
     # Migration: ตาราง prices เก่า (ยุคก่อนมีคอลัมน์ symbol) → เพิ่ม symbol
     # แล้วสมมติว่าแถวเก่าทั้งหมดเป็น frxXAUUSD (ข้อมูลกราฟเดิม)
     try:
@@ -246,15 +253,23 @@ def insert_setup_signal(signal_time: str, entry_price: float, direction: str,
                          confidence: float, horizon_min: int, target_time: str,
                          timeframe: str = "M1", score: Optional[float] = None,
                          total: Optional[int] = None, tier: str = "NONE",
-                         symbol: str = "frxXAUUSD") -> int:
+                         symbol: str = "frxXAUUSD",
+                         ema200_price: Optional[float] = None,
+                         dist200_pct: Optional[float] = None,
+                         near_ema200: Optional[bool] = None,
+                         crossed_ema100: Optional[bool] = None) -> int:
     conn = get_conn()
     cur = conn.execute(
         """INSERT INTO setup_signals
            (signal_time, timeframe, entry_price, direction, confidence,
-            score, total, tier, horizon_min, target_time, result, symbol)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)""",
+            score, total, tier, horizon_min, target_time, result, symbol,
+            ema200_price, dist200_pct, near_ema200, crossed_ema100)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?)""",
         (signal_time, timeframe, entry_price, direction, confidence,
-         score, total, tier, horizon_min, target_time, symbol),
+         score, total, tier, horizon_min, target_time, symbol,
+         ema200_price, dist200_pct,
+         (1 if near_ema200 else 0) if near_ema200 is not None else None,
+         (1 if crossed_ema100 else 0) if crossed_ema100 is not None else None),
     )
     conn.commit()
     new_id = cur.lastrowid

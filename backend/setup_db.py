@@ -60,6 +60,13 @@ def init_setup_db() -> None:
     if "symbol" not in cols:
         conn.execute("ALTER TABLE setup_scores ADD COLUMN symbol TEXT NOT NULL DEFAULT 'frxXAUUSD'")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_setup_scores_symbol ON setup_scores(symbol)")
+    # Migration: บันทึกตำแหน่งราคาเทียบ EMA200 ของทุกแคนดิเดต (รวมที่ไม่ยิง)
+    # ไว้วิเคราะห์ band ระยะห่างที่ชนะ — ขยาย scopes: cols เดิมสดสำหรับคอลัมน์ใหม่
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(setup_scores)").fetchall()}
+    for _c in ("ema200_price", "dist200_pct", "near_ema200", "crossed_ema100"):
+        if _c not in cols:
+            conn.execute(f"ALTER TABLE setup_scores ADD COLUMN {_c} REAL")
+    conn.commit()
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_setup_scores_tf_ts
         ON setup_scores (timeframe, id DESC)
@@ -77,8 +84,9 @@ def insert_setup_score(ts: str, result: "SetupResult",
         INSERT INTO setup_scores
             (ts, timeframe, score, total, direction, bias,
              entry_trigger, entry_trigger_note, details_json, grip_json,
-             tier, max_score, symbol)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             tier, max_score, symbol,
+             ema200_price, dist200_pct, near_ema200, crossed_ema100)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         ts, result.timeframe, result.score, result.max_score,
         result.direction, result.bias,
@@ -87,6 +95,8 @@ def insert_setup_score(ts: str, result: "SetupResult",
         json.dumps(to_json_safe(result.grip_hits), ensure_ascii=False),
         result.tier, result.max_score,
         symbol,
+        result.ema200_price, result.dist200_pct,
+        int(result.near_ema200), int(result.crossed_ema100),
     ))
     conn.commit()
     row_id = cur.lastrowid
@@ -95,6 +105,7 @@ def insert_setup_score(ts: str, result: "SetupResult",
 
 
 def _row_to_dict(r: sqlite3.Row) -> dict:
+    keys = r.keys()
     return {
         "ts": r["ts"],
         "timeframe": r["timeframe"],
@@ -109,6 +120,10 @@ def _row_to_dict(r: sqlite3.Row) -> dict:
         "tier": r["tier"],
         "max_score": r["max_score"],
         "symbol": r["symbol"],
+        "ema200_price": r["ema200_price"] if "ema200_price" in keys else None,
+        "dist200_pct": r["dist200_pct"] if "dist200_pct" in keys else None,
+        "near_ema200": bool(r["near_ema200"]) if "near_ema200" in keys else None,
+        "crossed_ema100": bool(r["crossed_ema100"]) if "crossed_ema100" in keys else None,
     }
 
 

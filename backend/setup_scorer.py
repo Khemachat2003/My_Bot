@@ -74,6 +74,12 @@ class SetupResult:
     grip_hits: list[str] = field(default_factory=list)
     score_breakdown: dict[str, float] = field(default_factory=dict)
     model_prob: float | None = None
+    # ตำแหน่งราคาเทียบ EMA200 ตอนประเมิน (สำหรับวิเคราะห์ว่า band ไหนของ EMA200
+    # ให้ winrate ดีที่สุด / ยืนยันว่าไม้ที่ชนะเป็น "แตะ EMA200" จริง)
+    ema200_price: float | None = None          # ค่า EMA200 ที่แท่งล่าสุด
+    dist200_pct: float | None = None           # |ราคา - EMA200| / EMA200 * 100
+    near_ema200: bool = False                  # dist200_pct <= ema200_near_tol_pct
+    crossed_ema100: bool = False               # ราคาทะลุ EMA100 ตามทิศเทรนแล้ว
 
 
 # ── ตัวชี้วัดพื้นฐาน ──────────────────────────────────────────────────────────
@@ -622,11 +628,16 @@ def score_setup(
 
     # ไม่มีเทรนด์ชัดเจน → NONE (ไม่สวนเทรน)
     if not direction:
+        _d200 = abs(last_close - e200) / e200 * 100.0
         return SetupResult(
             timeframe=timeframe,
             target_hold_minutes=target_hold_minutes,
             score=0.0, max_score=max_score, tier="NONE",
             direction="", bias="", entry_trigger=False,
+            ema200_price=e200,
+            dist200_pct=round(_d200, 4),
+            near_ema200=_d200 <= float(cfg.get("ema200_near_tol_pct", 0.35)),
+            crossed_ema100=False,
             entry_trigger_note=(
                 f"EMA ยังไม่เรียงตามเทรน (EMA50 {e50:.2f} / EMA100 {e100:.2f} / EMA200 {e200:.2f}) "
                 f"— รอเทรนชัดเจนก่อน ไม่เทรดสวนเทรน"),
@@ -681,6 +692,10 @@ def score_setup(
             target_hold_minutes=target_hold_minutes,
             score=score, max_score=max_score, tier="NONE",
             direction=direction, bias=bias, entry_trigger=False,
+            ema200_price=e200,
+            dist200_pct=round(dist200_pct, 4),
+            near_ema200=near_ema200,
+            crossed_ema100=crossed_ema100,
             entry_trigger_note=(
                 f"ราคา {last_close:.2f} ห่าง EMA200 {e200:.2f} ({dist200_pct:.2f}% > {tol_near:.2f}%) "
                 f"และยังไม่ทะลุ EMA100 — ใจหลักของระบบไม่ผ่าน (ต้องแตะ/ใกล้ EMA200 หรืออย่างน้อยทะลุ EMA100)"),
@@ -755,4 +770,8 @@ def score_setup(
         grip_hits=grip_hits,
         score_breakdown=score_breakdown,
         model_prob=None,
+        ema200_price=e200,
+        dist200_pct=round(dist200_pct, 4),
+        near_ema200=near_ema200,
+        crossed_ema100=crossed_ema100,
     )
