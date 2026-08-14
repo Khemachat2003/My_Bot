@@ -29,7 +29,7 @@ except ModuleNotFoundError:
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "bot.db"
 DB_PATH.parent.mkdir(exist_ok=True)
 
-MAX_PRICE_ROWS = 5000
+MAX_PRICE_ROWS = 50000
 MAX_TICK_ROWS = 10000
 
 
