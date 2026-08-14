@@ -218,18 +218,30 @@
   .wl-chg.down{color:var(--red); background:rgba(246,70,93,.1);}
   .wl-chg.flat{color:var(--muted); background:rgba(116,128,156,.1);}
 
-  /* chart panel + legend overlay */
+  /* chart panel + legend bar (ย้าย legend ออกจาก canvas → ไม่บังแท่งเทียน) */
   .chart-panel{position:relative;}
   .chart-wrap{position:relative;}
-  .legend-overlay{
-    position:absolute; top:6px; left:10px; z-index:3; display:flex; flex-wrap:wrap; gap:4px;
-    max-width:70%; pointer-events:none;
+  .chart-legendbar{
+    display:flex; align-items:center; gap:8px; padding:5px 9px; margin:8px 0 0;
+    background:var(--card); border:1px solid var(--border); border-radius:8px;
+    font-family:var(--num); font-size:10px; color:var(--muted);
+    overflow-x:auto; scrollbar-width:thin; flex-shrink:0;
   }
-  .legend-overlay.interactive{pointer-events:auto;}
+  .chart-legendbar .lb-ohlc{display:inline-flex; gap:9px; white-space:nowrap; font-size:10px; flex-shrink:0;}
+  .chart-legendbar .lb-ohlc b{color:var(--text); font-weight:700;}
+  .chart-legendbar .lb-ohlc .up b{color:var(--green);}
+  .chart-legendbar .lb-ohlc .dn b{color:var(--red);}
+  .chart-legendbar .lb-ohlc .muted b{color:var(--muted);}
+  .chart-legendbar .lb-spacer{flex:1; min-width:6px;}
+  .chart-legendbar #lbValues{display:inline-flex; gap:4px;}
+  .chart-legendbar.collapsed #lbValues{display:none;}
+  .chart-legendbar .lb-tools{display:inline-flex; gap:4px; flex-shrink:0;}
+  .chart-legendbar .lb-collapse{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;line-height:1;padding:2px 4px;flex-shrink:0;}
+  .chart-legendbar.collapsed .lb-collapse{transform:rotate(180deg);}
   .lo-chip{
     background:rgba(10,15,26,.72); border:1px solid var(--border); color:var(--text);
     font-size:9.5px; font-weight:700; font-family:var(--num); padding:2px 7px; border-radius:6px;
-    display:inline-flex; gap:5px; align-items:center; cursor:pointer; backdrop-filter:blur(3px);
+    display:inline-flex; gap:5px; align-items:center; cursor:pointer;
   }
   .lo-chip .sw{width:10px;height:2px;border-radius:2px;display:inline-block;}
   .lo-chip .lbl{color:var(--muted);}
@@ -458,8 +470,17 @@
             </span>
           </span>
         </h3>
+        <div class="chart-legendbar" id="chartLegendBar">
+          <span class="lb-ohlc" id="lbOhlc">—</span>
+          <span class="lb-spacer"></span>
+          <span id="lbValues"></span>
+          <span class="lb-tools">
+            <button class="tf-btn" id="addSrR" title="เพิ่มเส้นต้าน R (ลากปรับระดับได้)">+R</button>
+            <button class="tf-btn" id="addSrS" title="เพิ่มเส้นรับ S (ลากปรับระดับได้)">+S</button>
+          </span>
+          <button class="lb-collapse" id="lbCollapse" title="ย่อ/ขยายค่า indicator">▾</button>
+        </div>
         <div class="chart-wrap" style="height:460px;">
-          <div class="legend-overlay interactive" id="chartLegendOverlay"></div>
           <canvas id="candleChart" class="chart"></canvas>
         </div>
         <div class="ind-bar" id="chartIndBar">
@@ -849,6 +870,11 @@ function drawCandles(canvas, data){
   view.forEach(d=>{min=Math.min(min,d.l);max=Math.max(max,d.h);});
   const range=(max-min)||1; min-=range*0.06; max+=range*0.06;
   const dec=(max>1000||min>1000)?1:(max>100?2:(max>1?3:4));
+  // ── EMA200 ล่าสุด + ระยะ snap S/R (ขนาด pip ตาม symbol) ──
+  const emaArr=ema(closes,200);
+  lastEma200=null;
+  for(let i=nAll-1;i>=0;i--){ if(emaArr[i]!=null){lastEma200=emaArr[i];break;} }
+  srSnapDist=Math.pow(10,-dec)*SR_SNAP_PIPS;
   ctx.font='9.5px Cascadia Mono,monospace';
   const labelW=(max.toFixed(dec)).length*6.2+2;
   const padR=Math.max(50,labelW+14);
@@ -947,24 +973,12 @@ function drawCandles(canvas, data){
   // ── SMA5 ──
   if(chartInd.sma5) drawLine(sma(closes,5),'rgba(232,238,251,.9)',1);
 
-  // ── Fractal: ยอดแท่งที่ 8 ใน 15 แท่ง (ซ้าย/ขวา 7 แท่งต้องต่ำลงถ้ายอดสูง, สูงขึ้นถ้ายอดต่ำ) ──
+  // ── Fractal: จุดยอด (ยอดสูง/ต่ำล่าสุด → สร้างเส้น S/R อัตโนมัติใน srLevels) ──
   if(chartInd.fractal){
     const fr=fractal(nd,7,7).filter(p=>p.i>=start&&p.i<=end);
-    // แนวรับ/ต้าน: เส้นประที่ fractal สูง/ต่ำล่าสุดที่ยืนยันแล้ว
     const lastH=fr.filter(p=>p.t==='H').pop(), lastL=fr.filter(p=>p.t==='L').pop();
-    if(lastH){
-      ctx.setLineDash([3,4]); ctx.strokeStyle='rgba(246,70,93,.4)'; ctx.lineWidth=1;
-      ctx.beginPath(); ctx.moveTo(padL,py(lastH.v)); ctx.lineTo(W-padR,py(lastH.v)); ctx.stroke();
-      ctx.setLineDash([]); ctx.fillStyle='rgba(246,70,93,.8)';
-      ctx.textAlign='right'; ctx.fillText('R '+lastH.v.toFixed(dec),W-6,py(lastH.v)-4);
-    }
-    if(lastL){
-      ctx.setLineDash([3,4]); ctx.strokeStyle='rgba(34,201,138,.4)'; ctx.lineWidth=1;
-      ctx.beginPath(); ctx.moveTo(padL,py(lastL.v)); ctx.lineTo(W-padR,py(lastL.v)); ctx.stroke();
-      ctx.setLineDash([]); ctx.fillStyle='rgba(34,201,138,.8)';
-      ctx.textAlign='right'; ctx.fillText('S '+lastL.v.toFixed(dec),W-6,py(lastL.v)+12);
-    }
-    ctx.textAlign='left';
+    upsertSr('fH', lastH?lastH.v:null, 'R', false);
+    upsertSr('fL', lastL?lastL.v:null, 'S', false);
     fr.forEach(p=>{
       const x=pxForData(p.i), y=py(p.v);
       if(p.t==='H'){
@@ -977,12 +991,57 @@ function drawCandles(canvas, data){
     });
   }
 
-  // ── grid + price labels (right axis) ──
+  // ── S/R lines: interactive (ลากปรับระดับ · เพิ่มเองได้ · snap/highlight โซน EMA200) ──
+  const srRects=[];   // ช่วง y ที่ label ครอบครอง → กันชน label ขวากับ grid/price tag
+  const srLabelY=y=>{
+    for(let off=0;off<=5;off++){ const yy=y-off*17;
+      if(yy-9>=padT&&!srRects.some(r=>yy-8<r[1]&&yy+8>r[0])){ srRects.push([yy-8,yy+8]); return yy; } }
+    for(let off=1;off<=5;off++){ const yy=y+off*17;
+      if(yy+9<=padT+plotH&&!srRects.some(r=>yy-8<r[1]&&yy+8>r[0])){ srRects.push([yy-8,yy+8]); return yy; } }
+    srRects.push([y-8,y+8]); return y;
+  };
+  if(srLevels.length){
+    ctx.font='bold 9px Cascadia Mono,monospace';
+    srLevels.forEach(lv=>{
+      const y=py(lv.price);
+      if(y<padT-10||y>padT+plotH+10) return;
+      const nearEma=lastEma200!=null&&Math.abs(lv.price-lastEma200)<=srSnapDist;
+      const dragging=srDrag&&srDrag.id===lv.id;
+      const col=nearEma?'#f7b847':(lv.type==='R'?'#f6465d':'#22c98a');
+      const alpha=(nearEma||lv.manual||dragging)?'':'bb';
+      ctx.strokeStyle=col+alpha; ctx.lineWidth=dragging?1.6:1.1;
+      ctx.setLineDash(lv.manual||dragging?[6,4]:[2,4]);
+      ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
+      ctx.setLineDash([]);
+      // จุดจับลาก (ขวา)
+      ctx.fillStyle=col+alpha; ctx.beginPath(); ctx.arc(W-padR-5,y,3,0,7); ctx.fill();
+      // label ราคา (ขวา) — จัดไม่ให้ซ้อนกับ label อื่น/price tag
+      const ty=srLabelY(y);
+      const txt=(lv.type==='R'?'R ':'S ')+lv.price.toFixed(dec);
+      const tw=Math.min(ctx.measureText(txt).width+8,padR-4);
+      ctx.fillStyle=col+(alpha||''); ctx.beginPath(); ctx.roundRect(W-padR-tw-2,ty-7,tw,14,3); ctx.fill();
+      ctx.fillStyle='#0a0f1c'; ctx.textAlign='left'; ctx.fillText(txt,W-padR-tw+2,ty+4); ctx.textAlign='left';
+      // เตือน: อยู่ในโซน EMA200 (ห่างไม่เกิน 5 pips)
+      if(nearEma){
+        ctx.strokeStyle='rgba(247,184,71,.5)'; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
+        ctx.fillStyle='#f7b847'; ctx.font='bold 8.5px Cascadia Mono,monospace';
+        const btxt='EMA200';
+        const btw=ctx.measureText(btxt).width+8;
+        ctx.beginPath(); ctx.roundRect(padL+2,Math.max(y-13,padT+2),btw,12,3); ctx.fill();
+        ctx.fillStyle='#0a0f1c'; ctx.textAlign='left'; ctx.fillText(btxt,padL+6,Math.max(y-13,padT+2)+9); ctx.textAlign='left';
+        ctx.font='bold 9px Cascadia Mono,monospace';
+      }
+    });
+  }
+
+  // ── grid + price labels (right axis) — ข้าม label ที่ชนกับ label S/R ──
   ctx.strokeStyle='#131c30'; ctx.fillStyle='#4a5775'; ctx.font='9.5px Cascadia Mono,monospace';
   const GRID=5;
   for(let i=0;i<=GRID;i++){
     const y=padT+plotH*i/GRID;
     ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
+    if(srRects.some(r=>y-8<r[1]&&y+8>r[0])) continue;
     ctx.textAlign='right'; ctx.fillText((max-(max-min)*i/GRID).toFixed(dec),W-6,y+3);
   }
   ctx.textAlign='left';
@@ -1002,7 +1061,9 @@ function drawCandles(canvas, data){
   const tag=lp.toFixed(dec);
   ctx.font='bold 10px Cascadia Mono,monospace';
   const tw=Math.min(ctx.measureText(tag).width+12,padR-4);
-  const ty=Math.min(Math.max(py(lp)-8,6),H-24);
+  let ty=Math.min(Math.max(py(lp)-8,6),H-24);
+  // กันชนกับ label S/R ฝั่งขวา → ขยับขึ้นไม่ให้ซ้อน
+  if(srRects.length&&srRects.some(r=>ty-8<r[1]&&ty+16>r[0])) ty=Math.min(Math.max(py(lp)-22,6),H-24);
   ctx.fillStyle=lc; ctx.beginPath(); ctx.roundRect(W-tw-2,ty,tw,16,3); ctx.fill();
   ctx.fillStyle='#0a0f1c'; ctx.textAlign='left'; ctx.fillText(tag,W-tw+4,ty+12); ctx.textAlign='left';
 
@@ -1127,11 +1188,24 @@ function drawCandles(canvas, data){
   updateLegendOverlay(nd, legendIdx);
 }
 function updateLegendOverlay(nd, idx){
-  const el=document.getElementById('chartLegendOverlay'); if(!el) return;
+  const bar=document.getElementById('chartLegendBar'); if(!bar) return;
   const closes=nd.map(d=>d.c);
   const at=Math.max(0,Math.min((idx==null?nd.length-1:idx),nd.length-1));
+  const d=nd[at];
   const dec=(nd[nd.length-1]&&nd[nd.length-1].c>1000)?1:(nd[nd.length-1]&&nd[nd.length-1].c>100?2:3);
   const f=v=>v==null||isNaN(v)?'–':v.toFixed(dec);
+  // OHLC (ไม่บังแท่งเทียน — อยู่คนละบรรทัด)
+  const ohlc=document.getElementById('lbOhlc');
+  if(ohlc&&d){
+    const up=d.c>=d.o;
+    ohlc.innerHTML=
+      `<span>O <b>${f(d.o)}</b></span>`+
+      `<span>H <b>${f(d.h)}</b></span>`+
+      `<span>L <b>${f(d.l)}</b></span>`+
+      `<span class="${up?'up':'dn'}">C <b>${f(d.c)}</b></span>`+
+      `<span class="muted">Δ ${f(d.c-d.o)}</span>`;
+  }
+  // ค่าล่าสุดของ indicator (คลิกที่ chip = สลับปิด/เปิด เหมือนเดิม)
   const chips=[];
   const chip=(key,label,color,val,extra)=>{
     if(!chartInd[key]) return;
@@ -1149,25 +1223,25 @@ function updateLegendOverlay(nd, idx){
   if(chartInd.bb){ const b=bollinger(closes,20,2); chip('bb','BB', '#8ca0c8', b.up[at], ' / '+f(b.low[at])); }
   if(chartInd.rsi){ const rv=rsi(closes,14)[at]; chip('rsi','RSI14','#f7b847',rv); }
   if(chartInd.adx){ const a=adx(nd.map(d=>d.h),nd.map(d=>d.l),closes,14); chip('adx','ADX','#f7b847',a.adx[at], ' +'+f(a.pdi[at])+' −'+f(a.ndi[at])); }
-  el.innerHTML=chips.join('');
+  document.getElementById('lbValues').innerHTML=chips.join('');
 }
 function zoomChartAt(factor, frac){
   if(!lastCandles.length) return;
   const nAll=lastCandles.length;
-  const oldFuture=Math.max(3,Math.round(chartView.count*0.15));
-  const oldReal=Math.max(5,chartView.count-oldFuture);
+  const future=Math.max(3,Math.round(chartView.count*0.15));
+  const realSlots=Math.max(5,chartView.count-future);
   let end=(chartView.end<0||chartView.end>=nAll)?nAll-1:chartView.end;
-  const oldStart=Math.max(0,end-oldReal+1);
-  // แท่งที่อยู่ใต้ cursor: map frac ข้ามช่องทั้งหมด (count-1) ให้ตรงกับ pxForData
-  const anchor=Math.min(end,oldStart+Math.round(frac*(chartView.count-1)));
+  const start=Math.max(0,end-realSlots+1);
+  // แท่งที่อยู่ใต้ cursor: map ผ่าน px เดียวกับ pxForData (ใช้ count-1)
+  const anchor=Math.min(end,start+Math.round(frac*(chartView.count-1)));
   const newCount=Math.min(300,Math.max(30,Math.round(chartView.count*factor)));
   const newFuture=Math.max(3,Math.round(newCount*0.15));
   const newReal=Math.max(5,newCount-newFuture);
-  // ยึดแท่งใต้ cursor ให้อยู่ตำแหน่ง frac เดิมของหน้าต่างใหม่ (เหมือน TradingView)
-  let newStart=Math.round(anchor-frac*(newReal-1));
-  newStart=Math.max(0,Math.min(newStart,nAll-newReal));
-  const newEnd=newStart+newReal-1;
-  chartView.count=newCount; chartView.end=newEnd;
+  // ยึด anchor ไว้ที่ pixel เดิม: ใช้ (newCount-1) ให้ตรง pxForData → cursor นิ่ง ไม่ไถล
+  let newStart=Math.round(anchor-frac*(newCount-1));
+  newStart=Math.max(0,Math.min(newStart,nAll-newCount));
+  chartView.count=newCount;
+  chartView.end=newStart+newReal-1;
   drawCandles(document.getElementById('candleChart'),lastCandles);
 }
 function panChart(deltaIdx){
@@ -1183,6 +1257,38 @@ function panChart(deltaIdx){
 function resetChartView(){
   chartView.count=300; chartView.end=-1;
   if(lastCandles.length) drawCandles(document.getElementById('candleChart'),lastCandles);
+}
+
+/* ═══════ INTERACTIVE SUPPORT/RESISTANCE ═══════ */
+const SR_SNAP_PIPS=5;   // ลาก S/R เข้าใกล้ EMA200 ไม่เกินกี่ pips → snap + เตือน
+let srLevels=[];        // [{id, price, type:'R'|'S', manual:boolean}]
+let srPinned={};        // auto-line ที่ user ลากแล้ว → fractal ไม่เขียนทับ
+let srSeq=0;            // ตัวนับ id สำหรับเส้นที่สร้างเอง
+let srDrag=null;        // {id} ขณะลากเส้น
+let srSnapDist=0;       // = SR_SNAP_PIPS * 10^-dec (ขนาด pip ตาม symbol)
+let lastEma200=null;    // EMA200 ล่าสุด ใช้ตอนลาก snap
+
+function upsertSr(id, price, type, manual){
+  const lv=srLevels.find(l=>l.id===id);
+  if(lv){ if(!srPinned[id]&&price!=null) lv.price=price; }
+  else if(price!=null) srLevels.push({id, price, type, manual});
+}
+function hitSrAt(x,y){
+  if(!chartGeom||!srLevels.length) return null;
+  const {padL,padR,padT,plotH,py,W}=chartGeom;
+  if(x<padL||x>W-padR||y<padT||y>padT+plotH) return null;
+  let best=null,bd=6;
+  for(const lv of srLevels){
+    const d=Math.abs(y-py(lv.price));
+    if(d<bd){bd=d;best=lv;}
+  }
+  return best;
+}
+function addSrLine(type){
+  if(!lastCandles.length) return;
+  const last=lastCandles[lastCandles.length-1];
+  srLevels.push({id:'m'+(++srSeq), price:last.c, type, manual:true});
+  drawCandles(document.getElementById('candleChart'),lastCandles);
 }
 
 /* ═══════ SVG SEMICIRCLE GAUGE ═══════ */
@@ -1381,7 +1487,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(document.fullscreenElement){ document.exitFullscreen(); }
     else if(p.requestFullscreen){ p.requestFullscreen().then(()=>setTimeout(()=>drawCandles(document.getElementById('candleChart'),lastCandles),120)); }
   });
-  document.getElementById('chartLegendOverlay')?.addEventListener('click',e=>{
+  document.getElementById('chartLegendBar')?.addEventListener('click',e=>{
     const chip=e.target.closest('.lo-chip'); if(!chip) return;
     const key=chip.dataset.ind;
     chartInd[key]=!chartInd[key];
@@ -1390,6 +1496,11 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(bar) bar.classList.toggle('active',chartInd[key]);
     if(lastCandles.length) drawCandles(document.getElementById('candleChart'),lastCandles);
   });
+  document.getElementById('lbCollapse')?.addEventListener('click',()=>{
+    document.getElementById('chartLegendBar')?.classList.toggle('collapsed');
+  });
+  document.getElementById('addSrR')?.addEventListener('click',()=>addSrLine('R'));
+  document.getElementById('addSrS')?.addEventListener('click',()=>addSrLine('S'));
   document.getElementById('chartIndBar')?.addEventListener('click',e=>{
     const chip=e.target.closest('.ind-chip'); if(!chip) return;
     chip.classList.toggle('active');
@@ -1402,29 +1513,60 @@ document.addEventListener('DOMContentLoaded',()=>{
       e.preventDefault();
       const rect=cvs.getBoundingClientRect();
       const x=e.clientX-rect.left;
-      const frac=Math.max(0,Math.min(1,(x-8)/(Math.max(rect.width-8-58,1))));
+      const g=chartGeom||{};
+      const padLx=(g.padL!=null?g.padL:8), padRx=(g.padR!=null?g.padR:50);
+      const plotW=Math.max((g.W||rect.width)-padLx-padRx,1);
+      const frac=Math.max(0,Math.min(1,(x-padLx)/plotW));
       zoomChartAt(e.deltaY<0?0.8:1.25, frac);
     },{passive:false});
     let drag=null;
-    cvs.addEventListener('mousedown',e=>{ drag={x:e.clientX}; crosshair=null; e.preventDefault(); });
+    cvs.addEventListener('mousedown',e=>{
+      const rect=cvs.getBoundingClientRect();
+      const hit=hitSrAt(e.clientX-rect.left,e.clientY-rect.top);
+      if(hit){
+        srDrag={id:hit.id}; srPinned[hit.id]=true;   // ลากแล้ว → fractal ไม่เขียนทับ
+        e.preventDefault();
+        return;
+      }
+      drag={x:e.clientX}; crosshair=null; e.preventDefault();
+    });
     cvs.addEventListener('mousemove',e=>{
       if(drag) return;
       const rect=cvs.getBoundingClientRect();
       crosshair={x:e.clientX-rect.left, y:e.clientY-rect.top};
       if(lastCandles.length) drawCandles(cvs,lastCandles);
     });
+    cvs.addEventListener('dblclick',e=>{
+      const rect=cvs.getBoundingClientRect();
+      const hit=hitSrAt(e.clientX-rect.left,e.clientY-rect.top);
+      if(hit){
+        srLevels=srLevels.filter(l=>l.id!==hit.id);
+        delete srPinned[hit.id];
+        if(lastCandles.length) drawCandles(cvs,lastCandles);
+      }
+    });
     cvs.addEventListener('mouseleave',()=>{
       if(crosshair){ crosshair=null; if(lastCandles.length) drawCandles(cvs,lastCandles); }
     });
     window.addEventListener('mousemove',e=>{
-      if(!drag) return;
       const rect=cvs.getBoundingClientRect();
+      if(srDrag){
+        if(!chartGeom||!lastCandles.length) return;
+        const {min,max,padT,plotH}=chartGeom;
+        const y=e.clientY-rect.top;
+        let p=Math.max(min,Math.min(max,max-(y-padT)/plotH*(max-min)));
+        if(lastEma200!=null&&Math.abs(p-lastEma200)<=srSnapDist) p=lastEma200;   // snap EMA200
+        const lv=srLevels.find(l=>l.id===srDrag.id);
+        if(lv){ lv.price=p; drawCandles(cvs,lastCandles); }
+        return;
+      }
+      if(!drag) return;
       const plotW=rect.width-58;
       const idx=Math.round((drag.x-e.clientX)/Math.max(plotW/chartView.count,0.5));
       if(idx!==0) panChart(idx);
       drag.x=e.clientX;
     });
-    window.addEventListener('mouseup',()=>{ drag=null; });
+    window.addEventListener('mouseup',()=>{ drag=null; srDrag=null; });
   }
   window.addEventListener('resize',()=>{ if(lastCandles.length) drawCandles(document.getElementById('candleChart'),lastCandles); });
 });
