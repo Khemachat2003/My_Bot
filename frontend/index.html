@@ -830,10 +830,13 @@ function drawCandles(canvas, data){
   const nAll=nd.length;
   const closes=nd.map(d=>d.c);
 
-  // ── layout: price + (volume strip) + (RSI/ADX sub-panels) ──
+  // ── layout: price + (volume strip) + (RSI/ADX sub-panels) + time strip ──
+  const PANE_H=88;              // ความสูง sub-pane เท่ากันทั้ง RSI/ADX → สัดส่วนสมดุล
+  const PANE_MARGIN=13;         // padding แนวตั้ง 15% ของ pane กันเส้นชน/หลุดขอบกรอบ
+  const timeStrip=18;           // แถบเวลาแยกจากกรอบล่างสุด ไม่เบียด ADX
   const subCount=(chartInd.rsi?1:0)+(chartInd.adx?1:0);
-  const subH=subCount*90, volH=chartInd.vol?30:0, padL=8, padT=10;
-  const priceH=H-subH-volH-6, plotH=priceH-padT;
+  const subH=subCount*PANE_H, volH=chartInd.vol?30:0, padL=8, padT=10;
+  const priceH=H-subH-volH-timeStrip, plotH=priceH-padT;
 
   // ── หน้าต่าง + ช่องว่างขวา (future gap เหมือนโบรกเกอร์) ──
   const future=Math.max(3,Math.round(chartView.count*0.15));
@@ -859,6 +862,58 @@ function drawCandles(canvas, data){
       if(!started){ctx.moveTo(x,y);started=true;} else ctx.lineTo(x,y); }
     ctx.stroke(); };
   chartGeom={W,H,padL,padR,padT,plotH,start,end,step,min,max,dec,nd,pxForData,py};
+
+  // ── drawPane: ตัววาด sub-pane มาตรฐาน (RSI/ADX) ──
+  // ล็อคสเกล Y ที่ [min,max] + margin บน/ล่าง 15% → เส้นทุกเส้นมีระยะห่างจากขอบเสมอ
+  const GRID_SOFT='rgba(162,178,212,.10)';   // gridline โปร่ง สบายตา (โทน #1e222d)
+  const GRID_MAJ='rgba(162,178,212,.24)';    // gridline ระดับหลัก (50/40)
+  function drawPane(o){
+    const plotW=W-padL-padR;
+    const pTop=o.oy+PANE_MARGIN, pBot=o.oy+PANE_H-PANE_MARGIN, plot=pBot-pTop;
+    const yMap=v=>pBot-(v-o.min)/(o.max-o.min)*plot;   // mapper ที่มี padding ทั้ง 2 ด้าน
+    // พื้นหลัง + กรอบ
+    ctx.fillStyle='#0e1526'; ctx.fillRect(padL,o.oy,plotW,PANE_H);
+    ctx.strokeStyle='rgba(255,255,255,.06)'; ctx.strokeRect(padL,o.oy,plotW,PANE_H);
+    // โซน (overbought/oversold) วาดก่อน gridline
+    (o.zones||[]).forEach(z=>{
+      const yA=yMap(Math.max(z.v0,z.v1)), yB=yMap(Math.min(z.v0,z.v1));
+      ctx.fillStyle=z.color; ctx.fillRect(padL,yA,plotW,yB-yA);
+    });
+    // gridline + สเกลขวา (ไม่มี text overlay รกหน้าจออีกต่อไป)
+    ctx.font='9.5px Cascadia Mono,monospace';
+    o.guides.forEach(g=>{
+      const y=yMap(g.v);
+      ctx.strokeStyle=g.major?GRID_MAJ:GRID_SOFT;
+      ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle='#4a5775'; ctx.textAlign='right'; ctx.fillText(g.v,W-6,y+3); ctx.textAlign='left';
+    });
+    // clip พื้นที่วาดจริง (กัน gradient/pill ล้นกรอบ)
+    ctx.save(); ctx.beginPath(); ctx.rect(padL,pTop,plotW,plot); ctx.clip();
+    // gradient fill ใต้เส้นชุดหลัก
+    const fa=o.fill.arr, fv=fa[fa.length-1];
+    if(fv!=null){
+      const y0=yMap(fv);
+      const grad=ctx.createLinearGradient(0,y0,0,pBot);
+      grad.addColorStop(0,o.fill.color); grad.addColorStop(1,o.fill.color.replace(/[\d.]*\)$/,'0)'));
+      ctx.fillStyle=grad;
+      ctx.beginPath(); let started=false;
+      for(let i=start;i<=end;i++){ const v=fa[i]; if(v==null) continue; const x=pxForData(i);
+        if(!started){ctx.moveTo(x,yMap(v));started=true;} else ctx.lineTo(x,yMap(v)); }
+      ctx.lineTo(pxForData(end),pBot); ctx.lineTo(pxForData(start),pBot); ctx.closePath(); ctx.fill();
+    }
+    // เส้น indicator (+DI/-DI/ADX หรือ RSI) — คงสีมาตรฐานเดิม
+    o.lines.forEach(l=>drawLine(l.arr,l.color,l.width,yMap));
+    ctx.restore();
+    // ค่าล่าสุดเป็น pill ด้านขวา
+    const pa=o.pill.arr, pv=pa[pa.length-1];
+    if(pv!=null){
+      const t=pv.toFixed(1), y=yMap(pv);
+      ctx.font='bold 10px Cascadia Mono,monospace';
+      const tw=Math.min(ctx.measureText(t).width+12,padR-4);
+      ctx.fillStyle=o.pill.color; ctx.beginPath(); ctx.roundRect(W-tw-2,y-8,tw,16,3); ctx.fill();
+      ctx.fillStyle='#0a0f1c'; ctx.textAlign='left'; ctx.fillText(t,W-tw+4,y+4); ctx.textAlign='left';
+    }
+  }
 
   // ── Grip: เส้นประที่ราคากลมๆ ──
   if(chartInd.grip){
@@ -966,93 +1021,44 @@ function drawCandles(canvas, data){
     volTop+=volH;
   }
 
-  // ── RSI panel (frame + clip กันเส้นหลุดกรอบ) ──
-  let oy=volTop+4;
+  // ── RSI/ADX sub-panes (ใช้ drawPane ร่วมกัน: สเกลล็อค + margin กันเส้นหลุดขอบ) ──
+  let oy=volTop;
   if(chartInd.rsi){
-    const rv=rsi(closes,14), pTop=oy+14, pBot=oy+88, pArea=pBot-pTop;
-    ctx.fillStyle='#0e1526'; ctx.fillRect(padL,oy,plotW,90);
-    ctx.strokeStyle='rgba(255,255,255,.07)'; ctx.strokeRect(padL,oy,plotW,90);
-    ctx.fillStyle='#4a5775'; ctx.font='9.5px Cascadia Mono,monospace'; ctx.textAlign='left';
-    ctx.fillText('RSI(14)',padL+3,oy+11);
-    const vy=v=>pTop+(100-v)/100*(pArea-6);
-    [70,30,50].forEach(lv=>{
-      const y=vy(lv);
-      ctx.strokeStyle=lv===50?'rgba(255,255,255,.07)':'rgba(255,255,255,.14)';
-      ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle='#4a5775'; ctx.textAlign='right'; ctx.fillText(lv,W-6,y+3); ctx.textAlign='left';
+    const rv=rsi(closes,14);
+    drawPane({
+      oy,
+      min:0, max:100,                       // สเกล RSI คงที่ 0–100
+      guides:[{v:0},{v:30},{v:50,major:true},{v:70},{v:100}],
+      zones:[{v0:70,v1:100,color:'rgba(246,70,93,.08)'},
+             {v0:0,v1:30,color:'rgba(34,201,138,.08)'}],
+      fill:{arr:rv, color:'rgba(247,184,71,.30)'},
+      lines:[{arr:rv, color:'#f7b847', width:1.2}],
+      pill:{arr:rv, color:'#f7b847'}
     });
-    ctx.fillStyle='rgba(246,70,93,.10)'; ctx.fillRect(padL,vy(100),plotW,vy(70)-vy(100));
-    ctx.fillStyle='rgba(34,201,138,.10)'; ctx.fillRect(padL,vy(30),plotW,vy(0)-vy(30));
-    ctx.save(); ctx.beginPath(); ctx.rect(padL,pTop,plotW,pBot-pTop); ctx.clip();
-    // gradient fill ใต้เส้น RSI
-    const rlast=rv[rv.length-1];
-    if(rlast!=null){
-      const y0=vy(rlast);
-      const grad=ctx.createLinearGradient(0,y0,0,pBot);
-      grad.addColorStop(0,'rgba(247,184,71,.30)'); grad.addColorStop(1,'rgba(247,184,71,0)');
-      ctx.fillStyle=grad;
-      ctx.beginPath(); let started=false;
-      for(let i=start;i<=end;i++){ const v=rv[i]; if(v==null) continue; const x=pxForData(i);
-        if(!started){ctx.moveTo(x,vy(v));started=true;} else ctx.lineTo(x,vy(v)); }
-      ctx.lineTo(pxForData(end),pBot); ctx.lineTo(pxForData(start),pBot); ctx.closePath(); ctx.fill();
-    }
-    drawLine(rv,'#f7b847',1.2,vy);
-    // ค่าล่าสุดเป็น pill ด้านขวา
-    if(rlast!=null){
-      const rtxt=rlast.toFixed(1);
-      ctx.font='bold 10px Cascadia Mono,monospace';
-      const tw=Math.min(ctx.measureText(rtxt).width+12,padR-4);
-      ctx.fillStyle='#f7b847'; ctx.beginPath(); ctx.roundRect(W-tw-2,vy(rlast)-8,tw,16,3); ctx.fill();
-      ctx.fillStyle='#0a0f1c'; ctx.textAlign='left'; ctx.fillText(rtxt,W-tw+4,vy(rlast)+4); ctx.textAlign='left';
-    }
-    ctx.restore();
-    oy+=90;
+    oy+=PANE_H;
   }
-
-  // ── ADX panel ──
   if(chartInd.adx){
-    const a=adx(nd.map(d=>d.h),nd.map(d=>d.l),closes,14), pTop=oy+14, pBot=oy+88, pArea=pBot-pTop;
-    ctx.fillStyle='#0e1526'; ctx.fillRect(padL,oy,plotW,90);
-    ctx.strokeStyle='rgba(255,255,255,.07)'; ctx.strokeRect(padL,oy,plotW,90);
-    ctx.fillStyle='#4a5775'; ctx.font='9.5px Cascadia Mono,monospace'; ctx.textAlign='left';
-    ctx.fillText('ADX(14) — ADX>20 = เทรนด์แข็ง',padL+3,oy+11);
-    const vy=v=>pTop+(100-v)/100*(pArea-6);
-    const y20=vy(20), y40=vy(40);
-    ctx.fillStyle='rgba(34,201,138,.10)'; ctx.fillRect(padL,vy(100),plotW,y20-vy(100));
-    [20,40,80].forEach(lv=>{
-      const y=vy(lv);
-      ctx.strokeStyle=lv===40?'rgba(255,255,255,.07)':'rgba(255,255,255,.14)';
-      ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle='#4a5775'; ctx.textAlign='right'; ctx.fillText(lv,W-6,y+3); ctx.textAlign='left';
+    const aa=adx(nd.map(d=>d.h),nd.map(d=>d.l),closes,14);
+    // ล็อคสเกล ADX: ขั้นต่ำ 0–80, ขยายปัดขึ้นเป็นสิบถ้าข้อมูลจริงเกิน → เส้นไม่หลุดขอบบน
+    let aMax=0;
+    for(let i=start;i<=end;i++) aMax=Math.max(aMax,aa.pdi[i]||0,aa.ndi[i]||0,aa.adx[i]||0);
+    aMax=Math.max(80,Math.ceil(aMax/10)*10);
+    drawPane({
+      oy,
+      min:0, max:aMax,
+      guides:[{v:0},{v:20},{v:40,major:true},{v:60},{v:80}],
+      zones:[{v0:0,v1:20,color:'rgba(34,201,138,.07)'}],
+      fill:{arr:aa.adx, color:'rgba(247,184,71,.22)'},
+      lines:[{arr:aa.pdi, color:'rgba(34,201,138,.75)', width:1.2},
+             {arr:aa.ndi, color:'rgba(246,70,93,.75)', width:1.2},
+             {arr:aa.adx, color:'#f7b847', width:1.2}],
+      pill:{arr:aa.adx, color:'#f7b847'}
     });
-    ctx.save(); ctx.beginPath(); ctx.rect(padL,pTop,plotW,pBot-pTop); ctx.clip();
-    // gradient fill ใต้ ADX
-    const alast=a.adx[a.adx.length-1];
-    if(alast!=null){
-      const y0=vy(alast);
-      const grad=ctx.createLinearGradient(0,y0,0,pBot);
-      grad.addColorStop(0,'rgba(247,184,71,.22)'); grad.addColorStop(1,'rgba(247,184,71,0)');
-      ctx.fillStyle=grad;
-      ctx.beginPath(); let started=false;
-      for(let i=start;i<=end;i++){ const v=a.adx[i]; if(v==null) continue; const x=pxForData(i);
-        if(!started){ctx.moveTo(x,vy(v));started=true;} else ctx.lineTo(x,vy(v)); }
-      ctx.lineTo(pxForData(end),pBot); ctx.lineTo(pxForData(start),pBot); ctx.closePath(); ctx.fill();
-    }
-    drawLine(a.pdi,'rgba(34,201,138,.75)',1.2,vy);
-    drawLine(a.ndi,'rgba(246,70,93,.75)',1.2,vy);
-    drawLine(a.adx,'#f7b847',1.2,vy);
-    // ค่าล่าสุดเป็น pill ด้านขวา
-    if(alast!=null){
-      const atxt=alast.toFixed(1);
-      ctx.font='bold 10px Cascadia Mono,monospace';
-      const tw=Math.min(ctx.measureText(atxt).width+12,padR-4);
-      ctx.fillStyle='#f7b847'; ctx.beginPath(); ctx.roundRect(W-tw-2,vy(alast)-8,tw,16,3); ctx.fill();
-      ctx.fillStyle='#0a0f1c'; ctx.textAlign='left'; ctx.fillText(atxt,W-tw+4,vy(alast)+4); ctx.textAlign='left';
-    }
-    ctx.restore();
   }
 
-  // ── time labels + ระดับ zoom ──
+  // ── time strip: แยกจากกรอบล่างสุดด้วยเส้นคั่น ไม่เบียดขอบ ADX ──
+  ctx.strokeStyle='rgba(255,255,255,.06)';
+  ctx.beginPath(); ctx.moveTo(padL,H-timeStrip); ctx.lineTo(W-padR,H-timeStrip); ctx.stroke();
   ctx.fillStyle='#4a5775'; ctx.font='9.5px Cascadia Mono,monospace';
   ctx.textAlign='left';
   ctx.fillText(view[0].t?fmtHM(view[0].t):'',padL,H-6);
