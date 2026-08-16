@@ -250,6 +250,17 @@ class SetupFeedEngine:
 
     # 🎯 ตรวจ 9 Checklist ต่อ timeframe → บันทึก setup_scores เสมอ, ยิงสัญญาณเมื่อ trigger ใหม่
     def _check_setup_scorer(self, now: pd.Timestamp):
+        # 🛡️ กันสัญญาณผี: ราคาใน buffer ต้องสดพอ (ไม่ค้างจากช่วงตลาดปิด/feed freeze)
+        # — แม้ market_hours พลาด (วันหยุดพิเศษ ฯลฯ) ก็ไม่ยิงจากข้อมูลเก่า
+        if not self.buffer.empty:
+            last_ts = pd.Timestamp(self.buffer.index[-1])
+            age_min = (now - last_ts).total_seconds() / 60.0
+            max_resample = max(m for _, _, m in SETUP_TIMEFRAMES)
+            max_age_min = max_resample * 3 + 5
+            if age_min > max_age_min:
+                print(f"[SetupFeed:{self.symbol}] ข้ามประเมิน — ข้อมูลค้าง {age_min:.0f} นาที "
+                      f"(เกิน {max_age_min}) ราคาสุดท้าย {last_ts} — รอ poll ราคาสด")
+                return
         for tf_label, hold_min, minutes in SETUP_TIMEFRAMES:
             df_tf = self._resample(minutes)
             if len(df_tf) < SETUP_MIN_BARS:
@@ -348,7 +359,13 @@ class SetupFeedEngine:
               f"(polling {POLL_SECONDS}s) ...")
 
         now_ts = pd.Timestamp(datetime.now(timezone.utc))
-        self._check_setup_scorer(now_ts)
+        # 🐛 FIX (สัญญาณผีสุดสัปดาห์): ตอน restart ต้องไม่ประเมินสัญญาณทันทีถ้าตลาดปิด
+        # (เดิมเรียก _check_setup_scorer ตรงๆ ไม่เช็ค market_open → ใช้ราคาค้างยิงสัญญาณผี)
+        if is_forex_like(self.symbol) and not market_open_now(now_ts):
+            print(f"[SetupFeed:{self.symbol}] ตลาดปิดตอน start — ข้ามประเมิน "
+                  f"(จะเริ่มจริงเมื่อตลาดเปิด / poll ถัดไป)")
+        else:
+            self._check_setup_scorer(now_ts)
 
         while True:
             try:
