@@ -69,7 +69,8 @@ def init_db() -> None:
             horizon_min INTEGER NOT NULL,
             target_time TEXT NOT NULL,
             exit_price REAL,
-            result TEXT DEFAULT 'PENDING'
+            result TEXT DEFAULT 'PENDING',
+            phantom INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_setup_signals_time ON setup_signals(signal_time);
         CREATE INDEX IF NOT EXISTS idx_setup_signals_tf ON setup_signals(timeframe);
@@ -91,7 +92,8 @@ def init_db() -> None:
             target_time TEXT NOT NULL,
             exit_price REAL,
             result TEXT DEFAULT 'PENDING',
-            features_json TEXT
+            features_json TEXT,
+            phantom INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_ml_signals_time ON ml_signals(signal_time);
         CREATE INDEX IF NOT EXISTS idx_ml_signals_tf ON ml_signals(timeframe);
@@ -147,7 +149,8 @@ def init_db() -> None:
             payout REAL DEFAULT 0.82,
             win_amount REAL,
             loss_amount REAL,
-            note TEXT
+            note TEXT,
+            phantom INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_trade_journal_time ON trade_journal(entry_time);
         CREATE INDEX IF NOT EXISTS idx_trade_journal_tf ON trade_journal(timeframe);
@@ -225,6 +228,31 @@ def init_db() -> None:
         if _c not in gcols:
             conn.execute(f"ALTER TABLE setup_signals ADD COLUMN {_c} REAL")
     conn.commit()
+
+    # Migration: phantom flag — กันสัญญาณผีออกจากสถิติ (เช่น 7 สัญญาณที่ยิงตอน
+    # restart วันเสาร์ 2026-08-15 20:33 หลังตลาดปิด ราคา exit==entry เลยแพ้รวด
+    # ซึ่งไม่ใช่การเทรดจริง) เก็บแถวไว้เป็น audit trail แต่ไม่นับใน winrate/P&L
+    for _t in ("setup_signals", "ml_signals", "trade_journal"):
+        _cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({_t})").fetchall()}
+        if "phantom" not in _cols:
+            conn.execute(f"ALTER TABLE {_t} ADD COLUMN phantom INTEGER NOT NULL DEFAULT 0")
+    conn.commit()
+    _ph = conn.execute(
+        "SELECT id FROM setup_signals "
+        "WHERE signal_time >= '2026-08-15T20:33:40' AND signal_time <= '2026-08-15T20:34:00' "
+        "AND result = 'LOSE' AND COALESCE(phantom, 0) = 0"
+    ).fetchall()
+    if _ph:
+        _ids = [r["id"] for r in _ph]
+        conn.executemany(
+            "UPDATE setup_signals SET phantom = 1 WHERE id = ?",
+            [(i,) for i in _ids],
+        )
+        conn.executemany(
+            "UPDATE trade_journal SET phantom = 1 WHERE signal_id = ? AND signal_type = 'SETUP'",
+            [(i,) for i in _ids],
+        )
+        conn.commit()
 
     # Migration: ตาราง prices เก่า (ยุคก่อนมีคอลัมน์ symbol) → เพิ่ม symbol
     # แล้วสมมติว่าแถวเก่าทั้งหมดเป็น frxXAUUSD (ข้อมูลกราฟเดิม)
@@ -604,8 +632,8 @@ def _compute_stats(table: str, payout: float = 0.82) -> dict:
     conn = get_conn()
     row = conn.execute(
         f"""SELECT
-             COUNT(*) FILTER (WHERE result != 'PENDING') AS n_resolved,
-             COUNT(*) FILTER (WHERE result = 'WIN') AS wins,
+             COUNT(*) FILTER (WHERE result != 'PENDING' AND COALESCE(phantom, 0) = 0) AS n_resolved,
+             COUNT(*) FILTER (WHERE result = 'WIN' AND COALESCE(phantom, 0) = 0) AS wins,
              COUNT(*) FILTER (WHERE result = 'PENDING') AS n_pending
            FROM {table}"""
     ).fetchone()
@@ -634,8 +662,8 @@ def _compute_stats_by_timeframe(table: str, payout: float = 0.82) -> dict:
     rows = conn.execute(
         f"""SELECT
              COALESCE(timeframe, 'M1') AS tf,
-             COUNT(*) FILTER (WHERE result != 'PENDING') AS n_resolved,
-             COUNT(*) FILTER (WHERE result = 'WIN') AS wins,
+             COUNT(*) FILTER (WHERE result != 'PENDING' AND COALESCE(phantom, 0) = 0) AS n_resolved,
+             COUNT(*) FILTER (WHERE result = 'WIN' AND COALESCE(phantom, 0) = 0) AS wins,
              COUNT(*) FILTER (WHERE result = 'PENDING') AS n_pending
            FROM {table}
            GROUP BY tf"""
@@ -722,7 +750,8 @@ def compute_journal_stats(payout: float = 0.82) -> dict:
     """P&L รวม / winrate / equity curve จำลอง จาก trade_journal ทั้งหมด"""
     conn = get_conn()
     rows = conn.execute(
-        "SELECT * FROM trade_journal WHERE result IN ('WIN', 'LOSE') ORDER BY exit_time"
+        "SELECT * FROM trade_journal WHERE result IN ('WIN', 'LOSE') AND COALESCE(phantom, 0) = 0 "
+        "ORDER BY exit_time"
     ).fetchall()
     conn.close()
     rows = [dict(r) for r in rows]
@@ -875,7 +904,8 @@ def compute_money_report(start: str | None = None, end: str | None = None) -> di
 
     conn = get_conn()
     rows = conn.execute(
-        "SELECT * FROM trade_journal WHERE result IN ('WIN', 'LOSE') ORDER BY exit_time"
+        "SELECT * FROM trade_journal WHERE result IN ('WIN', 'LOSE') AND COALESCE(phantom, 0) = 0 "
+        "ORDER BY exit_time"
     ).fetchall()
     conn.close()
 
