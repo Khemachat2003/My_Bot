@@ -121,6 +121,12 @@ def init_db() -> None:
 
         CREATE INDEX IF NOT EXISTS idx_ticks_time ON ticks(timestamp);
 
+        -- MACRO (DXY รายชั่วโมง — ใช้คำนวณ Regime-Gate ตอนยิงสัญญาณ) -----------
+        CREATE TABLE IF NOT EXISTS macro_1h (
+            ts TEXT PRIMARY KEY,
+            dxy_close REAL
+        );
+
         -- TRADE JOURNAL (บันทึกทุกออเดอร์จริง เพื่อตรวจสอบ/พัฒนาโมเดล) ---------
         CREATE TABLE IF NOT EXISTS trade_journal (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -212,6 +218,14 @@ def init_db() -> None:
             conn.execute(f"ALTER TABLE setup_signals ADD COLUMN {_c} REAL")
         conn.commit()
 
+    # Migration: Regime-Gate (shadow mode) — บันทึก gold_1h_slope/dxy_slope_24/
+    # dxy_rsi/gate_agree ตอนยิงสัญญาณ FIRE (ยังไม่บล็อก — เก็บสะสมผลจริงก่อนเปิดใช้)
+    gcols = {r["name"] for r in conn.execute("PRAGMA table_info(setup_signals)").fetchall()}
+    for _c in ("gold_slope_1h", "dxy_slope_24", "dxy_rsi", "gate_agree"):
+        if _c not in gcols:
+            conn.execute(f"ALTER TABLE setup_signals ADD COLUMN {_c} REAL")
+    conn.commit()
+
     # Migration: ตาราง prices เก่า (ยุคก่อนมีคอลัมน์ symbol) → เพิ่ม symbol
     # แล้วสมมติว่าแถวเก่าทั้งหมดเป็น frxXAUUSD (ข้อมูลกราฟเดิม)
     try:
@@ -248,6 +262,34 @@ def init_db() -> None:
     conn.close()
 
 
+# ── MACRO (DXY รายชั่วโมง — ข้อมูลสำหรับ Regime-Gate) ─────────────────────────
+def upsert_macro_dxy(ts: str, dxy_close: float) -> None:
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO macro_1h (ts, dxy_close) VALUES (?, ?) "
+        "ON CONFLICT(ts) DO UPDATE SET dxy_close = excluded.dxy_close",
+        (ts, float(dxy_close)),
+    )
+    conn.commit()
+    conn.close()
+
+
+def fetch_macro_dxy(limit: int = 96) -> list[dict]:
+    """DXY รายชั่วโมง เก่า→ใหม่ (limit แถวล่าสุด) — ใช้คำนวณ slope/RSI ตอนยิงสัญญาณ"""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM macro_1h ORDER BY ts DESC LIMIT ?", (limit,)).fetchall()
+    conn.close()
+    return [dict(r) for r in reversed(rows)]
+
+
+def fetch_latest_macro_dxy() -> dict | None:
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM macro_1h ORDER BY ts DESC LIMIT 1").fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
 # RULE-BASED SETUP SIGNALS
 def insert_setup_signal(signal_time: str, entry_price: float, direction: str,
                          confidence: float, horizon_min: int, target_time: str,
@@ -257,19 +299,27 @@ def insert_setup_signal(signal_time: str, entry_price: float, direction: str,
                          ema200_price: Optional[float] = None,
                          dist200_pct: Optional[float] = None,
                          near_ema200: Optional[bool] = None,
-                         crossed_ema100: Optional[bool] = None) -> int:
+                         crossed_ema100: Optional[bool] = None,
+                         gold_slope_1h: Optional[float] = None,
+                         dxy_slope_24: Optional[float] = None,
+                         dxy_rsi: Optional[float] = None,
+                         gate_agree: Optional[bool] = None) -> int:
     conn = get_conn()
     cur = conn.execute(
         """INSERT INTO setup_signals
            (signal_time, timeframe, entry_price, direction, confidence,
             score, total, tier, horizon_min, target_time, result, symbol,
-            ema200_price, dist200_pct, near_ema200, crossed_ema100)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?)""",
+            ema200_price, dist200_pct, near_ema200, crossed_ema100,
+            gold_slope_1h, dxy_slope_24, dxy_rsi, gate_agree)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?,
+                   ?, ?, ?, ?)""",
         (signal_time, timeframe, entry_price, direction, confidence,
          score, total, tier, horizon_min, target_time, symbol,
          ema200_price, dist200_pct,
          (1 if near_ema200 else 0) if near_ema200 is not None else None,
-         (1 if crossed_ema100 else 0) if crossed_ema100 is not None else None),
+         (1 if crossed_ema100 else 0) if crossed_ema100 is not None else None,
+         gold_slope_1h, dxy_slope_24, dxy_rsi,
+         (1 if gate_agree else 0) if gate_agree is not None else None),
     )
     conn.commit()
     new_id = cur.lastrowid

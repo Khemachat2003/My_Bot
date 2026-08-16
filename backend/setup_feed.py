@@ -37,6 +37,7 @@ except Exception:
 import pandas as pd
 
 from backend import db, setup_db
+from backend.indicators import rsi
 from backend.telegram import send_telegram
 from backend.market_hours import is_forex_like, market_open_now, symbol_label
 from backend.setup_scorer import score_setup
@@ -248,6 +249,31 @@ class SetupFeedEngine:
             print(f"[SetupFeed:{self.symbol}] Error ในการสรุปผล PENDING signals:")
             traceback.print_exc()
 
+    # 🛡️ Regime-Gate (shadow mode): คำนวณ gold 1h slope + DXY slope/RSI + agree
+    # ตอนยิงสัญญาณ — ยังไม่บล็อก แค่บันทึกไว้วิเคราะห์ forward ว่า "เห็นพ้อง" ได้ winrate ≥60% จริง
+    def _gate_features(self) -> tuple[float | None, float | None, float | None, int | None]:
+        try:
+            # gold 1h slope (24 ชม.) จาก buffer 1m
+            g1 = self.buffer["close"].resample("1h", closed="left", label="left").last().dropna()
+            if len(g1) < 26:
+                return None, None, None, None
+            gold_slope = (g1.iloc[-1] - g1.iloc[-25]) / g1.iloc[-25] * 100.0
+
+            m = db.fetch_macro_dxy(limit=96)
+            if len(m) < 26:
+                return None, None, None, None
+            dxy = pd.Series(
+                [r["dxy_close"] for r in m],
+                index=pd.to_datetime([r["ts"] for r in m], utc=True),
+            ).dropna()
+            dxy_slope = (dxy.iloc[-1] - dxy.iloc[-25]) / dxy.iloc[-25] * 100.0
+            dxy_rsi_v = float(rsi(dxy, 14).iloc[-1])
+            agree = int((gold_slope > 0) == (dxy_slope > 0))
+            return (round(float(gold_slope), 4), round(float(dxy_slope), 4),
+                    round(dxy_rsi_v, 2), agree)
+        except Exception:
+            return None, None, None, None
+
     # 🎯 ตรวจ 9 Checklist ต่อ timeframe → บันทึก setup_scores เสมอ, ยิงสัญญาณเมื่อ trigger ใหม่
     def _check_setup_scorer(self, now: pd.Timestamp):
         # 🛡️ กันสัญญาณผี: ราคาใน buffer ต้องสดพอ (ไม่ค้างจากช่วงตลาดปิด/feed freeze)
@@ -300,6 +326,7 @@ class SetupFeedEngine:
                         continue
 
                 target_time = (now + pd.Timedelta(minutes=hold_min)).isoformat()
+                gold_slope, dxy_slope, dxy_rsi_v, gate_agree = self._gate_features()
                 try:
                     new_sig_id = db.insert_setup_signal(
                         signal_time=now.isoformat(),
@@ -317,6 +344,10 @@ class SetupFeedEngine:
                         dist200_pct=result.dist200_pct,
                         near_ema200=result.near_ema200,
                         crossed_ema100=result.crossed_ema100,
+                        gold_slope_1h=gold_slope,
+                        dxy_slope_24=dxy_slope,
+                        dxy_rsi=dxy_rsi_v,
+                        gate_agree=gate_agree,
                     )
                     print(f"[SetupFeed:{self.symbol}] บันทึกสัญญาณ ID #{new_sig_id} [{tf_label}] "
                           f"ลง setup_signals (รอวัดผลในอีก {hold_min} นาที)")
@@ -325,11 +356,16 @@ class SetupFeedEngine:
                     traceback.print_exc()
 
                 sym_text = symbol_label(self.symbol)
+                gate_txt = "n/a"
+                if gate_agree is not None:
+                    gate_txt = ("เห็นพ้อง ✅" if gate_agree == 1 else "ขัดแย้ง ⛔")
+                    gate_txt += f" (gold1h {gold_slope:+.2f}% | DXY24 {dxy_slope:+.2f}%)"
                 msg_trigger = (
                     f"🔵 [RULE-BASED ALERT]\n"
                     f"Symbol: {sym_text} | TF: {tf_label} | Tier: {result.tier}\n"
                     f"Direction: {result.direction} | Entry: {self.last_price:.5f}\n"
                     f"Score: {result.score}/{result.max_score} | Hold: {hold_min}m\n"
+                    f"Regime-Gate (shadow): {gate_txt}\n"
                     f"เหตุผล: {result.entry_trigger_note}\n"
                     f"เวลาเข้า: {now.strftime('%H:%M:%S')} UTC"
                 )

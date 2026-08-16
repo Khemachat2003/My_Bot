@@ -54,6 +54,8 @@ PROCESSES = [
     # ถ้ามีสัญญาณจริงใหม่พอ → เทรนใหม่ → ทับ model_m5 ถ้าดีกว่าโมเดลเดิม
     {"name": "auto_retrain", "cmd": ["-m", "backend.ml_forecaster.auto_retrain"],
      "restart": True},
+    # ข้อมูล macro (DXY รายชั่วโมง) — ใช้คำนวณ Regime-Gate ตอนยิงสัญญาณ FIRE
+    {"name": "macro_feed", "cmd": ["-m", "backend.macro_feed"], "restart": True},
 ]
 
 BACKUP_ENABLED = os.getenv("BACKUP_ENABLED", "true").lower() not in ("0", "false", "no")
