@@ -216,9 +216,11 @@ class SetupFeedEngine:
                 entry_price = row["entry_price"]
                 direction = row["direction"]
                 if direction == "CALL":
-                    res = "WIN" if exit_price > entry_price else "LOSE"
+                    res = "WIN" if exit_price > entry_price else (
+                        "LOSE" if exit_price < entry_price else "DRAW")
                 else:
-                    res = "WIN" if exit_price < entry_price else "LOSE"
+                    res = "WIN" if exit_price < entry_price else (
+                        "LOSE" if exit_price > entry_price else "DRAW")
 
                 db.update_setup_signal_result(row["id"], exit_price, res)
 
@@ -233,7 +235,12 @@ class SetupFeedEngine:
                 db.update_trade_result(trade_id, exit_price, now.isoformat(), res)
 
                 pips_diff = abs(exit_price - entry_price)
-                result_icon = "🟢 WIN" if res == "WIN" else "🔴 LOSE"
+                if res == "WIN":
+                    result_icon = "🟢 WIN"
+                elif res == "LOSE":
+                    result_icon = "🔴 LOSE"
+                else:
+                    result_icon = "🟡 DRAW"
                 sym_text = symbol_label(self.symbol)
                 msg = (
                     f"🏁 [RESULT] [RULE-BASED] | ID #{row['id']} | TF: {row['timeframe']}\n"

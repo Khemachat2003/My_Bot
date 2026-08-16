@@ -634,6 +634,8 @@ def _compute_stats(table: str, payout: float = 0.82) -> dict:
         f"""SELECT
              COUNT(*) FILTER (WHERE result != 'PENDING' AND COALESCE(phantom, 0) = 0) AS n_resolved,
              COUNT(*) FILTER (WHERE result = 'WIN' AND COALESCE(phantom, 0) = 0) AS wins,
+             COUNT(*) FILTER (WHERE result = 'LOSE' AND COALESCE(phantom, 0) = 0) AS losses,
+             COUNT(*) FILTER (WHERE result = 'DRAW' AND COALESCE(phantom, 0) = 0) AS draws,
              COUNT(*) FILTER (WHERE result = 'PENDING') AS n_pending
            FROM {table}"""
     ).fetchone()
@@ -641,14 +643,16 @@ def _compute_stats(table: str, payout: float = 0.82) -> dict:
 
     n = row["n_resolved"] or 0
     wins = row["wins"] or 0
-    losses = n - wins
-    winrate = round(100 * wins / n, 2) if n else 0.0
-    ci_low, ci_high = wilson_ci(wins, n)
+    losses = row["losses"] or 0
+    draws = row["draws"] or 0
+    decided = wins + losses
+    winrate = round(100 * wins / decided, 2) if decided else 0.0
+    ci_low, ci_high = wilson_ci(wins, decided)
     breakeven = round(1 / (1 + payout) * 100, 2)
     margin = round(ci_low - breakeven, 2)
 
     return {
-        "n_resolved": n, "wins": wins, "losses": losses,
+        "n_resolved": n, "wins": wins, "losses": losses, "draws": draws,
         "n_pending": row["n_pending"] or 0,
         "winrate": winrate, "ci_low": ci_low, "ci_high": ci_high,
         "breakeven": breakeven, "margin": margin, "payout": payout,
@@ -664,6 +668,8 @@ def _compute_stats_by_timeframe(table: str, payout: float = 0.82) -> dict:
              COALESCE(timeframe, 'M1') AS tf,
              COUNT(*) FILTER (WHERE result != 'PENDING' AND COALESCE(phantom, 0) = 0) AS n_resolved,
              COUNT(*) FILTER (WHERE result = 'WIN' AND COALESCE(phantom, 0) = 0) AS wins,
+             COUNT(*) FILTER (WHERE result = 'LOSE' AND COALESCE(phantom, 0) = 0) AS losses,
+             COUNT(*) FILTER (WHERE result = 'DRAW' AND COALESCE(phantom, 0) = 0) AS draws,
              COUNT(*) FILTER (WHERE result = 'PENDING') AS n_pending
            FROM {table}
            GROUP BY tf"""
@@ -675,12 +681,14 @@ def _compute_stats_by_timeframe(table: str, payout: float = 0.82) -> dict:
     for r in rows:
         n = r["n_resolved"] or 0
         wins = r["wins"] or 0
-        losses = n - wins
-        winrate = round(100 * wins / n, 2) if n else 0.0
-        ci_low, ci_high = wilson_ci(wins, n)
+        losses = r["losses"] or 0
+        draws = r["draws"] or 0
+        decided = wins + losses
+        winrate = round(100 * wins / decided, 2) if decided else 0.0
+        ci_low, ci_high = wilson_ci(wins, decided)
         margin = round(ci_low - breakeven, 2)
         out[r["tf"]] = {
-            "n_resolved": n, "wins": wins, "losses": losses,
+            "n_resolved": n, "wins": wins, "losses": losses, "draws": draws,
             "n_pending": r["n_pending"] or 0,
             "winrate": winrate, "ci_low": ci_low, "ci_high": ci_high,
             "breakeven": breakeven, "margin": margin, "payout": payout,
@@ -720,7 +728,7 @@ def update_trade_result(trade_id: int, exit_price: float, exit_time: str,
     if row is None:
         conn.close()
         return
-    pnl = row["payout"] if result == "WIN" else -1.0
+    pnl = row["payout"] if result == "WIN" else (-1.0 if result == "LOSE" else 0.0)
     conn.execute(
         """UPDATE trade_journal SET exit_price = ?, exit_time = ?, result = ?,
            pnl = ?, win_amount = CASE WHEN ? = 'WIN' THEN ? ELSE 0 END,

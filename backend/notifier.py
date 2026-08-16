@@ -263,9 +263,11 @@ class MLFeedEngine:
                 entry_price = row["entry_price"]
                 direction = row["direction"]
                 if direction == "CALL":
-                    res = "WIN" if last_price > entry_price else "LOSE"
+                    res = "WIN" if last_price > entry_price else (
+                        "LOSE" if last_price < entry_price else "DRAW")
                 else:
-                    res = "WIN" if last_price < entry_price else "LOSE"
+                    res = "WIN" if last_price < entry_price else (
+                        "LOSE" if last_price > entry_price else "DRAW")
 
                 db.update_ml_signal_result(row["id"], last_price, res)
 
@@ -280,7 +282,12 @@ class MLFeedEngine:
                 db.update_trade_result(trade_id, last_price, now.isoformat(), res)
 
                 pips_diff = abs(last_price - entry_price)
-                result_icon = "🟢 WIN" if res == "WIN" else "🔴 LOSE"
+                if res == "WIN":
+                    result_icon = "🟢 WIN"
+                elif res == "LOSE":
+                    result_icon = "🔴 LOSE"
+                else:
+                    result_icon = "🟡 DRAW"
                 msg = (
                     f"🏁 [RESULT] [ML MODEL] | ID #{row['id']} | TF: {row['timeframe']}\n"
                     f"ทิศทาง: {direction} | ผลลัพธ์: {result_icon}\n"
