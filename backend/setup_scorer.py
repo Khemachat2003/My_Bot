@@ -636,7 +636,7 @@ def score_setup(
             direction="", bias="", entry_trigger=False,
             ema200_price=e200,
             dist200_pct=round(_d200, 4),
-            near_ema200=_d200 <= float(cfg.get("ema200_near_tol_pct", 0.35)),
+            near_ema200=_d200 <= float(cfg.get("ema200_near_tol_pct", 0.20)),
             crossed_ema100=False,
             entry_trigger_note=(
                 f"EMA ยังไม่เรียงตามเทรน (EMA50 {e50:.2f} / EMA100 {e100:.2f} / EMA200 {e200:.2f}) "
@@ -646,6 +646,40 @@ def score_setup(
                               "note": "EMA ไม่เรียงตามทิศเทรน"},
             },
         )
+
+    # ── Hard gate: H1 trend alignment ──
+    # -resample M5 → H1 เพื่อเช็ค trend ของ H1 (กรอบใหญ่กว่า)
+    # ถ้า H1 trend ขัดแย้งกับ M5 direction → ไม่ส่ง (กันสัญญาณสวนเทรนใหญ่)
+    try:
+        h1_close = df["close"].resample("1h", closed="left", label="left").last().dropna()
+        if len(h1_close) >= 50:
+            h1_ema50 = _calc_ema(h1_close, 50)
+            h1_e50 = float(h1_ema50.iloc[-1])
+            h1_last = float(h1_close.iloc[-1])
+            h1_bullish = h1_last > h1_e50
+            h1_bearish = h1_last < h1_e50
+            h1_conflict = (direction == "CALL" and h1_bearish) or (direction == "PUT" and h1_bullish)
+            if h1_conflict:
+                _d200 = abs(last_close - e200) / e200 * 100.0
+                return SetupResult(
+                    timeframe=timeframe,
+                    target_hold_minutes=target_hold_minutes,
+                    score=0.0, max_score=max_score, tier="NONE",
+                    direction=direction, bias=bias, entry_trigger=False,
+                    ema200_price=e200,
+                    dist200_pct=round(_d200, 4),
+                    near_ema200=_d200 <= float(cfg.get("ema200_near_tol_pct", 0.20)),
+                    crossed_ema100=False,
+                    entry_trigger_note=(
+                        f"M5 {direction} แต่ H1 สวนเทรน (H1 close={h1_last:.2f} vs H1 EMA50={h1_e50:.2f}) "
+                        f"— ห้ามเทรดสวนเทรน H1"),
+                    details={
+                        "trend_ema": {"ok": False, "frac": 0.0, "weight": int(weights.get("trend_ema", 2)),
+                                      "note": f"H1 trend ขัดแย้ง M5 {direction}"},
+                    },
+                )
+    except Exception:
+        pass  # ถ้า resample H1 ไม่ได้ → ข้าม H1 gate (ยังยิงได้ตาม M5)
 
     score, details, grip_hits = _score_trend_setup(df, direction, ctx, cfg)
     score = round(score, 1)
@@ -671,7 +705,7 @@ def score_setup(
 
     # สถานะราคาเทียบ EMA200 / EMA100 (โซนแตะ = ema200_tol_pct, โซนใกล้/ใจหลัก = ema200_near_tol_pct)
     tol_touch = float(cfg.get("ema200_tol_pct", 0.15))
-    tol_near = float(cfg.get("ema200_near_tol_pct", 0.35))
+    tol_near = float(cfg.get("ema200_near_tol_pct", 0.20))
     dist200_pct = abs(last_close - e200) / e200 * 100.0
     touching_ema200 = dist200_pct <= tol_touch      # แตะจริง (ย่อยของใจหลัก)
     near_ema200 = dist200_pct <= tol_near           # แตะหรือใกล้ = ใจหลักของระบบ

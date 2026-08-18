@@ -7,7 +7,7 @@
   "daily_cap": 6,
   "adx_min": 20,
   "ema200_tol_pct": 0.15,
-  "ema200_near_tol_pct": 0.35,
+  "ema200_near_tol_pct": 0.20,
   "ema100_tol_pct": 0.08,
   "rejection_lookback": 10,
   "fractal": {
