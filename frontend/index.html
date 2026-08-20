@@ -337,6 +337,21 @@
   .guide-note{margin-top:10px; padding:9px 11px; border-radius:9px; background:rgba(12,18,32,.6); border:1px dashed var(--border); font-size:11px; line-height:1.5;}
   .guide-note.ready{color:var(--green); border-color:rgba(34,201,138,.35);}
   .guide-note.wait{color:var(--dim);}
+
+  /* compact setup rows (accordion) */
+  .setup-row{border-bottom:1px solid var(--border); cursor:pointer; transition:background .12s;}
+  .setup-row:hover{background:rgba(77,163,255,.04);}
+  .setup-row-head{display:grid; grid-template-columns:80px 50px 1fr 45px; align-items:center; gap:6px; padding:8px 10px; font-size:11.5px;}
+  .setup-sym{font-weight:800; color:var(--text); letter-spacing:.3px;}
+  .setup-tier{font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; padding:2px 6px; border-radius:5px; text-align:center;}
+  .setup-tier.ok{background:rgba(34,201,138,.15); color:var(--green);}
+  .setup-tier.wait{background:rgba(240,185,11,.12); color:var(--yellow);}
+  .setup-tier.none{background:rgba(116,128,156,.08); color:var(--dim);}
+  .setup-dir{font-size:10.5px; font-weight:700;}
+  .setup-score{font-family:var(--num); font-weight:800; font-size:12px; text-align:right; color:var(--muted);}
+  .setup-row-detail{display:none; padding:0 10px 10px;}
+  .setup-row.expanded .setup-row-detail{display:block;}
+  .setup-row.expanded{background:rgba(12,18,32,.4);}
   .tier{display:inline-block; font-size:9.5px; font-weight:900; padding:3px 9px; border-radius:99px; letter-spacing:.4px;}
   .tier.FIRE{background:rgba(34,201,138,.16); color:var(--green); border:1px solid rgba(34,201,138,.5);}
   .tier.WATCH{background:rgba(56,189,248,.13); color:var(--cyan); border:1px solid rgba(56,189,248,.45);}
@@ -511,8 +526,8 @@
           <div id="gaugePanel"></div>
         </div>
         <div class="panel">
-          <h3><span class="ph blue"></span>Setup Checklist สด — ทุกคู่เงิน</h3>
-          <div id="setupMini" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+          <h3><span class="ph blue"></span>Setup — ทุกคู่เงิน</h3>
+          <div id="setupMini"></div>
         </div>
       </div>
     </div>
@@ -589,8 +604,8 @@
       <div class="kpi blue"><div class="lbl">Winrate M5</div><div class="val blue" id="setWrM5">–</div><div class="sub">ถือ 30 นาที</div></div>
     </div>
     <div class="cols l3">
-      <div class="panel"><h3><span class="ph blue"></span>Checklist สด M5 — ทุกสัญลักษณ์</h3><div id="setupAllM5" style="display:flex;flex-wrap:wrap;gap:12px;"></div></div>
-      <div class="panel"><h3><span class="ph blue"></span>Checklist สด M1 — ทุกสัญลักษณ์</h3><div id="setupAllM1" style="display:flex;flex-wrap:wrap;gap:12px;"></div></div>
+      <div class="panel"><h3><span class="ph blue"></span>Setup — M5</h3><div id="setupAllM5"></div></div>
+      <div class="panel"><h3><span class="ph blue"></span>Setup — M1</h3><div id="setupAllM1"></div></div>
       <div class="panel">
         <h3><span class="ph blue"></span>ประวัติสัญญาณ Rule-Based
           <select id="setupSymFilter" style="background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:800;font-family:inherit;float:right;">
@@ -1424,44 +1439,37 @@ async function loadSymbols(){
     symbolList=list;
     _symbolsLoaded=true;
     const sel=document.getElementById('chartSymbol');
-    if(!sel) return;
-    let cur='frxXAUUSD';
-    try{ const s=await fetchJSON('/api/symbol'); if(s&&s.symbol) cur=s.symbol; }catch(e){}
-    sel.innerHTML=list.map(s=>`<option value="${s.symbol}" ${s.symbol===cur?'selected':''}>${s.label}</option>`).join('');
-    sel.addEventListener('change',()=>refreshPrice());
-  }catch(e){}
+    if(sel){
+      let cur='frxXAUUSD';
+      try{ const s=await fetchJSON('/api/symbol'); if(s&&s.symbol) cur=s.symbol; }catch(e){}
+      sel.innerHTML=list.map(s=>`<option value="${s.symbol}" ${s.symbol===cur?'selected':''}>${s.label}</option>`).join('');
+      sel.addEventListener('change',()=>refreshPrice());
+    }
+  }catch(e){ _symbolsLoaded=true; }
 }
 
+const _wlCache={};
 async function refreshWatchlist(){
   const rowsEl=document.getElementById('watchlistRows'); if(!rowsEl) return;
   if(!_symbolsLoaded){
-    try{ const list=await fetchJSON('/api/symbols'); symbolList=list; _symbolsLoaded=true; }catch(e){ return; }
+    try{ const list=await fetchJSON('/api/symbols'); symbolList=list; _symbolsLoaded=true; }catch(e){ _symbolsLoaded=true; return; }
   }
   const list=symbolList;
   if(!list.length) return;
   const cur=document.getElementById('chartSymbol')?.value||'frxXAUUSD';
   const short=s=>s.replace(/^frx/,'').replace(/_/g,'');
-  const rows=[];
-  await Promise.all(list.map(async s=>{
-    try{
-      const c=await fetchJSON('/api/candles?tf=1m&count=2&symbol='+encodeURIComponent(s.symbol));
-      if(!Array.isArray(c)||c.length===0) throw new Error('no candles');
-      const last=c[c.length-1], prev=c[c.length-2];
-      const price=last?last.c:null;
-      const chg=prev?last.c-prev.c:0;
-      const chgPct=prev?chg/prev.c*100:null;
-      const cls=chgPct==null?'flat':(chgPct>=0?'up':'down');
-      const pcls=price==null?'flat':'';
-      rows.push(`<div class="wl-row ${s.symbol===cur?'active':''}" data-symbol="${s.symbol}">
-        <span><span class="wl-name">${short(s.symbol)}</span><span class="wl-kind">${s.label||''}</span></span>
-        <span class="wl-price ${pcls}">${price!=null?price.toFixed(price>=1000?1:(price>=100?2:3)):'–'}</span>
-        <span class="wl-chg ${cls}">${chgPct==null?'–':(chgPct>=0?'+':'')+chgPct.toFixed(2)+'%'}</span>
-      </div>`);
-    }catch(e){ rows.push(`<div class="wl-row ${s.symbol===cur?'active':''}" data-symbol="${s.symbol}">
+  rowsEl.innerHTML=list.map(s=>{
+    const c=_wlCache[s.symbol];
+    const price=c?c.price:null;
+    const chgPct=c?c.chgPct:null;
+    const cls=chgPct==null?'flat':(chgPct>=0?'up':'down');
+    const pcls=price==null?'flat':'';
+    return `<div class="wl-row ${s.symbol===cur?'active':''}" data-symbol="${s.symbol}">
       <span><span class="wl-name">${short(s.symbol)}</span><span class="wl-kind">${s.label||''}</span></span>
-      <span class="wl-price flat">–</span><span class="wl-chg flat">–</span></div>`); }
-  }));
-  rowsEl.innerHTML=rows.join('');
+      <span class="wl-price ${pcls}">${price!=null?price.toFixed(price>=1000?1:(price>=100?2:3)):''}</span>
+      <span class="wl-chg ${cls}">${chgPct==null?'':(chgPct>=0?'+':'')+chgPct.toFixed(2)+'%'}</span>
+    </div>`;
+  }).join('');
   rowsEl.querySelectorAll('.wl-row').forEach(row=>{
     row.addEventListener('click',()=>{
       const sel=document.getElementById('chartSymbol'); if(!sel) return;
@@ -1469,6 +1477,32 @@ async function refreshWatchlist(){
       rowsEl.querySelectorAll('.wl-row').forEach(r=>r.classList.toggle('active',r===row));
       refreshPrice();
     });
+  });
+  await Promise.all(list.map(async s=>{
+    try{
+      const c=await fetchJSON('/api/candles?tf=1m&count=2&symbol='+encodeURIComponent(s.symbol));
+      if(!Array.isArray(c)||c.length<2) return;
+      const last=c[c.length-1], prev=c[c.length-2];
+      const price=last?last.c:null;
+      const chg=prev&&last?last.c-prev.c:0;
+      const chgPct=prev?chg/prev.c*100:null;
+      _wlCache[s.symbol]={price,chgPct};
+    }catch(e){}
+  }));
+  const cur2=document.getElementById('chartSymbol')?.value||'frxXAUUSD';
+  rowsEl.querySelectorAll('.wl-row').forEach(row=>{
+    const s=_wlCache[row.dataset.symbol];
+    if(!s) return;
+    const priceEl=row.querySelector('.wl-price');
+    const chgEl=row.querySelector('.wl-chg');
+    if(priceEl&&s.price!=null){
+      priceEl.textContent=s.price.toFixed(s.price>=1000?1:(s.price>=100?2:3));
+      priceEl.className='wl-price';
+    }
+    if(chgEl&&s.chgPct!=null){
+      chgEl.textContent=(s.chgPct>=0?'+':'')+s.chgPct.toFixed(2)+'%';
+      chgEl.className='wl-chg '+(s.chgPct>=0?'up':'down');
+    }
   });
 }
 
@@ -1688,76 +1722,83 @@ async function refreshSetupTab(){
 }
 
 const SETUP_STEPS=[
-  ['c1_fractal_sr','1. Fractal 15 S/R Zone'],
-  ['c2_bb_break','2. ราคาทะลุ BB'],
+  ['c1_fractal_sr','1. Fractal 15 S/R'],
+  ['c2_bb_break','2. BB Break'],
   ['c3_rsi_ob_os','3. RSI OVB/OVS'],
-  ['c4_rsi_div','4. RSI Divergence/Convergence'],
+  ['c4_rsi_div','4. RSI Divergence'],
   ['c5_adx','5. ADX > 20'],
-  ['c6_pa','6. PA ยืนยันที่ S/R'],
-  ['c7_fractal_trend','7. Fractal Trend (HH/HL/LH/LL)'],
-  ['c8_grip','8. Grip (เลขกลม)'],
-  ['c9_bb_width','9. BB บีบ/ขยาย'],
-  ['c10_mtf','10. MTF Trend (3/5 TFs)'],
+  ['c6_pa','6. PA Confirmation'],
+  ['c7_fractal_trend','7. Fractal Trend'],
+  ['c8_grip','8. Grip'],
+  ['c9_bb_width','9. BB Width'],
+  ['c10_mtf','10. MTF Trend'],
 ];
 const BIAS_TXT={
-  'BULLISH_TREND':'เทรนขึ้น → CALL',
-  'BEARISH_TREND':'เทรนลง → PUT',
+  'BULLISH_TREND':'▲ CALL',
+  'BEARISH_TREND':'▼ PUT',
 };
 const TIER_ACTION={
-  'FIRE':'🚨 สัญญาณครบ — พร้อมเข้า',
-  'WATCH':'⏳ รอ confirm — ยังไม่ครบ',
-  'NONE':'❌ ยังไม่เข้าเงื่อนไข',
+  'FIRE':'🔥 Ready',
+  'WATCH':'⏳ Waiting',
+  'NONE':'–',
 };
 const IMPORTANCE_TXT={
-  1:'🚨 Importance 1 — แตะ EMA200 → ส่งทันที',
-  2:'⏳ Importance 2 — ทะลุ EMA100 → รอ 7/10',
+  1:'🚨 EMA200 Touch',
+  2:'⏳ EMA100 Cross',
 };
+const _symShort=s=>(s||'').replace(/^frx/,'').replace(/_/g,'');
 function renderSetupCard(s){
-  if(!s) return `<div class="guide-card NONE"><div class="guide-head"><span class="guide-tf">Setup Guide</span></div><div class="guide-action NONE">ยังไม่มีข้อมูล — รอ setup_feed.py สะสมแท่ง</div></div>`;
+  if(!s) return `<div class="guide-card NONE"><div class="guide-head"><span class="guide-tf">Setup</span></div><div class="guide-action NONE">ยังไม่มีข้อมูล</div></div>`;
   const max=(s.max_score||s.total||10);
   const details=s.details||{};
   const condLog=s.conditions_log||{};
+  const source=Object.keys(condLog).length>0?condLog:details;
   const known=SETUP_STEPS.map(x=>x[0]);
   const steps=[];
-  
-  // Use V8 conditions_log if available, fallback to details
-  const source=Object.keys(condLog).length>0?condLog:details;
-  
   SETUP_STEPS.forEach(([key,label])=>{
     const d=source[key]||details[key]; if(!d) return;
     const frac=d.frac!=null?d.frac:(d.ok?1:(d.pass!=null?(d.pass?1:0):0));
     const cls=frac>=0.999?'pass':(frac>0?'part':'fail');
     const ico=frac>=0.999?'✓':(frac>0?'◐':'✕');
-    const note=d.note||'';
-    steps.push(`<li><span class="guide-ico ${cls}">${ico}</span><span class="gname">${label}</span><span class="gnote">${note}</span></li>`);
-  });
-  Object.entries(source).forEach(([k,d])=>{
-    if(known.includes(k)||k.startsWith('c')) return;
-    const cls=d.ok?'pass':'fail';
-    steps.push(`<li><span class="guide-ico ${cls}">${d.ok?'✓':'✕'}</span><span class="gname">${k}</span><span class="gnote">${d.note||''}</span></li>`);
+    steps.push(`<li><span class="guide-ico ${cls}">${ico}</span><span class="gname">${label}</span><span class="gnote">${d.note||''}</span></li>`);
   });
   const tier=s.tier||'NONE';
   const bias=s.bias||'';
-  const biasTxt=BIAS_TXT[bias]||'ไม่มีเทรนชัดเจน';
-  const actionTxt=(TIER_ACTION[tier]||TIER_ACTION.NONE)+(s.direction&&tier==='FIRE'?` ${s.direction}`:'');
+  const biasTxt=BIAS_TXT[bias]||'NEUTRAL';
   const imp=s.importance||0;
-  const impTxt=IMPORTANCE_TXT[imp]||'';
   const condPassed=s.conditions_passed||0;
   const condTotal=s.conditions_total||10;
   const sym=s.symbol||'';
-  const symShort=sym.replace(/^frx/,'').replace(/_/g,'');
-  const scorePct=Math.round((s.score||0)/max*100);
+  const scorePct=Math.round((condPassed/Math.max(condTotal,1))*100);
   const scoreCls=tier==='FIRE'?'ok':(tier==='WATCH'?'wait':'none');
   return `<div class="guide-card ${tier}">
     <div class="guide-head">
-      <span class="guide-tf">${s.timeframe||'Setup'} Guide · ${symShort||'XAUUSD'}<br><b class="${dirClass(s.direction)}">${biasTxt}</b></span>
-      <span class="guide-score ${scoreCls}">${condPassed}<span style="font-size:12px;color:var(--muted)">/${condTotal}</span></span>
+      <span class="guide-tf">${_symShort(sym)||'XAUUSD'} · ${s.timeframe||'M5'}</span>
+      <span class="guide-score ${scoreCls}">${condPassed}/${condTotal}</span>
     </div>
-    ${imp?`<div class="guide-action ${imp===1?'FIRE':'WATCH'}">${impTxt}</div>`:''}
-    <div class="guide-action ${tier}">${actionTxt}</div>
+    <div class="guide-action ${tier}">${TIER_ACTION[tier]||'–'} <span class="${dirClass(s.direction)}">${biasTxt}</span>${imp?` · ${IMPORTANCE_TXT[imp]}`:''}</div>
     <ul class="guide-steps">${steps.join('')}</ul>
-    <div class="guide-prog ${tier}"><i style="width:${scorePct}%"></i></div>
     ${s.entry_trigger_note?`<div class="guide-note ${tier==='FIRE'?'ready':'wait'}">${s.entry_trigger_note}</div>`:''}
+  </div>`;
+}
+function renderSetupCompact(s){
+  if(!s) return '';
+  const tier=s.tier||'NONE';
+  const bias=s.bias||'';
+  const imp=s.importance||0;
+  const condPassed=s.conditions_passed||0;
+  const condTotal=s.conditions_total||10;
+  const sym=s.symbol||'';
+  const biasTxt=BIAS_TXT[bias]||'–';
+  const tierCls=tier==='FIRE'?'ok':(tier==='WATCH'?'wait':'none');
+  return `<div class="setup-row" data-sym="${sym}" onclick="this.classList.toggle('expanded')">
+    <div class="setup-row-head">
+      <span class="setup-sym">${_symShort(sym)}</span>
+      <span class="setup-tier ${tierCls}">${tier}</span>
+      <span class="setup-dir ${dirClass(s.direction)}">${biasTxt}</span>
+      <span class="setup-score">${condPassed}/${condTotal}</span>
+    </div>
+    <div class="setup-row-detail">${renderSetupCard(s)}</div>
   </div>`;
 }
 
@@ -1766,37 +1807,34 @@ async function refreshSetupMini(){
     const all=await fetchJSON('/api/setup/latest-all');
     const container=document.getElementById('setupMini');
     if(!container) return;
-    const cards=[];
     const order=['frxXAUUSD','frxEURUSD','frxGBPUSD','frxUSDJPY','frxAUDUSD','frxUSDCAD','frxUSDCHF','frxNZDUSD','R_100'];
     const sorted=Object.keys(all).sort((a,b)=>order.indexOf(a)-order.indexOf(b));
+    const rows=[];
     for(const sym of sorted){
       const tfs=all[sym];
       const s=tfs['M5']||tfs['M1'];
-      if(s) cards.push(renderSetupCard({...s,symbol:sym}));
+      if(s) rows.push(renderSetupCompact({...s,symbol:sym}));
     }
-    container.innerHTML=cards.length?cards.join(''):`<div style="color:var(--muted);padding:12px;">ยังไม่มีข้อมูล setup</div>`;
+    container.innerHTML=rows.length?rows.join(''):`<div class="empty" style="padding:16px;">รอ setup_feed.py ทำงาน</div>`;
   }catch(e){}
 }
 
 async function refreshSetupAll(){
   try{
     const all=await fetchJSON('/api/setup/latest-all');
-    const short=s=>s.replace(/^frx/,'').replace(/_/g,'');
     const m1El=document.getElementById('setupAllM1');
     const m5El=document.getElementById('setupAllM5');
     if(!m1El||!m5El) return;
+    const order=['frxXAUUSD','frxEURUSD','frxGBPUSD','frxUSDJPY','frxAUDUSD','frxUSDCAD','frxUSDCHF','frxNZDUSD','R_100'];
+    const sorted=Object.keys(all).sort((a,b)=>order.indexOf(a)-order.indexOf(b));
     const m1Cards=[], m5Cards=[];
-    const sorted=Object.keys(all).sort((a,b)=>{
-      const order=['frxXAUUSD','frxEURUSD','frxGBPUSD','frxUSDJPY','frxAUDUSD','frxUSDCAD','frxUSDCHF','frxNZDUSD','R_100'];
-      return order.indexOf(a)-order.indexOf(b);
-    });
     for(const sym of sorted){
       const tfs=all[sym];
-      if(tfs['M5']) m5Cards.push(renderSetupCard({...tfs['M5'],symbol:sym}));
-      if(tfs['M1']) m1Cards.push(renderSetupCard({...tfs['M1'],symbol:sym}));
+      if(tfs['M5']) m5Cards.push(renderSetupCompact({...tfs['M5'],symbol:sym}));
+      if(tfs['M1']) m1Cards.push(renderSetupCompact({...tfs['M1'],symbol:sym}));
     }
-    m1El.innerHTML=m1Cards.length?m1Cards.join(''):`<div style="color:var(--muted);padding:12px;">ยังไม่มีข้อมูล</div>`;
-    m5El.innerHTML=m5Cards.length?m5Cards.join(''):`<div style="color:var(--muted);padding:12px;">ยังไม่มีข้อมูล</div>`;
+    m1El.innerHTML=m1Cards.length?m1Cards.join(''):`<div class="empty" style="padding:16px;">รอข้อมูล</div>`;
+    m5El.innerHTML=m5Cards.length?m5Cards.join(''):`<div class="empty" style="padding:16px;">รอข้อมูล</div>`;
   }catch(e){}
 }
 
@@ -1941,12 +1979,16 @@ async function refreshAll(){
   await Promise.all([
     refreshOverview(),refreshPrice(),refreshGauges(),refreshHeaderSignals(),
     refreshMlTab(),refreshSetupTab(),refreshSetupMini(),refreshSetupAll(),
-    refreshJournalTab(),refreshJournalMoney(),refreshWatchlist(),
+    refreshJournalTab(),refreshJournalMoney(),
   ]);
+  await refreshWatchlist();
 }
 
-refreshAll();
-setInterval(refreshAll, REFRESH_MS);
+(async()=>{
+  await loadSymbols();
+  refreshAll();
+  setInterval(refreshAll, REFRESH_MS);
+})();
 </script>
 </body>
 </html>
