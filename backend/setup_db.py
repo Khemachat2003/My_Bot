@@ -66,6 +66,12 @@ def init_setup_db() -> None:
     for _c in ("ema200_price", "dist200_pct", "near_ema200", "crossed_ema100"):
         if _c not in cols:
             conn.execute(f"ALTER TABLE setup_scores ADD COLUMN {_c} REAL")
+    # V8: Two-tier system — importance + conditions log
+    for _c in ("importance", "conditions_passed", "conditions_total"):
+        if _c not in cols:
+            conn.execute(f"ALTER TABLE setup_scores ADD COLUMN {_c} INTEGER")
+    if "conditions_log_json" not in cols:
+        conn.execute("ALTER TABLE setup_scores ADD COLUMN conditions_log_json TEXT")
     conn.commit()
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_setup_scores_tf_ts
@@ -85,8 +91,9 @@ def insert_setup_score(ts: str, result: "SetupResult",
             (ts, timeframe, score, total, direction, bias,
              entry_trigger, entry_trigger_note, details_json, grip_json,
              tier, max_score, symbol,
-             ema200_price, dist200_pct, near_ema200, crossed_ema100)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ema200_price, dist200_pct, near_ema200, crossed_ema100,
+             importance, conditions_passed, conditions_total, conditions_log_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         ts, result.timeframe, result.score, result.max_score,
         result.direction, result.bias,
@@ -97,6 +104,10 @@ def insert_setup_score(ts: str, result: "SetupResult",
         symbol,
         result.ema200_price, result.dist200_pct,
         int(result.near_ema200), int(result.crossed_ema100),
+        result.importance,
+        result.conditions_passed,
+        result.conditions_total,
+        json.dumps(to_json_safe(result.conditions_log), ensure_ascii=False),
     ))
     conn.commit()
     row_id = cur.lastrowid
@@ -124,6 +135,10 @@ def _row_to_dict(r: sqlite3.Row) -> dict:
         "dist200_pct": r["dist200_pct"] if "dist200_pct" in keys else None,
         "near_ema200": bool(r["near_ema200"]) if "near_ema200" in keys else None,
         "crossed_ema100": bool(r["crossed_ema100"]) if "crossed_ema100" in keys else None,
+        "importance": r["importance"] if "importance" in keys else 0,
+        "conditions_passed": r["conditions_passed"] if "conditions_passed" in keys else 0,
+        "conditions_total": r["conditions_total"] if "conditions_total" in keys else 0,
+        "conditions_log": json.loads(r["conditions_log_json"]) if "conditions_log_json" in keys and r["conditions_log_json"] else {},
     }
 
 
