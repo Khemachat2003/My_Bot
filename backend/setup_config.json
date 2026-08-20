@@ -1,8 +1,8 @@
 {
-  "comment": "Rule-Based V6 — 3 Core Pillars: EMA200 Touch + Fractal 15 S/R + RSI Divergence",
-  "max_score": 3,
-  "fire_score": 2.5,
-  "watch_score": 1.5,
+  "comment": "Rule-Based V7 — 8 Checklist Items matching owner's actual trading setup",
+  "max_score": 8,
+  "fire_score": 6,
+  "watch_score": 4,
   "cooldown_minutes": 45,
   "daily_cap": 6,
   "adx_min": 20,
@@ -14,15 +14,10 @@
     "left": 7,
     "right": 7
   },
-  "sma5": {
-    "period": 5,
-    "distance_pct": 0.30,
-    "weight": 1
-  },
   "hard_gates": {
-    "no_sideway": true,
-    "bb": true,
-    "sr": true
+    "no_sideway": false,
+    "bb": false,
+    "sr": false
   },
   "rsi": {
     "overbought": 70,
@@ -45,7 +40,12 @@
   },
   "weights": {
     "ema200_touch": 1,
-    "fractal_sr": 1,
-    "rsi_divergence": 1
+    "ema_trend": 1,
+    "adx": 1,
+    "bb": 1,
+    "fractal": 1,
+    "rejection": 1,
+    "grip": 1,
+    "rsi_div": 1
   }
 }
