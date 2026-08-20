@@ -1,8 +1,8 @@
 {
-  "comment": "Rule-Based Checklist V5 — หลักการ 'EMA200 คือใจหลัก': ราคาต้องแตะ/ใกล้ EMA200 (heart gate, ห้ามส่งถ้าห่าง) · ข้อยกเว้น A: ทะลุ EMA100 แล้วยังไม่แตะ EMA200 → ส่งได้ถ้า setup >= fire_score(13) · ข้อยกเว้น B: แตะ EMA200 แล้ว → ส่งได้แม้สกอร์ต่ำ แต่ต้องตามเทรนหลัก (สวนเทรนย่อยได้) + มีแนวรับ/ต้านใกล้จุดแตะ",
-  "max_score": 18,
-  "fire_score": 13,
-  "watch_score": 10,
+  "comment": "Rule-Based V6 — 3 Core Pillars: EMA200 Touch + Fractal 15 S/R + RSI Divergence",
+  "max_score": 3,
+  "fire_score": 2.5,
+  "watch_score": 1.5,
   "cooldown_minutes": 45,
   "daily_cap": 6,
   "adx_min": 20,
@@ -35,8 +35,8 @@
     "major_tests": 3,
     "minor_tests": 2,
     "zone_pct": 0.35,
-    "fractal_left": 2,
-    "fractal_right": 2
+    "fractal_left": 7,
+    "fractal_right": 7
   },
   "grip": {
     "auto_scale": true,
@@ -44,16 +44,8 @@
     "tolerance_pct": 0.05
   },
   "weights": {
-    "trend_ema": 2,
-    "adx": 1,
-    "rsi_zone": 1,
-    "rsi_div": 2,
-    "ema100": 1,
-    "bb": 2,
-    "structure": 1,
-    "pullback": 3,
-    "sr": 1,
-    "rejection": 3,
-    "sma5": 1
+    "ema200_touch": 1,
+    "fractal_sr": 1,
+    "rsi_divergence": 1
   }
 }
