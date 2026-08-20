@@ -1306,7 +1306,7 @@ function gaugeSVG(g){
   const upEnd=a0+(aEnd-a0)*Math.min(up,100)/100;
   const sigClass=g.signal==='CALL'?'CALL':(g.signal==='PUT'?'PUT':'NEUTRAL');
   return `<div class="gauge">
-    <div class="ghead"><span class="gname">TF ${g.timeframe||'–'} — WIN PROBABILITY</span><span class="gsig ${sigClass}">${g.signal||'–'}</span></div>
+    <div class="ghead"><span class="gname">XAUUSD · TF ${g.timeframe||'–'} — WIN PROBABILITY</span><span class="gsig ${sigClass}">${g.signal||'–'}</span></div>
     <div class="gauge-svg">
       <svg width="220" height="96" viewBox="0 0 220 96">
         <path d="${arcPath(cx,cy,r,a0,aEnd)}" stroke="#131c30" stroke-width="${w}" fill="none" stroke-linecap="round"/>
@@ -1685,41 +1685,51 @@ async function refreshSetupTab(){
 }
 
 const SETUP_STEPS=[
-  ['trend_ema','1. เทรนใหญ่ EMA50>100>200'],
-  ['structure','2. โครงสร้าง Fractal (15) HH/HL'],
-  ['adx','3. ADX > 20 (แรงเทรน)'],
-  ['rsi_zone','4. RSI ย่อในโซนเทรน'],
-  ['rsi_div','5. Divergence / Convergence'],
-  ['bb','6. BB ขยาย (ไม่บีบ)'],
-  ['ema100','7. ราคาเคยทะลุ EMA100'],
-  ['pullback','8. ย่อมาหา EMA200'],
-  ['sr','9. แนวรับ/ต้าน + Grip'],
-  ['rejection','10. Reject ที่ EMA200'],
+  ['c1_fractal_sr','1. Fractal 15 S/R Zone'],
+  ['c2_bb_break','2. ราคาทะลุ BB'],
+  ['c3_rsi_ob_os','3. RSI OVB/OVS'],
+  ['c4_rsi_div','4. RSI Divergence/Convergence'],
+  ['c5_adx','5. ADX > 20'],
+  ['c6_pa','6. PA ยืนยันที่ S/R'],
+  ['c7_fractal_trend','7. Fractal Trend (HH/HL/LH/LL)'],
+  ['c8_grip','8. Grip (เลขกลม)'],
+  ['c9_bb_width','9. BB บีบ/ขยาย'],
+  ['c10_mtf','10. MTF Trend (3/5 TFs)'],
 ];
 const BIAS_TXT={
   'BULLISH_TREND':'เทรนขึ้น → CALL',
   'BEARISH_TREND':'เทรนลง → PUT',
 };
 const TIER_ACTION={
-  'FIRE':'พร้อมเข้า — สัญญาณครบ ตามเทรน',
-  'WATCH':'รอ Reject ที่ EMA200 — เกือบครบแล้ว',
-  'NONE':'รอเงื่อนไข — ยังไม่เข้า',
+  'FIRE':'🚨 สัญญาณครบ — พร้อมเข้า',
+  'WATCH':'⏳ รอ confirm — ยังไม่ครบ',
+  'NONE':'❌ ยังไม่เข้าเงื่อนไข',
+};
+const IMPORTANCE_TXT={
+  1:'🚨 Importance 1 — แตะ EMA200 → ส่งทันที',
+  2:'⏳ Importance 2 — ทะลุ EMA100 → รอ 7/10',
 };
 function renderSetupCard(s){
   if(!s) return `<div class="guide-card NONE"><div class="guide-head"><span class="guide-tf">Setup Guide</span></div><div class="guide-action NONE">ยังไม่มีข้อมูล — รอ setup_feed.py สะสมแท่ง</div></div>`;
-  const max=(s.max_score||s.total||15);
+  const max=(s.max_score||s.total||10);
   const details=s.details||{};
+  const condLog=s.conditions_log||{};
   const known=SETUP_STEPS.map(x=>x[0]);
   const steps=[];
+  
+  // Use V8 conditions_log if available, fallback to details
+  const source=Object.keys(condLog).length>0?condLog:details;
+  
   SETUP_STEPS.forEach(([key,label])=>{
-    const d=details[key]; if(!d) return;
-    const frac=d.frac!=null?d.frac:(d.ok?1:0);
+    const d=source[key]||details[key]; if(!d) return;
+    const frac=d.frac!=null?d.frac:(d.ok?1:(d.pass!=null?(d.pass?1:0):0));
     const cls=frac>=0.999?'pass':(frac>0?'part':'fail');
     const ico=frac>=0.999?'✓':(frac>0?'◐':'✕');
-    steps.push(`<li><span class="guide-ico ${cls}">${ico}</span><span class="gname">${label}</span><span class="gnote">${d.note||''}</span></li>`);
+    const note=d.note||'';
+    steps.push(`<li><span class="guide-ico ${cls}">${ico}</span><span class="gname">${label}</span><span class="gnote">${note}</span></li>`);
   });
-  Object.entries(details).forEach(([k,d])=>{
-    if(known.includes(k)) return;
+  Object.entries(source).forEach(([k,d])=>{
+    if(known.includes(k)||k.startsWith('c')) return;
     const cls=d.ok?'pass':'fail';
     steps.push(`<li><span class="guide-ico ${cls}">${d.ok?'✓':'✕'}</span><span class="gname">${k}</span><span class="gnote">${d.note||''}</span></li>`);
   });
@@ -1727,13 +1737,20 @@ function renderSetupCard(s){
   const bias=s.bias||'';
   const biasTxt=BIAS_TXT[bias]||'ไม่มีเทรนชัดเจน';
   const actionTxt=(TIER_ACTION[tier]||TIER_ACTION.NONE)+(s.direction&&tier==='FIRE'?` ${s.direction}`:'');
+  const imp=s.importance||0;
+  const impTxt=IMPORTANCE_TXT[imp]||'';
+  const condPassed=s.conditions_passed||0;
+  const condTotal=s.conditions_total||10;
+  const sym=s.symbol||'';
+  const symShort=sym.replace(/^frx/,'').replace(/_/g,'');
   const scorePct=Math.round((s.score||0)/max*100);
   const scoreCls=tier==='FIRE'?'ok':(tier==='WATCH'?'wait':'none');
   return `<div class="guide-card ${tier}">
     <div class="guide-head">
-      <span class="guide-tf">${s.timeframe||'Setup'} Guide<br><b class="${dirClass(s.direction)}">${biasTxt}</b></span>
-      <span class="guide-score ${scoreCls}">${(s.score||0).toFixed(1)}<span style="font-size:12px;color:var(--muted)">/${max}</span></span>
+      <span class="guide-tf">${s.timeframe||'Setup'} Guide · ${symShort||'XAUUSD'}<br><b class="${dirClass(s.direction)}">${biasTxt}</b></span>
+      <span class="guide-score ${scoreCls}">${condPassed}<span style="font-size:12px;color:var(--muted)">/${condTotal}</span></span>
     </div>
+    ${imp?`<div class="guide-action ${imp===1?'FIRE':'WATCH'}">${impTxt}</div>`:''}
     <div class="guide-action ${tier}">${actionTxt}</div>
     <ul class="guide-steps">${steps.join('')}</ul>
     <div class="guide-prog ${tier}"><i style="width:${scorePct}%"></i></div>
@@ -1746,7 +1763,7 @@ async function refreshSetupMini(){
     const latest=await fetchJSON('/api/setup/latest');
     document.getElementById('setupM1').innerHTML=renderSetupCard(latest['M1']);
     document.getElementById('setupM5').innerHTML=renderSetupCard(latest['M5']);
-    document.getElementById('setupMini').innerHTML=renderSetupCard(latest['M1']);
+    document.getElementById('setupMini').innerHTML=renderSetupCard(latest['M1']||latest['M5']);
   }catch(e){}
 }
 
