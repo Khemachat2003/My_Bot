@@ -1,22 +1,27 @@
 """
-setup_scorer.py — V7: Owner's Actual Trading Setup
-==================================================
-Matches owner's real setup (70%+ winrate manually traded):
+setup_scorer.py — V8: Two-Tier Signal System (Owner's Complete Trading Logic)
+============================================================================
+Importance 1 (EMERGENCY):
+  Price TOUCHES EMA200 → Fire signal IMMEDIATELY
+  + Log all 10 conditions (pass/fail) for future analysis
+  + "เมื่อ EMA200 แตะแล้ว เงื่อนไขใดผ่าน → ออเดอร์ชนะ"
 
-  Checklist:
-    1. EMA200 TOUCH (HARD GATE): Price wick must touch EMA200 line — แตะครั้งเดียวพอ
-    2. EMA TREND: EMA50/100/200 aligned + price above all 3 (uptrend) → pullback to EMA200
-    3. ADX > 20: Trend is strong enough
-    4. BB: Check if price breaks BB (not just squeeze)
-    5. FRACTAL STRUCTURE: HH/HL = uptrend, LH/LL = downtrend
-    6. REJECTION CANDLE: Pinbar/engulfing at EMA200 for confidence
-    7. GRIP (Round Numbers): EMA200 near round number
-    8. RSI DIVERGENCE/CONVERGENCE: Primary RSI signal
+Importance 2 (WAITING):
+  Price CROSSES EMA100 but hasn't touched EMA200 yet
+  → Wait until 7/10 conditions pass → Fire
+  + Log all 10 conditions
 
-  Tier:
-    FIRE  = EMA200 touch + trend + ADX + (RSI div OR rejection) + BB
-    WATCH = EMA200 touch + trend + some confirm
-    NONE  = no EMA200 touch or no trend
+10 Checklist Conditions:
+  1. Fractal 15 S/R zone alignment
+  2. Price breaks BB (oversold/overbought)
+  3. RSI OVB/OVS
+  4. RSI Divergence/Convergence at fractal S/R points
+  5. ADX > 20
+  6. Price Action (PA) confirmation at S/R zone
+  7. Trend from fractal swing high/low
+  8. Grip (round numbers) near EMA200
+  9. BB squeeze or expansion
+  10. Multi-timeframe trend (M1, M30, H1, H4, D1) — need 3/5 TFs aligned
 """
 from __future__ import annotations
 
@@ -52,7 +57,7 @@ class SetupResult:
     timeframe: str
     target_hold_minutes: int
     score: float = 0.0
-    max_score: int = 8
+    max_score: int = 10
     tier: str = "NONE"
     direction: str = ""
     bias: str = ""
@@ -67,15 +72,16 @@ class SetupResult:
     near_ema200: bool = False
     touched_ema200: bool = False
     crossed_ema100: bool = False
+    # V8: Two-tier system
+    importance: int = 0          # 1 = EMA200 touch (emergency), 2 = EMA100 cross (waiting)
+    conditions_passed: int = 0   # How many of 10 conditions passed
+    conditions_total: int = 10
+    conditions_log: dict = field(default_factory=dict)  # Full log of all 10 conditions
 
 
 # ── Indicators ────────────────────────────────────────────────────────────────
 def _calc_ema(series: pd.Series, period: int) -> pd.Series:
     return series.ewm(span=period, adjust=False).mean()
-
-
-def _calc_sma(series: pd.Series, period: int) -> pd.Series:
-    return series.rolling(window=period).mean()
 
 
 def _calc_rsi(series: pd.Series, period: int = 14) -> pd.Series:
@@ -140,7 +146,6 @@ def _find_fractals(high: pd.Series, low: pd.Series, left: int = 7, right: int = 
 
 
 def _fractal_structure(piv_highs, piv_lows) -> str:
-    """HH+HL = UPTREND, LH+LL = DOWNTREND, else SIDEWAYS"""
     if len(piv_highs) >= 2 and piv_highs[-1][1] > piv_highs[-2][1]:
         hh = True
     elif len(piv_highs) >= 2:
@@ -160,10 +165,204 @@ def _fractal_structure(piv_highs, piv_lows) -> str:
     return "SIDEWAYS"
 
 
-# ── EMA200 TOUCH Detection ──────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# 10 CONDITIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _cond1_fractal_sr(df: pd.DataFrame, piv_highs, piv_lows, direction: str) -> dict:
+    """Fractal 15 S/R zone alignment"""
+    last_close = float(df["close"].iloc[-1])
+    
+    for idx, price in reversed(piv_highs):
+        if idx < len(df):
+            row = df.iloc[idx]
+            body_top = max(float(row["open"]), float(row["close"]))
+            if price >= last_close >= body_top:
+                return {"pass": True, "note": f"ราคาอยู่ในโซนแนวต้าน fractal ({body_top:.2f}-{price:.2f})"}
+    
+    for idx, price in reversed(piv_lows):
+        if idx < len(df):
+            row = df.iloc[idx]
+            body_bottom = min(float(row["open"]), float(row["close"]))
+            if body_bottom >= last_close >= price:
+                return {"pass": True, "note": f"ราคาอยู่ในโซนแนวรับ fractal ({price:.2f}-{body_bottom:.2f})"}
+    
+    return {"pass": False, "note": "ราคาไม่ได้อยู่ในโซน S/R จาก fractal"}
+
+
+def _cond2_bb_break(df: pd.DataFrame, bb_up, bb_lo, direction: str) -> dict:
+    """Price breaks BB"""
+    last_close = float(df["close"].iloc[-1])
+    last_up = float(bb_up.iloc[-1]) if not np.isnan(bb_up.iloc[-1]) else 0
+    last_lo = float(bb_lo.iloc[-1]) if not np.isnan(bb_lo.iloc[-1]) else 0
+    
+    if direction == "CALL" and last_close <= last_lo:
+        return {"pass": True, "note": f"ราคา {last_close:.2f} ทะลุ BB ล่าง {last_lo:.2f}"}
+    elif direction == "PUT" and last_close >= last_up:
+        return {"pass": True, "note": f"ราคา {last_close:.2f} ทะลุ BB บน {last_up:.2f}"}
+    
+    return {"pass": False, "note": f"ราคา {last_close:.2f} ไม่ได้ทะลุ BB ({last_lo:.2f}-{last_up:.2f})"}
+
+
+def _cond3_rsi_ob_os(rsi_val: float, direction: str) -> dict:
+    """RSI OVB/OVS"""
+    if direction == "CALL" and rsi_val < 35:
+        return {"pass": True, "note": f"RSI={rsi_val:.1f} oversold (<35)"}
+    elif direction == "PUT" and rsi_val > 65:
+        return {"pass": True, "note": f"RSI={rsi_val:.1f} overbought (>65)"}
+    return {"pass": False, "note": f"RSI={rsi_val:.1f} ไม่ใช่ OVB/OVS"}
+
+
+def _cond4_rsi_divergence(rsi: pd.Series, piv_highs, piv_lows, direction: str) -> dict:
+    """RSI Divergence/Convergence at fractal S/R points"""
+    if direction == "CALL":
+        if len(piv_lows) >= 2:
+            (i1, p1), (i2, p2) = piv_lows[-2], piv_lows[-1]
+            r1, r2 = rsi.iloc[i1], rsi.iloc[i2]
+            if p2 < p1 and r2 > r1:
+                return {"pass": True, "note": f"Bullish Divergence: ราคา {p1:.2f}→{p2:.2f} (LL) RSI {r1:.1f}→{r2:.1f} (HL)"}
+            if p2 <= p1 * 1.003 and r2 > r1:
+                return {"pass": True, "note": f"Bullish Convergence: ราคา + RSI ยืนยันทิศขึ้น"}
+    else:
+        if len(piv_highs) >= 2:
+            (i1, p1), (i2, p2) = piv_highs[-2], piv_highs[-1]
+            r1, r2 = rsi.iloc[i1], rsi.iloc[i2]
+            if p2 > p1 and r2 < r1:
+                return {"pass": True, "note": f"Bearish Divergence: ราคา {p1:.2f}→{p2:.2f} (HH) RSI {r1:.1f}→{r2:.1f} (LH)"}
+            if p2 >= p1 * 0.997 and r2 < r1:
+                return {"pass": True, "note": f"Bearish Convergence: ราคา + RSI ยืนยันทิศลง"}
+    
+    return {"pass": False, "note": "ไม่พบ Divergence/Convergence"}
+
+
+def _cond5_adx(adx_val: float) -> dict:
+    """ADX > 20"""
+    if adx_val >= 20:
+        return {"pass": True, "note": f"ADX={adx_val:.1f} (>=20) เทรนแข็งแรง"}
+    return {"pass": False, "note": f"ADX={adx_val:.1f} (<20) เทรนอ่อน"}
+
+
+def _cond6_pa_confirmation(df: pd.DataFrame, direction: str) -> dict:
+    """Price Action confirmation at S/R zone (pinbar/engulfing)"""
+    n = len(df)
+    for k in range(min(5, n)):
+        idx = n - 1 - k
+        if idx < 1:
+            break
+        cur = df.iloc[idx]
+        prev = df.iloc[idx - 1]
+        body = abs(cur["close"] - cur["open"])
+        rng = max(cur["high"] - cur["low"], 1e-9)
+        upper_w = cur["high"] - max(cur["close"], cur["open"])
+        lower_w = min(cur["close"], cur["open"]) - cur["low"]
+        
+        if direction == "CALL":
+            if (cur["close"] > cur["open"] and prev["close"] < prev["open"]
+                    and cur["close"] >= prev["open"] and cur["open"] <= prev["close"]):
+                return {"pass": True, "note": f"Bullish Engulfing (แท่งก่อน {k})"}
+            if lower_w >= body * 1.5 and lower_w > 0:
+                return {"pass": True, "note": f"Hammer ไส้ล่าง ≥1.5x (แท่งก่อน {k})"}
+        else:
+            if (cur["close"] < cur["open"] and prev["close"] > prev["open"]
+                    and cur["close"] <= prev["open"] and cur["open"] >= prev["close"]):
+                return {"pass": True, "note": f"Bearish Engulfing (แท่งก่อน {k})"}
+            if upper_w >= body * 1.5 and upper_w > 0:
+                return {"pass": True, "note": f"Shooting Star ไส้บน ≥1.5x (แท่งก่อน {k})"}
+    
+    return {"pass": False, "note": "ไม่พบ PA confirmation"}
+
+
+def _cond7_fractal_trend(structure: str, direction: str) -> dict:
+    """Trend from fractal swing high/low"""
+    if direction == "CALL" and structure == "UPTREND":
+        return {"pass": True, "note": f"Fractal: {structure} — HH/HL ตามเทรนขึ้น"}
+    elif direction == "PUT" and structure == "DOWNTREND":
+        return {"pass": True, "note": f"Fractal: {structure} — LH/LL ตามเทรนลง"}
+    return {"pass": False, "note": f"Fractal: {structure} — ไม่ตรงทิศ {direction}"}
+
+
+def _cond8_grip(ema200_price: float, cfg: dict) -> dict:
+    """Grip (round numbers) near EMA200"""
+    g = cfg.get("grip", {})
+    if g.get("auto_scale", True):
+        step = _nice_step(ema200_price / g.get("scale_divisor", 800))
+    else:
+        step = g.get("fixed_step", 5.0)
+    
+    line = round(ema200_price / step) * step
+    dist_pct = abs(ema200_price - line) / ema200_price * 100.0
+    tol = float(g.get("tolerance_pct", 0.05))
+    
+    if dist_pct <= tol:
+        return {"pass": True, "note": f"EMA200 ({ema200_price:.2f}) ใกล้เลขกลม {line:.2f} ({dist_pct:.3f}%)"}
+    return {"pass": False, "note": f"EMA200 ({ema200_price:.2f}) ห่างจากเลขกลม ({dist_pct:.3f}%)"}
+
+
+def _nice_step(v: float) -> float:
+    if v <= 0:
+        return 1.0
+    exp = math.floor(math.log10(v))
+    base = v / 10 ** exp
+    if base < 1.5:
+        return 1 * 10 ** exp
+    if base < 3.5:
+        return 2 * 10 ** exp
+    if base < 7.5:
+        return 5 * 10 ** exp
+    return 10 * 10 ** exp
+
+
+def _cond9_bb_width(bb_width: pd.Series) -> dict:
+    """BB squeeze or expansion"""
+    cur_w = float(bb_width.iloc[-1]) if not np.isnan(bb_width.iloc[-1]) else 0
+    avg_w = float(bb_width.rolling(20).mean().iloc[-1]) if len(bb_width) >= 20 else cur_w
+    
+    if cur_w > avg_w * 1.1:
+        return {"pass": True, "note": f"BB ขยาย (width {cur_w:.2f}% > avg {avg_w:.2f}%) — มีวอลุ่ม"}
+    elif cur_w < avg_w * 0.9:
+        return {"pass": True, "note": f"BB บีบ (width {cur_w:.2f}% < avg {avg_w:.2f}%) — เตรียม breakout"}
+    return {"pass": False, "note": f"BB ทรงตัว ({cur_w:.2f}% vs avg {avg_w:.2f}%)"}
+
+
+def _cond10_mtf_trend(df: pd.DataFrame, direction: str) -> dict:
+    """Multi-timeframe trend: M1, M30, H1, H4, D1 — need 3/5 TFs aligned"""
+    close = df["close"]
+    tf_configs = [
+        ("M1", 1), ("M30", 30), ("H1", 60), ("H4", 240), ("D1", 1440)
+    ]
+    
+    aligned_count = 0
+    tf_results = []
+    
+    for tf_name, tf_minutes in tf_configs:
+        try:
+            resampled = close.resample(f"{tf_minutes}min", closed="left", label="last").last().dropna()
+            if len(resampled) < 50:
+                tf_results.append(f"{tf_name}: ข้อมูลไม่พอ")
+                continue
+            ema20 = resampled.ewm(span=20, adjust=False).mean()
+            last_p = float(resampled.iloc[-1])
+            last_e20 = float(ema20.iloc[-1])
+            
+            if direction == "CALL" and last_p > last_e20:
+                aligned_count += 1
+                tf_results.append(f"{tf_name}: ✅ขึ้น")
+            elif direction == "PUT" and last_p < last_e20:
+                aligned_count += 1
+                tf_results.append(f"{tf_name}: ✅ลง")
+            else:
+                tf_results.append(f"{tf_name}: ❌ขัด")
+        except Exception:
+            tf_results.append(f"{tf_name}: error")
+    
+    passed = aligned_count >= 3
+    return {"pass": passed, "note": f"MTF {aligned_count}/5 TFs ตรงทิศ ({', '.join(tf_results)})"}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EMA200 TOUCH Detection
+# ══════════════════════════════════════════════════════════════════════════════
 def _ema200_touch检测(df: pd.DataFrame, ema200: pd.Series, lookback: int = 20) -> tuple[bool, str]:
-    """Check if price wick actually TOUCHES EMA200 line in last N candles.
-    Touch = candle's low <= EMA200 <= candle's high"""
     n = len(df)
     touches = []
     for k in range(min(lookback, n)):
@@ -185,124 +384,16 @@ def _ema200_touch检测(df: pd.DataFrame, ema200: pd.Series, lookback: int = 20)
     return True, f"ราคาเคยแตะ EMA200 ไป {touches[0]} แท่งก่อน (ล่าสุด {e200:.2f})"
 
 
-# ── RSI Divergence / Convergence ─────────────────────────────────────────────
-def _rsi_divergence(rsi: pd.Series, piv_highs, piv_lows, direction: str) -> tuple[float, str]:
-    if direction == "CALL":
-        if len(piv_lows) >= 2:
-            (i1, p1), (i2, p2) = piv_lows[-2], piv_lows[-1]
-            r1, r2 = rsi.iloc[i1], rsi.iloc[i2]
-            if p2 < p1 and r2 > r1:
-                return 1.0, f"Bullish Divergence: ราคา {p1:.2f}→{p2:.2f} (LL) แต่ RSI {r1:.1f}→{r2:.1f} (HL)"
-            if p2 <= p1 * 1.003 and r2 > r1:
-                return 0.8, f"Bullish Convergence: ราคา {p1:.2f}→{p2:.2f} + RSI {r1:.1f}→{r2:.1f}"
-        r_now, r_prev = rsi.iloc[-1], rsi.iloc[-3]
-        if r_now > r_prev and r_now < 45:
-            return 0.6, f"RSI พลิกกลับ {r_prev:.1f}→{r_now:.1f} (oversold)"
-        return 0.0, "ไม่พบ Bullish Divergence"
-    else:
-        if len(piv_highs) >= 2:
-            (i1, p1), (i2, p2) = piv_highs[-2], piv_highs[-1]
-            r1, r2 = rsi.iloc[i1], rsi.iloc[i2]
-            if p2 > p1 and r2 < r1:
-                return 1.0, f"Bearish Divergence: ราคา {p1:.2f}→{p2:.2f} (HH) แต่ RSI {r1:.1f}→{r2:.1f} (LH)"
-            if p2 >= p1 * 0.997 and r2 < r1:
-                return 0.8, f"Bearish Convergence: ราคา {p1:.2f}→{p2:.2f} + RSI {r1:.1f}→{r2:.1f}"
-        r_now, r_prev = rsi.iloc[-1], rsi.iloc[-3]
-        if r_now < r_prev and r_now > 55:
-            return 0.6, f"RSI พลิกกลับ {r_prev:.1f}→{r_now:.1f} (overbought)"
-        return 0.0, "ไม่พบ Bearish Divergence"
-
-
-# ── Rejection Candle at EMA200 ───────────────────────────────────────────────
-def _rejection_at_ema200(df: pd.DataFrame, ema200: pd.Series, direction: str, cfg: dict) -> tuple[float, str]:
-    """Check for rejection candle (pinbar/engulfing) near EMA200."""
-    tol = float(cfg.get("ema200_tol_pct", 0.15))
-    lookback = int(cfg.get("rejection_lookback", 10))
-    n = len(df)
-    e200 = float(ema200.iloc[-1])
-    
-    for k in range(min(lookback, n)):
-        idx = n - 1 - k
-        if idx < 1:
-            break
-        cur = df.iloc[idx]
-        prev = df.iloc[idx - 1]
-        body = abs(cur["close"] - cur["open"])
-        rng = max(cur["high"] - cur["low"], 1e-9)
-        upper_w = cur["high"] - max(cur["close"], cur["open"])
-        lower_w = min(cur["close"], cur["open"]) - cur["low"]
-        
-        # Check if candle is near EMA200
-        e_at_bar = float(ema200.iloc[idx]) if idx < len(ema200) else e200
-        near_ema = False
-        if direction == "CALL":
-            near_ema = float(cur["low"]) <= e_at_bar * (1 + tol / 100.0)
-        else:
-            near_ema = float(cur["high"]) >= e_at_bar * (1 - tol / 100.0)
-        
-        if not near_ema:
-            continue
-        
-        if direction == "CALL":
-            # Bullish engulfing
-            if (cur["close"] > cur["open"] and prev["close"] < prev["open"]
-                    and cur["close"] >= prev["open"] and cur["open"] <= prev["close"]):
-                return 1.0, f"Bullish Engulfing ที่ EMA200 (แท่งก่อน {k})"
-            # Hammer/Pinbar
-            if lower_w >= body * 1.5 and lower_w > 0:
-                return 1.0, f"Hammer ที่ EMA200 ไส้ล่าง ≥1.5x (แท่งก่อน {k})"
-        else:
-            # Bearish engulfing
-            if (cur["close"] < cur["open"] and prev["close"] > prev["open"]
-                    and cur["close"] <= prev["open"] and cur["open"] >= prev["close"]):
-                return 1.0, f"Bearish Engulfing ที่ EMA200 (แท่งก่อน {k})"
-            # Shooting star
-            if upper_w >= body * 1.5 and upper_w > 0:
-                return 1.0, f"Shooting Star ที่ EMA200 ไส้บน ≥1.5x (แท่งก่อน {k})"
-    
-    return 0.0, "ไม่พบ Rejection candle ที่ EMA200"
-
-
-# ── Grip (Round Numbers) at EMA200 ──────────────────────────────────────────
-def _nice_step(v: float) -> float:
-    if v <= 0:
-        return 1.0
-    exp = math.floor(math.log10(v))
-    base = v / 10 ** exp
-    if base < 1.5:
-        return 1 * 10 ** exp
-    if base < 3.5:
-        return 2 * 10 ** exp
-    if base < 7.5:
-        return 5 * 10 ** exp
-    return 10 * 10 ** exp
-
-
-def _grip_at_ema200(ema200_price: float, cfg: dict) -> tuple[bool, str]:
-    """Check if EMA200 is near a round number (grip)."""
-    g = cfg.get("grip", {})
-    if g.get("auto_scale", True):
-        step = _nice_step(ema200_price / g.get("scale_divisor", 800))
-    else:
-        step = g.get("fixed_step", 5.0)
-    
-    line = round(ema200_price / step) * step
-    dist_pct = abs(ema200_price - line) / ema200_price * 100.0
-    tol = float(g.get("tolerance_pct", 0.05))
-    
-    if dist_pct <= tol:
-        return True, f"EMA200 ({ema200_price:.2f}) ใกล้เลขกลม {line:.2f} (ห่าง {dist_pct:.3f}%)"
-    return False, f"EMA200 ({ema200_price:.2f}) ห่างจากเลขกลมที่ใกล้สุด {line:.2f} ({dist_pct:.3f}%)"
-
-
-# ── Main Scoring Function ────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# MAIN SCORING FUNCTION
+# ══════════════════════════════════════════════════════════════════════════════
 def score_setup(
     df: pd.DataFrame,
     timeframe: str = "M5",
     target_hold_minutes: int = 30,
 ) -> SetupResult:
     cfg = load_config() or {}
-    max_score = 8
+    max_score = 10
     
     if len(df) < 60:
         return SetupResult(
@@ -319,7 +410,6 @@ def score_setup(
     rsi = _calc_rsi(close, 14)
     bb_mid, bb_up, bb_lo, bb_width = _calc_bollinger_bands(close)
     adx = _calc_adx(high, low, close, 14)
-    atr = _calc_atr(high, low, close, 14)
     
     frac_left = int(cfg.get("fractal", {}).get("left", 7))
     frac_right = int(cfg.get("fractal", {}).get("right", 7))
@@ -327,7 +417,6 @@ def score_setup(
     structure = _fractal_structure(piv_h, piv_l)
     
     last_close = float(close.iloc[-1])
-    last_atr = float(atr.iloc[-1]) if not np.isnan(atr.iloc[-1]) else float(close.tail(20).std() or 1.0)
     e50, e100, e200 = float(ema50.iloc[-1]), float(ema100.iloc[-1]), float(ema200.iloc[-1])
     adx_val = float(adx.iloc[-1]) if not np.isnan(adx.iloc[-1]) else 0.0
     rsi_val = float(rsi.iloc[-1])
@@ -354,177 +443,100 @@ def score_setup(
             ema200_price=e200,
             dist200_pct=round(dist200, 4),
             near_ema200=False, touched_ema200=False,
-            entry_trigger_note=(
-                f"EMA ไม่เรียงตามเทรน (EMA50 {e50:.2f} / EMA100 {e100:.2f} / EMA200 {e200:.2f}) "
-                f"— รอเทรนชัดเจนก่อน"),
-            details={
-                "ema_trend": {"ok": False, "frac": 0.0, "weight": 1, "note": "EMA ไม่เรียงตามทิศ"},
-            },
+            entry_trigger_note="EMA ไม่เรียงตามเทรน — รอเทรนชัดเจน",
+            details={"ema_trend": {"ok": False, "frac": 0.0, "weight": 1, "note": "EMA ไม่เรียง"}},
         )
     
     # ════════════════════════════════════════════════════════════════════════
-    # CHECKLIST ITEMS
+    # CHECK EMA200 TOUCH & EMA100 CROSS
     # ════════════════════════════════════════════════════════════════════════
-    
-    details = {}
-    score = 0.0
-    
-    # 1) EMA200 TOUCH (HARD GATE) ──────────────────────────────────────────
-    touched, touch_note = _ema200_touch检测(df, ema200, lookback=20)
     dist200 = abs(last_close - e200) / e200 * 100.0
+    touched, touch_note = _ema200_touch检测(df, ema200, lookback=20)
     near_ema200 = dist200 <= float(cfg.get("ema200_near_tol_pct", 0.20))
     
-    if not touched:
-        return SetupResult(
-            timeframe=timeframe,
-            target_hold_minutes=target_hold_minutes,
-            score=0.0, max_score=max_score, tier="NONE",
-            direction=direction, bias=bias, entry_trigger=False,
-            ema200_price=e200,
-            dist200_pct=round(dist200, 4),
-            near_ema200=near_ema200, touched_ema200=False,
-            entry_trigger_note=(
-                f"❌ ราคา {last_close:.2f} ไม่ได้แตะ EMA200 {e200:.2f} ({dist200:.2f}%) "
-                f"— ใจหลักไม่ผ่าน (ต้องแตะ EMA200)"),
-            details={"ema200_touch": {"ok": False, "frac": 0.0, "weight": 1, "note": touch_note}},
-        )
-    
-    details["ema200_touch"] = {"ok": True, "frac": 1.0, "weight": 1, "note": touch_note}
-    score += 1.0
-    
-    # 2) EMA TREND (EMA50/100/200 aligned + price above all) ──────────────
-    ema_trend_note = f"EMA50 {e50:.2f} > EMA100 {e100:.2f} > EMA200 {e200:.2f}" if trend_align_up else \
-                     f"EMA50 {e50:.2f} < EMA100 {e100:.2f} < EMA200 {e200:.2f}"
-    # Check if price was above all 3 then pulled back to EMA200
-    look = min(30, len(close))
+    # Check if price crossed EMA100 (currently between EMA100 and EMA200)
     if direction == "CALL":
-        was_above = float(close.iloc[-look:].max()) > e50
-        pulled_back = last_close <= e50
+        crossed_ema100 = last_close < e100 * 1.001  # price pulled back below/near EMA100
     else:
-        was_above = float(close.iloc[-look:].min()) < e50
-        pulled_back = last_close >= e50
+        crossed_ema100 = last_close > e100 * 0.999  # price pulled back above/near EMA100
     
-    if was_above and pulled_back:
-        ema_trend_frac = 1.0
-        ema_trend_note += " + ย่อมาหา EMA200 แล้ว"
-    elif trend_align_up or trend_align_down:
-        ema_trend_frac = 0.7
-        ema_trend_note += " (ยังไม่确认 pullback)"
-    else:
-        ema_trend_frac = 0.0
+    # ════════════════════════════════════════════════════════════════════════
+    # EVALUATE ALL 10 CONDITIONS
+    # ════════════════════════════════════════════════════════════════════════
+    cond = {}
+    cond["c1_fractal_sr"] = _cond1_fractal_sr(df, piv_h, piv_l, direction)
+    cond["c2_bb_break"] = _cond2_bb_break(df, bb_up, bb_lo, direction)
+    cond["c3_rsi_ob_os"] = _cond3_rsi_ob_os(rsi_val, direction)
+    cond["c4_rsi_div"] = _cond4_rsi_divergence(rsi, piv_h, piv_l, direction)
+    cond["c5_adx"] = _cond5_adx(adx_val)
+    cond["c6_pa"] = _cond6_pa_confirmation(df, direction)
+    cond["c7_fractal_trend"] = _cond7_fractal_trend(structure, direction)
+    cond["c8_grip"] = _cond8_grip(e200, cfg)
+    cond["c9_bb_width"] = _cond9_bb_width(bb_width)
+    cond["c10_mtf"] = _cond10_mtf_trend(df, direction)
     
-    details["ema_trend"] = {"ok": ema_trend_frac >= 0.5, "frac": ema_trend_frac, "weight": 1, "note": ema_trend_note}
-    score += ema_trend_frac
-    
-    # 3) ADX > 20 ─────────────────────────────────────────────────────────
-    adx_min = float(cfg.get("adx_min", 20))
-    if adx_val >= adx_min:
-        adx_frac = 1.0
-    elif adx_val >= adx_min - 5:
-        adx_frac = 0.5
-    else:
-        adx_frac = 0.0
-    details["adx"] = {"ok": adx_frac >= 0.5, "frac": adx_frac, "weight": 1, "note": f"ADX={adx_val:.1f} (>= {adx_min:.0f})"}
-    score += adx_frac
-    
-    # 4) BB — ราคาทะลุ BB หรือไม่ ─────────────────────────────────────────
-    last_bb_up = float(bb_up.iloc[-1]) if not np.isnan(bb_up.iloc[-1]) else last_close + last_atr
-    last_bb_lo = float(bb_lo.iloc[-1]) if not np.isnan(bb_lo.iloc[-1]) else last_close - last_atr
-    last_bb_width = float(bb_width.iloc[-1]) if not np.isnan(bb_width.iloc[-1]) else 0.0
-    avg_bb_width = float(bb_width.rolling(20).mean().iloc[-1]) if len(bb_width) >= 20 else last_bb_width
-    
-    if direction == "CALL":
-        # ราคาทะลุ BB ล่าง = oversold + มีแรงดีดกลับ
-        if last_close <= last_bb_lo:
-            bb_frac = 1.0
-            bb_note = f"ราคา {last_close:.2f} ทะลุ BB ล่าง {last_bb_lo:.2f} — oversold + มีแรงดีด"
-        elif last_close < last_bb_lo * 1.005:
-            bb_frac = 0.7
-            bb_note = f"ราคา {last_close:.2f} ใกล้ BB ล่าง {last_bb_lo:.2f}"
-        else:
-            bb_frac = 0.3
-            bb_note = f"ราคา {last_close:.2f} อยู่ใน BB ({last_bb_lo:.2f}-{last_bb_up:.2f})"
-    else:
-        # ราคาทะลุ BB บน = overbought + มีแรงกดกลับ
-        if last_close >= last_bb_up:
-            bb_frac = 1.0
-            bb_note = f"ราคา {last_close:.2f} ทะลุ BB บน {last_bb_up:.2f} — overbought + มีแรงกด"
-        elif last_close > last_bb_up * 0.995:
-            bb_frac = 0.7
-            bb_note = f"ราคา {last_close:.2f} ใกล้ BB บน {last_bb_up:.2f}"
-        else:
-            bb_frac = 0.3
-            bb_note = f"ราคา {last_close:.2f} อยู่ใน BB ({last_bb_lo:.2f}-{last_bb_up:.2f})"
-    
-    details["bb"] = {"ok": bb_frac >= 0.5, "frac": bb_frac, "weight": 1, "note": bb_note}
-    score += bb_frac
-    
-    # 5) FRACTAL STRUCTURE (HH/HL/LH/LL) ──────────────────────────────────
-    if direction == "CALL":
-        struct_ok = structure == "UPTREND"
-        struct_note = f"Fractal: {structure} — HH/HL ตามเทรนขึ้น" if struct_ok else f"Fractal: {structure}"
-    else:
-        struct_ok = structure == "DOWNTREND"
-        struct_note = f"Fractal: {structure} — LH/LL ตามเทรนลง" if struct_ok else f"Fractal: {structure}"
-    struct_frac = 1.0 if struct_ok else 0.0
-    details["fractal"] = {"ok": struct_ok, "frac": struct_frac, "weight": 1, "note": struct_note}
-    score += struct_frac
-    
-    # 6) REJECTION CANDLE at EMA200 ────────────────────────────────────────
-    rej_frac, rej_note = _rejection_at_ema200(df, ema200, direction, cfg)
-    details["rejection"] = {"ok": rej_frac >= 0.5, "frac": rej_frac, "weight": 1, "note": rej_note}
-    score += rej_frac
-    
-    # 7) GRIP (Round Numbers) at EMA200 ───────────────────────────────────
-    grip_ok, grip_note = _grip_at_ema200(e200, cfg)
-    grip_frac = 1.0 if grip_ok else 0.0
-    details["grip"] = {"ok": grip_ok, "frac": grip_frac, "weight": 1, "note": grip_note}
-    score += grip_frac
-    
-    # 8) RSI DIVERGENCE/CONVERGENCE ────────────────────────────────────────
-    rsi_frac, rsi_note = _rsi_divergence(rsi, piv_h, piv_l, direction)
-    details["rsi_div"] = {"ok": rsi_frac >= 0.5, "frac": rsi_frac, "weight": 1, "note": rsi_note}
-    score += rsi_frac
+    passed_count = sum(1 for c in cond.values() if c["pass"])
     
     # ════════════════════════════════════════════════════════════════════════
     # TIER DETERMINATION
     # ════════════════════════════════════════════════════════════════════════
     
-    fire_score = float(cfg.get("fire_score", 6))
-    watch_score = float(cfg.get("watch_score", 4))
-    
-    has_strong_confirm = (rsi_frac >= 0.5 or rej_frac >= 0.5)  # RSI div OR rejection
-    has_trend = ema_trend_frac >= 0.5
-    has_adx = adx_frac >= 0.5
-    has_bb = bb_frac >= 0.5
-    has_fractal = struct_frac >= 0.5
-    
-    if score >= fire_score and has_trend and has_adx and has_strong_confirm:
+    if touched:
+        # ═══ IMPORTANCE 1: EMA200 TOUCHED → FIRE IMMEDIATELY ═══
+        # ส่งสัญญาณทันที + log ทุกเงื่อนไข (ไม่สนว่าผ่านกี่ข้อ)
+        importance = 1
         tier = "FIRE"
         entry_trigger = True
-    elif score >= watch_score and has_trend:
-        tier = "WATCH"
-        entry_trigger = False
+        note_parts = [
+            f"🚨 IMPORTANCE 1 — ราคาแตะ EMA200 แล้ว!",
+            f"EMA200 = {e200:.2f} | ผ่าน {passed_count}/10 เงื่อนไข",
+            f"เก็บ log ทุกเงื่อนไขเพื่อวิเคราะห์อนาคต",
+        ]
+    
+    elif crossed_ema100:
+        # ═══ IMPORTANCE 2: EMA100 CROSSED → WAIT FOR 7/10 ═══
+        importance = 2
+        if passed_count >= 7:
+            tier = "FIRE"
+            entry_trigger = True
+            note_parts = [
+                f"⏳ IMPORTANCE 2 — ทะลุ EMA100 แล้ว + ผ่าน {passed_count}/10 เงื่อนไข",
+                f"EMA100 = {e100:.2f} | EMA200 = {e200:.2f}",
+                f"เข้า {direction} ตามเทรน {bias}",
+            ]
+        else:
+            tier = "WATCH"
+            entry_trigger = False
+            note_parts = [
+                f"⏳ IMPORTANCE 2 — ทะลุ EMA100 แล้ว แต่ผ่านแค่ {passed_count}/10 (ต้อง >=7)",
+                f"รอ confirm เพิ่ม",
+            ]
     else:
+        # ห่าง EMA200 + ยังไม่ทะลุ EMA100 → NONE
+        importance = 0
         tier = "NONE"
         entry_trigger = False
+        note_parts = [
+            f"❌ ราคา {last_close:.2f} ห่าง EMA200 {e200:.2f} ({dist200:.2f}%)",
+            f"และยังไม่ทะลุ EMA100 — ยังไม่เข้าเงื่อนไขใด",
+        ]
     
-    note_parts = [f"Setup {score:.1f}/{max_score} → {tier}"]
-    if tier == "FIRE":
-        note_parts.append(
-            f"✅ ราคาแตะ EMA200 {e200:.2f} + เทรน {direction} + ADX={adx_val:.0f} "
-            f"+ {rsi_note} + {rej_note}")
-    elif tier == "WATCH":
-        note_parts.append(f"⏳ รอ confirm เพิ่ม ({rsi_note} | {rej_note})")
-    else:
-        note_parts.append(f"❌ สกอร์ {score:.1f} ต่ำกว่าเกณฑ์ ({fire_score:.0f})")
+    # Build details for DB storage
+    details = {}
+    for name, c in cond.items():
+        details[name] = {
+            "ok": c["pass"],
+            "frac": 1.0 if c["pass"] else 0.0,
+            "weight": 1,
+            "note": c["note"],
+        }
     
-    score_breakdown = {name: round(d["weight"] * d["frac"], 2) for name, d in details.items()}
+    score_breakdown = {name: (1.0 if c["pass"] else 0.0) for name, c in cond.items()}
     
     return SetupResult(
         timeframe=timeframe,
         target_hold_minutes=target_hold_minutes,
-        score=round(score, 2),
+        score=float(passed_count),
         max_score=max_score,
         tier=tier,
         direction=direction,
@@ -532,11 +544,16 @@ def score_setup(
         entry_trigger=entry_trigger,
         entry_trigger_note=" | ".join(note_parts),
         details=details,
-        grip_hits=["Grip"] if grip_ok else [],
+        grip_hits=["Grip"] if cond["c8_grip"]["pass"] else [],
         score_breakdown=score_breakdown,
         model_prob=None,
         ema200_price=e200,
         dist200_pct=round(dist200, 4),
         near_ema200=near_ema200,
-        touched_ema200=True,
+        touched_ema200=touched,
+        crossed_ema100=crossed_ema100,
+        importance=importance,
+        conditions_passed=passed_count,
+        conditions_total=10,
+        conditions_log=cond,
     )
