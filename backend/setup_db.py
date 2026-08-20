@@ -143,7 +143,7 @@ def _row_to_dict(r: sqlite3.Row) -> dict:
 
 
 def fetch_latest_setup_scores(symbol: str | None = None) -> dict:
-    """คืนค่าล่าสุดของแต่ละ timeframe ของ symbol → {"1m": {...}, "5m": {...}}
+    """คืนค่าล่าสุดของแต่ละ timeframe ของ symbol → {"M1": {...}, "M5": {...}}
     (ไม่ระบุ symbol = เอาล่าสุดข้ามทุกสัญลักษณ์)"""
     conn = _connect()
     if symbol:
@@ -160,6 +160,29 @@ def fetch_latest_setup_scores(symbol: str | None = None) -> dict:
         """).fetchall()
     conn.close()
     return {r["timeframe"]: _row_to_dict(r) for r in rows}
+
+
+def fetch_latest_setup_all_symbols() -> dict:
+    """คืนค่าล่าสุดของแต่ละ timeframe × แต่ละ symbol
+    → {"frxXAUUSD": {"M5": {...}}, "frxEURUSD": {"M5": {...}}, ...}"""
+    conn = _connect()
+    rows = conn.execute("""
+        SELECT * FROM setup_scores
+        WHERE id IN (
+            SELECT MAX(id) FROM setup_scores
+            GROUP BY symbol, timeframe
+        )
+        ORDER BY symbol, timeframe
+    """).fetchall()
+    conn.close()
+    result: dict = {}
+    for r in rows:
+        sym = r["symbol"]
+        tf = r["timeframe"]
+        if sym not in result:
+            result[sym] = {}
+        result[sym][tf] = _row_to_dict(r)
+    return result
 
 
 def fetch_recent_setup_scores(timeframe: str, limit: int = 50,

@@ -351,8 +351,15 @@ def get_stats_by_timeframe(payout: float = Query(0.82, ge=0.0, le=5.0), _auth=De
 @app.get("/api/setup/latest")
 def get_setup_latest(symbol: str = Query("frxXAUUSD"), _auth=Depends(require_auth)):
     """ผลล่าสุดของ setup_scorer checklist ต่อ timeframe ของสัญลักษณ์
-    → {"1m": {...}, "5m": {...}}"""
+    → {"M1": {...}, "M5": {...}}"""
     return setup_db.fetch_latest_setup_scores(symbol=symbol)
+
+
+@app.get("/api/setup/latest-all")
+def get_setup_latest_all(_auth=Depends(require_auth)):
+    """ผลล่าสุดของ setup_scorer checklist ทุกสัญลักษณ์ × ทุก timeframe
+    → {"frxXAUUSD": {"M5": {...}}, "frxEURUSD": {"M5": {...}}, ...}"""
+    return setup_db.fetch_latest_setup_all_symbols()
 
 
 @app.get("/api/setup/history")
