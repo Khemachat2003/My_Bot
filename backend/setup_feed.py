@@ -80,7 +80,7 @@ if _tf_env:
 else:
     SETUP_TIMEFRAMES = _DEFAULT_TF
 
-SETUP_MIN_BARS = 30
+SETUP_MIN_BARS = 215
 
 # 🚦 กันสัญญาณถี่เกิน (เทคนิคจริงออกออเดอร์ไม่ถี่ — ตั้งค่าได้ใน setup_config.json / env)
 #   - cooldown: อย่างน้อยกี่นาทีระหว่างสัญญาณแต่ละตัวของ TF เดียวกัน

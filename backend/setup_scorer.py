@@ -395,18 +395,18 @@ def score_setup(
     cfg = load_config() or {}
     max_score = 10
     
-    if len(df) < 60:
+    if len(df) < 210:
         return SetupResult(
             timeframe=timeframe, target_hold_minutes=target_hold_minutes,
             max_score=max_score,
             details={"Data": {"ok": False, "frac": 0.0,
-                              "note": f"แท่งไม่พอ (ต้องการ >= 60, ได้ {len(df)})", "weight": 0}},
+                              "note": f"แท่งไม่พอ (ต้องการ >= 210 สำหรับ EMA200, ได้ {len(df)})", "weight": 0}},
         )
     
     close, high, low = df["close"], df["high"], df["low"]
     ema50 = _calc_ema(close, 50)
-    ema100 = _calc_ema(close, 100) if len(df) >= 100 else _calc_ema(close, len(df))
-    ema200 = _calc_ema(close, 200) if len(df) >= 200 else _calc_ema(close, len(df))
+    ema100 = _calc_ema(close, 100)
+    ema200 = _calc_ema(close, 200)
     rsi = _calc_rsi(close, 14)
     bb_mid, bb_up, bb_lo, bb_width = _calc_bollinger_bands(close)
     adx = _calc_adx(high, low, close, 14)
