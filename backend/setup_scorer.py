@@ -362,26 +362,31 @@ def _cond10_mtf_trend(df: pd.DataFrame, direction: str) -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 # EMA200 TOUCH Detection
 # ══════════════════════════════════════════════════════════════════════════════
-def _ema200_touch检测(df: pd.DataFrame, ema200: pd.Series, lookback: int = 20) -> tuple[bool, str]:
+def _ema200_touch检测(df: pd.DataFrame, ema200: pd.Series,
+                       lookback: int = 20) -> tuple[bool, str]:
+    """ตรวจว่าแท่งล่าสุด (k=0) มี wick แตะ EMA200 หรือไม่
+    ใช้ lookback=1 เท่านั้น — ต้องเป็นแท่งปัจจุบันเท่านั้น
+    แท่งเก่าไม่นับเพราะราคา move away ไปแล้ว
+    """
     n = len(df)
-    touches = []
-    for k in range(min(lookback, n)):
-        idx = n - 1 - k
-        if idx < 0:
-            break
-        row = df.iloc[idx]
-        candle_high = float(row["high"])
-        candle_low = float(row["low"])
-        e_at_bar = float(ema200.iloc[idx]) if idx < len(ema200) else float(ema200.iloc[-1])
-        if candle_low <= e_at_bar <= candle_high:
-            touches.append(k)
-    
+    idx = n - 1
+    if idx < 0:
+        return False, "ไม่มีข้อมูล"
+
+    row = df.iloc[idx]
+    candle_high = float(row["high"])
+    candle_low = float(row["low"])
+    e_at_bar = float(ema200.iloc[idx]) if idx < len(ema200) else float(ema200.iloc[-1])
     e200 = float(ema200.iloc[-1])
-    if not touches:
-        return False, f"ราคาไม่ได้แตะ EMA200 ({e200:.2f}) ใน {lookback} แท่ง"
-    if touches[0] == 0:
-        return True, f"ราคาแตะ EMA200 แล้ว! (แท่งล่าสุด wick ผ่าน {e200:.2f})"
-    return True, f"ราคาเคยแตะ EMA200 ไป {touches[0]} แท่งก่อน (ล่าสุด {e200:.2f})"
+    dist_now = abs(float(df["close"].iloc[-1]) - e200) / e200 * 100.0
+
+    if candle_low <= e_at_bar <= candle_high:
+        if dist_now > 0.30:
+            return False, (f"แท่งล่าสุด wick ผ่าน EMA200 ({e200:.2f}) "
+                           f"แต่ราคาปิดห่าง {dist_now:.2f}% — ไม่ FIRE")
+        return True, f"ราคาแตะ EMA200 แล้ว! (แท่งล่าสุด wick ผ่าน {e200:.2f}, ห่าง {dist_now:.2f}%)"
+
+    return False, f"แท่งล่าสุดไม่ได้แตะ EMA200 ({e200:.2f})"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -451,8 +456,12 @@ def score_setup(
     # CHECK EMA200 TOUCH & EMA100 CROSS
     # ════════════════════════════════════════════════════════════════════════
     dist200 = abs(last_close - e200) / e200 * 100.0
-    touched, touch_note = _ema200_touch检测(df, ema200, lookback=20)
+    touched, touch_note = _ema200_touch检测(df, ema200)
     near_ema200 = dist200 <= float(cfg.get("ema200_near_tol_pct", 0.20))
+    
+    # Importance 1: ต้องมีทั้ง touched (แท่งล่าสุด) AND near_ema200 (ราคาปิดยังอยู่ใกล้)
+    # กันกรณี: wick แตะ EMA200 แต่ราคาปิด move away ไปแล้ว
+    importance1 = touched and near_ema200
     
     # Check if price crossed EMA100 (currently between EMA100 and EMA200)
     if direction == "CALL":
@@ -481,9 +490,8 @@ def score_setup(
     # TIER DETERMINATION
     # ════════════════════════════════════════════════════════════════════════
     
-    if touched:
-        # ═══ IMPORTANCE 1: EMA200 TOUCHED → FIRE IMMEDIATELY ═══
-        # ส่งสัญญาณทันที + log ทุกเงื่อนไข (ไม่สนว่าผ่านกี่ข้อ)
+    if importance1:
+        # ═══ IMPORTANCE 1: แท่งล่าสุดแตะ EMA200 + ราคายังอยู่ใกล้ → FIRE IMMEDIATELY ═══
         importance = 1
         tier = "FIRE"
         entry_trigger = True
