@@ -1431,79 +1431,71 @@ async function refreshPrice(){
   }
 }
 
-let symbolList=[];
-let _symbolsLoaded=false;
+const WL_SYMBOLS=[
+  {symbol:'frxXAUUSD',label:'XAUUSD · ทองคำ'},
+  {symbol:'frxEURUSD',label:'EURUSD'},
+  {symbol:'frxGBPUSD',label:'GBPUSD'},
+  {symbol:'frxUSDJPY',label:'USDJPY'},
+  {symbol:'frxAUDUSD',label:'AUDUSD'},
+  {symbol:'frxUSDCAD',label:'USDCAD'},
+  {symbol:'frxUSDCHF',label:'USDCHF'},
+  {symbol:'frxNZDUSD',label:'NZDUSD'},
+];
+let symbolList=WL_SYMBOLS;
+let _symbolsLoaded=true;
 async function loadSymbols(){
   try{
     const list=await fetchJSON('/api/symbols');
-    symbolList=list;
-    _symbolsLoaded=true;
-    const sel=document.getElementById('chartSymbol');
-    if(sel){
-      let cur='frxXAUUSD';
-      try{ const s=await fetchJSON('/api/symbol'); if(s&&s.symbol) cur=s.symbol; }catch(e){}
-      sel.innerHTML=list.map(s=>`<option value="${s.symbol}" ${s.symbol===cur?'selected':''}>${s.label}</option>`).join('');
-      sel.addEventListener('change',()=>refreshPrice());
-    }
-  }catch(e){ _symbolsLoaded=true; }
+    if(Array.isArray(list)&&list.length) symbolList=list;
+  }catch(e){}
+  _symbolsLoaded=true;
+  const sel=document.getElementById('chartSymbol');
+  if(sel){
+    let cur='frxXAUUSD';
+    try{ const s=await fetchJSON('/api/symbol'); if(s&&s.symbol) cur=s.symbol; }catch(e){}
+    sel.innerHTML=symbolList.map(s=>`<option value="${s.symbol}" ${s.symbol===cur?'selected':''}>${s.label}</option>`).join('');
+    sel.addEventListener('change',()=>refreshPrice());
+  }
+  renderWatchlist();
 }
 
 const _wlCache={};
-async function refreshWatchlist(){
+function renderWatchlist(){
   const rowsEl=document.getElementById('watchlistRows'); if(!rowsEl) return;
-  if(!_symbolsLoaded){
-    try{ const list=await fetchJSON('/api/symbols'); symbolList=list; _symbolsLoaded=true; }catch(e){ _symbolsLoaded=true; return; }
-  }
-  const list=symbolList;
-  if(!list.length) return;
   const cur=document.getElementById('chartSymbol')?.value||'frxXAUUSD';
   const short=s=>s.replace(/^frx/,'').replace(/_/g,'');
-  rowsEl.innerHTML=list.map(s=>{
+  rowsEl.innerHTML=symbolList.map(s=>{
     const c=_wlCache[s.symbol];
     const price=c?c.price:null;
     const chgPct=c?c.chgPct:null;
     const cls=chgPct==null?'flat':(chgPct>=0?'up':'down');
-    const pcls=price==null?'flat':'';
-    return `<div class="wl-row ${s.symbol===cur?'active':''}" data-symbol="${s.symbol}">
+    const active=s.symbol===cur?'active':'';
+    return `<div class="wl-row ${active}" data-symbol="${s.symbol}">
       <span><span class="wl-name">${short(s.symbol)}</span><span class="wl-kind">${s.label||''}</span></span>
-      <span class="wl-price ${pcls}">${price!=null?price.toFixed(price>=1000?1:(price>=100?2:3)):''}</span>
-      <span class="wl-chg ${cls}">${chgPct==null?'':(chgPct>=0?'+':'')+chgPct.toFixed(2)+'%'}</span>
+      <span class="wl-price">${price!=null?price.toFixed(price>=1000?1:(price>=100?2:3)):''}</span>
+      <span class="wl-chg ${cls}">${chgPct!=null?(chgPct>=0?'+':'')+chgPct.toFixed(2)+'%':''}</span>
     </div>`;
   }).join('');
   rowsEl.querySelectorAll('.wl-row').forEach(row=>{
     row.addEventListener('click',()=>{
-      const sel=document.getElementById('chartSymbol'); if(!sel) return;
-      sel.value=row.dataset.symbol;
+      const sel=document.getElementById('chartSymbol'); if(sel) sel.value=row.dataset.symbol;
       rowsEl.querySelectorAll('.wl-row').forEach(r=>r.classList.toggle('active',r===row));
       refreshPrice();
     });
   });
-  await Promise.all(list.map(async s=>{
+}
+async function refreshWatchlist(){
+  renderWatchlist();
+  await Promise.all(symbolList.map(async s=>{
     try{
       const c=await fetchJSON('/api/candles?tf=1m&count=2&symbol='+encodeURIComponent(s.symbol));
       if(!Array.isArray(c)||c.length<2) return;
       const last=c[c.length-1], prev=c[c.length-2];
-      const price=last?last.c:null;
-      const chg=prev&&last?last.c-prev.c:0;
-      const chgPct=prev?chg/prev.c*100:null;
-      _wlCache[s.symbol]={price,chgPct};
+      if(!last||!prev) return;
+      _wlCache[s.symbol]={price:last.c, chgPct:(last.c-prev.c)/prev.c*100};
     }catch(e){}
   }));
-  const cur2=document.getElementById('chartSymbol')?.value||'frxXAUUSD';
-  rowsEl.querySelectorAll('.wl-row').forEach(row=>{
-    const s=_wlCache[row.dataset.symbol];
-    if(!s) return;
-    const priceEl=row.querySelector('.wl-price');
-    const chgEl=row.querySelector('.wl-chg');
-    if(priceEl&&s.price!=null){
-      priceEl.textContent=s.price.toFixed(s.price>=1000?1:(s.price>=100?2:3));
-      priceEl.className='wl-price';
-    }
-    if(chgEl&&s.chgPct!=null){
-      chgEl.textContent=(s.chgPct>=0?'+':'')+s.chgPct.toFixed(2)+'%';
-      chgEl.className='wl-chg '+(s.chgPct>=0?'up':'down');
-    }
-  });
+  renderWatchlist();
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
@@ -1802,11 +1794,20 @@ function renderSetupCompact(s){
   </div>`;
 }
 
+function _getExpandedSetup(){
+  const s=new Set();
+  document.querySelectorAll('.setup-row.expanded').forEach(r=>{ if(r.dataset.sym) s.add(r.dataset.sym); });
+  return s;
+}
+function _restoreExpandedSetup(container,expanded){
+  container.querySelectorAll('.setup-row').forEach(r=>{ if(expanded.has(r.dataset.sym)) r.classList.add('expanded'); });
+}
 async function refreshSetupMini(){
   try{
     const all=await fetchJSON('/api/setup/latest-all');
     const container=document.getElementById('setupMini');
     if(!container) return;
+    const expanded=_getExpandedSetup();
     const order=['frxXAUUSD','frxEURUSD','frxGBPUSD','frxUSDJPY','frxAUDUSD','frxUSDCAD','frxUSDCHF','frxNZDUSD','R_100'];
     const sorted=Object.keys(all).sort((a,b)=>order.indexOf(a)-order.indexOf(b));
     const rows=[];
@@ -1816,6 +1817,7 @@ async function refreshSetupMini(){
       if(s) rows.push(renderSetupCompact({...s,symbol:sym}));
     }
     container.innerHTML=rows.length?rows.join(''):`<div class="empty" style="padding:16px;">รอ setup_feed.py ทำงาน</div>`;
+    _restoreExpandedSetup(container,expanded);
   }catch(e){}
 }
 
@@ -1825,6 +1827,7 @@ async function refreshSetupAll(){
     const m1El=document.getElementById('setupAllM1');
     const m5El=document.getElementById('setupAllM5');
     if(!m1El||!m5El) return;
+    const expanded1=_getExpandedSetup(), expanded5=_getExpandedSetup();
     const order=['frxXAUUSD','frxEURUSD','frxGBPUSD','frxUSDJPY','frxAUDUSD','frxUSDCAD','frxUSDCHF','frxNZDUSD','R_100'];
     const sorted=Object.keys(all).sort((a,b)=>order.indexOf(a)-order.indexOf(b));
     const m1Cards=[], m5Cards=[];
@@ -1835,6 +1838,8 @@ async function refreshSetupAll(){
     }
     m1El.innerHTML=m1Cards.length?m1Cards.join(''):`<div class="empty" style="padding:16px;">รอข้อมูล</div>`;
     m5El.innerHTML=m5Cards.length?m5Cards.join(''):`<div class="empty" style="padding:16px;">รอข้อมูล</div>`;
+    _restoreExpandedSetup(m1El,expanded1);
+    _restoreExpandedSetup(m5El,expanded5);
   }catch(e){}
 }
 
