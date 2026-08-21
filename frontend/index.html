@@ -2113,7 +2113,7 @@ function renderPeriodTable(){
       <td class="mono">${d.ALL.n}</td><td class="mono ${d.ALL.winrate>=50?'dir-call':'dir-put'}">${d.ALL.n?d.ALL.winrate+'%':'–'}</td>
       <td class="mono ${d.ALL.pnl_money>0?'dir-call':(d.ALL.pnl_money<0?'dir-put':'')}">${d.ALL.n?pnl(d.ALL.pnl_money):'–'}</td>
       <td class="mono">${d.ALL.n?d.ALL.roi+'%':'–'}</td>
-      <td class="mono">${d.ML.n}</td><td class="mono ${d.ML.n?d.ML.winrate+'%':'–'}</td>
+      <td class="mono">${d.ML.n}</td><td class="mono">${d.ML.n?d.ML.winrate+'%':'–'}</td>
       <td class="mono ${d.ML.pnl_money>0?'dir-call':(d.ML.pnl_money<0?'dir-put':'')}">${d.ML.n?pnl(d.ML.pnl_money):'–'}</td>
       <td class="mono">${d.SETUP.n}</td><td class="mono">${d.SETUP.n?d.SETUP.winrate+'%':'–'}</td>
       <td class="mono ${d.SETUP.pnl_money>0?'dir-call':(d.SETUP.pnl_money<0?'dir-put':'')}">${d.SETUP.n?pnl(d.SETUP.pnl_money):'–'}</td>
