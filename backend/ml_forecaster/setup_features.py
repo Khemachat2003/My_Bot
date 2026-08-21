@@ -12,9 +12,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from backend.setup_scorer import SetupResult
 
-# 10 checklist ใน details ของ score_setup → flatten เป็นคอลัมน์ตัวเลข
-SETUP_DETAIL_KEYS = ["structure", "adx", "rsi_zone", "rsi_div", "ema",
-                     "bb", "sma5", "sr", "pullback", "rejection"]
+# V8: 10 conditions ใน details ของ score_setup → flatten เป็นคอลัมน์ตัวเลข
+SETUP_DETAIL_KEYS = ["c1_fractal_sr", "c2_bb_break", "c3_rsi_ob_os", "c4_rsi_div",
+                     "c5_adx", "c6_pa", "c7_fractal_trend", "c8_grip",
+                     "c9_bb_width", "c10_mtf"]
 _TIER_ENC = {"NONE": 0, "WATCH": 1, "FIRE": 2}
 _DIR_ENC = {"CALL": 1, "PUT": -1}
 
