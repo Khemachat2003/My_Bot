@@ -481,6 +481,18 @@
     .j-compare{grid-template-columns:1fr;}
     .j-cmp-stats{grid-template-columns:repeat(2,1fr);}
   }
+
+  /* ═══ OVERVIEW BOTTOM ═══ */
+  .ov-status-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 14px;}
+  .ov-stat{display:flex;flex-direction:column;gap:2px;text-align:center;padding:4px 6px;}
+  .ov-stat-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;}
+  .ov-stat-val{font-family:var(--num);font-size:18px;font-weight:800;line-height:1.1;}
+  .ov-stat-val.purple{color:var(--purple);}
+  .ov-stat-sub{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ov-bottom{display:grid;grid-template-columns:1.6fr 1fr;gap:14px;margin-bottom:14px;}
+  @media(max-width:1000px){.ov-bottom{grid-template-columns:1fr;}}
+  .ov-equity-panel,.ov-feed-panel{margin-bottom:0;}
+
 </style>
 </head>
 <body>
@@ -598,21 +610,22 @@
       </div>
     </div>
 
-    <div class="cols l3">
-      <div class="panel">
-        <h3><span class="ph purple"></span>เส้น P&amp;L (Equity Curve)</h3>
-        <div class="chart-wrap" style="height:230px;"><canvas id="equityChart" class="chart"></canvas></div>
+    <div class="ov-status-bar">
+      <div class="ov-stat"><span class="ov-stat-lbl">ML Winrate</span><span class="ov-stat-val" id="ovMlWinrate">–</span><span class="ov-stat-sub" id="ovMlWinrateSub">รอสัญญาณ...</span></div>
+      <div class="ov-stat"><span class="ov-stat-lbl">ML Margin</span><span class="ov-stat-val" id="ovMlMargin">–</span><span class="ov-stat-sub" id="ovMlN">–</span></div>
+      <div class="ov-stat"><span class="ov-stat-lbl">Setup Winrate</span><span class="ov-stat-val" id="ovSetWinrate">–</span><span class="ov-stat-sub" id="ovSetWinrateSub">รอสัญญาณ...</span></div>
+      <div class="ov-stat"><span class="ov-stat-lbl">Setup Margin</span><span class="ov-stat-val" id="ovSetMargin">–</span><span class="ov-stat-sub" id="ovSetN">–</span></div>
+      <div class="ov-stat"><span class="ov-stat-lbl">Model M1</span><span class="ov-stat-val purple" id="ovModelM1">–</span><span class="ov-stat-sub" id="ovModelM1Sub">–</span></div>
+      <div class="ov-stat"><span class="ov-stat-lbl">Model M5</span><span class="ov-stat-val purple" id="ovModelM5">–</span><span class="ov-stat-sub" id="ovModelM5Sub">–</span></div>
+    </div>
+    <div class="ov-bottom">
+      <div class="panel ov-equity-panel">
+        <h3><span class="ph purple"></span>Equity Curve</h3>
+        <div style="height:280px;"><canvas id="equityChart" class="chart"></canvas></div>
       </div>
-      <div class="panel">
-        <h3><span class="ph green"></span>สัญญาณ ML ล่าสุด</h3>
-        <div id="mlRecentFeed" style="max-height:230px;overflow-y:auto;"></div>
-      </div>
-      <div class="panel">
-        <h3><span class="ph cyan"></span>Model M1 / M5</h3>
-        <div id="ovModels">
-          <div class="kpi cyan" style="margin-bottom:10px;"><div class="lbl">Model M1</div><div class="val purple" id="ovModelM1" style="font-size:18px;">–</div><div class="sub" id="ovModelM1Sub">–</div></div>
-          <div class="kpi red"><div class="lbl">Model M5</div><div class="val purple" id="ovModelM5" style="font-size:18px;">–</div><div class="sub" id="ovModelM5Sub">–</div></div>
-        </div>
+      <div class="panel ov-feed-panel">
+        <h3><span class="ph green"></span>สัญญาณล่าสุด</h3>
+        <div id="mlRecentFeed" style="max-height:310px;overflow-y:auto;"></div>
       </div>
     </div>
   </section>
@@ -1517,17 +1530,17 @@ function elTextCls(id,v,cls){ const el=elText(id,v); if(el) el.className=cls; re
 async function refreshOverview(){
   try{
     const ml=await fetchJSON('/api/ml/stats');
-    elText('ovMlWinrate',ml.n_resolved?ml.winrate+'%':'–');
+    renderStat(document.getElementById('ovMlWinrate'),ml.n_resolved?ml.winrate+'%':'–',ml.n_resolved?'cyan':'muted');
     elText('ovMlWinrateSub',ml.n_resolved?`CI [${ml.ci_low}% – ${ml.ci_high}%]`:'รอสัญญาณ...');
     elText('ovMlMargin',ml.n_resolved?fmtMargin(ml.margin):'–');
-    elText('ovMlN',`${ml.n_resolved} ชนะ/แพ้ = ${ml.wins}/${ml.losses}`);
+    elText('ovMlN',`${ml.n_resolved} W/L = ${ml.wins}/${ml.losses}`);
   }catch(e){}
   try{
     const st=await fetchJSON('/api/stats');
-    elText('ovSetWinrate',st.n_resolved?st.winrate+'%':'–');
+    renderStat(document.getElementById('ovSetWinrate'),st.n_resolved?st.winrate+'%':'–',st.n_resolved?'blue':'muted');
     elText('ovSetWinrateSub',st.n_resolved?`CI [${st.ci_low}% – ${st.ci_high}%]`:'รอสัญญาณ...');
     elText('ovSetMargin',st.n_resolved?fmtMargin(st.margin):'–');
-    elText('ovSetN',`${st.n_resolved} ชนะ/แพ้ = ${st.wins}/${st.losses}`);
+    elText('ovSetN',`${st.n_resolved} W/L = ${st.wins}/${st.losses}`);
   }catch(e){}
   try{
     const j=await fetchJSON('/api/journal/stats');
