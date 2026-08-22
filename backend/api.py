@@ -313,7 +313,7 @@ def get_symbols(_auth=Depends(require_auth)):
 
 @app.get("/api/candles")
 def get_candles(tf: str = Query("1m", pattern="^(1m|5m|15m|30m|1h|4h)$"),
-                count: int = Query(300, ge=10, le=1000),
+                count: int = Query(300, ge=2, le=1000),
                 symbol: str = Query("", description="เช่น frxXAUUSD / R_100 / frxEURUSD"),
                 _auth=Depends(require_auth)):
     """แท่งเทียน history ตาม TF สำหรับกราฟ (1m/5m/15m/30m/1h/4h) — cache 30 วิ"""
