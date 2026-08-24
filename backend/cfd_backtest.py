@@ -95,9 +95,16 @@ class CFDBacktest:
     def get_signals(self, signal_type: str = "ALL") -> list[dict]:
         conn = self._connect()
         out = []
+        # check which columns exist
+        setup_cols = {r["name"] for r in conn.execute("PRAGMA table_info(setup_signals)").fetchall()}
+        ml_cols = {r["name"] for r in conn.execute("PRAGMA table_info(ml_signals)").fetchall()}
+        has_sym = "symbol" in setup_cols
+
         if signal_type in ("ALL", "SETUP"):
-            rows = conn.execute("""
-                SELECT id, signal_time, entry_price, direction, symbol, timeframe,
+            sym_col = "COALESCE(symbol, 'frxXAUUSD')" if has_sym else "'frxXAUUSD'"
+            rows = conn.execute(f"""
+                SELECT id, signal_time, entry_price, direction,
+                       {sym_col} as symbol, timeframe,
                        result as binary_result, 'SETUP' as signal_type
                 FROM setup_signals
                 WHERE phantom = 0 AND result IN ('WIN','LOSE')
@@ -105,8 +112,11 @@ class CFDBacktest:
             """).fetchall()
             out.extend(dict(r) for r in rows)
         if signal_type in ("ALL", "ML"):
-            rows = conn.execute("""
-                SELECT id, signal_time, entry_price, direction, symbol, timeframe,
+            ml_has_sym = "symbol" in ml_cols
+            sym_col2 = "COALESCE(symbol, 'frxXAUUSD')" if ml_has_sym else "'frxXAUUSD'"
+            rows = conn.execute(f"""
+                SELECT id, signal_time, entry_price, direction,
+                       {sym_col2} as symbol, timeframe,
                        result as binary_result, 'ML' as signal_type
                 FROM ml_signals
                 WHERE phantom = 0 AND result IN ('WIN','LOSE')
