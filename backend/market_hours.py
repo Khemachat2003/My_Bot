@@ -47,6 +47,17 @@ def choose_symbol(now: datetime | None = None) -> str:
     return primary
 
 
+def market_open_cooldown(now: datetime | None = None, cooldown_min: int = 15) -> bool:
+    """True ถ้าอยู่ในช่วง cooldown หลังตลาดเปิดสัปดาห์ (จันทร์ 00:00-00:XX UTC)
+    กันสัญญาณ FIRE ถล่มตอน market open — spread กว้าง + whipsaw รุนแรง"""
+    now = now or datetime.now(timezone.utc)
+    if now.weekday() == 0:  # จันทร์
+        minutes_since_midnight = now.hour * 60 + now.minute
+        if minutes_since_midnight < cooldown_min:
+            return True
+    return False
+
+
 def symbol_label(symbol: str) -> str:
     """ชื่อที่ใช้ใน Telegram message — XAUUSD สำหรับทองจริง, R100 สำหรับตัวสำรอง"""
     if symbol == "frxXAUUSD":

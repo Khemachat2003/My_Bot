@@ -39,7 +39,7 @@ import pandas as pd
 from backend import db, setup_db
 from backend.indicators import rsi
 from backend.telegram import send_telegram
-from backend.market_hours import is_forex_like, market_open_now, symbol_label
+from backend.market_hours import is_forex_like, market_open_now, market_open_cooldown, symbol_label
 from backend.setup_scorer import score_setup
 
 try:
@@ -103,6 +103,7 @@ except Exception:
     DAILY_CAP = _int_env("SETUP_DAILY_CAP", 0)
 COOLDOWN_MIN = _int_env("SETUP_COOLDOWN_MINUTES", COOLDOWN_MIN)
 DAILY_CAP = _int_env("SETUP_DAILY_CAP", DAILY_CAP)
+MARKET_OPEN_COOLDOWN_MIN = _int_env("SETUP_MARKET_OPEN_COOLDOWN_MINUTES", 15)
 
 
 class SetupFeedEngine:
@@ -294,6 +295,14 @@ class SetupFeedEngine:
                 print(f"[SetupFeed:{self.symbol}] ข้ามประเมิน — ข้อมูลค้าง {age_min:.0f} นาที "
                       f"(เกิน {max_age_min}) ราคาสุดท้าย {last_ts} — รอ poll ราคาสด")
                 return
+
+        # 🚦 Market open cooldown: ข้าม FIRE信号ในช่วง N นาทีแรกหลังตลาดเปิดสัปดาห์
+        #   กันสัญญาณถล่มตอน Monday open — spread กว้าง + whipsaw → LOSS ทุกไม้
+        if is_forex_like(self.symbol) and market_open_cooldown(now, MARKET_OPEN_COOLDOWN_MIN):
+            print(f"[SetupFeed:{self.symbol}] ข้ามประเมิน — market open cooldown "
+                  f"({MARKET_OPEN_COOLDOWN_MIN} นาทีแรกหลังเปิดตลาดสัปดาห์)")
+            return
+
         for tf_label, hold_min, minutes in SETUP_TIMEFRAMES:
             df_tf = self._resample(minutes)
             if len(df_tf) < SETUP_MIN_BARS:
