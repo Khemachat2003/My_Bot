@@ -40,7 +40,7 @@ import pandas as pd
 from backend import db, setup_db
 from backend.indicators import rsi
 from backend.telegram import send_telegram
-from backend.market_hours import is_forex_like, market_open_now, market_open_cooldown, symbol_label, should_block_call
+from backend.market_hours import is_forex_like, market_open_now, market_open_cooldown, symbol_label, get_session
 from backend.setup_scorer import score_setup
 
 try:
@@ -371,10 +371,12 @@ class SetupFeedEngine:
                         self._last_entry_trigger[tf_label] = result.entry_trigger
                         continue
 
-                # 🚦 session block: CALL Night (18-24 UTC) = 34.1% WR — บล็อก
-                if result.direction == "CALL" and should_block_call(now):
-                    print(f"[SetupFeed:{self.symbol}] ข้าม CALL [{tf_label}] — "
-                          f"Night session (34.1% WR จาก 482 trades)")
+                # 🚦 session block: Night (18-24 UTC) = ตลาด volume ต่ำสุด — บล็อกทั้ง CALL/PUT
+                # CALL Night: 34.1% WR (41 trades), PUT Night: 45.9% WR (37 trades)
+                # ทั้งสองต่ำกว่า break-even 54.95% → ไม่เทรดช่วงนี้เลยดีกว่า
+                if get_session(now) == "Night":
+                    print(f"[SetupFeed:{self.symbol}] ข้ามสัญญาณ [{tf_label}] — "
+                          f"Night session (volume ต่ำ, CALL 34% PUT 46%)")
                     self._last_entry_trigger[tf_label] = result.entry_trigger
                     continue
 
