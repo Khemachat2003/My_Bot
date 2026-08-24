@@ -464,10 +464,15 @@ def score_setup(
     importance1 = touched and near_ema200
     
     # Check if price crossed EMA100 (currently between EMA100 and EMA200)
+    # BUG FIX: threshold เดิม 0.1% (10+ pips) หลวมเกิน → ราคาอยู่เหนือ EMA100 ก็ triggers
+    # แก้เป็น 0.02% (~2 pips) สำหรับ forex 5 ตำแหน่ง + ต้องอยู่ระหว่าง EMA100-EMA200 จริง
+    _ema100_tol = float(cfg.get("ema100_tol_pct", 0.02))
     if direction == "CALL":
-        crossed_ema100 = last_close < e100 * 1.001  # price pulled back below/near EMA100
+        # ต้องอยู่ระหว่าง EMA100 (ล่าง) กับ EMA200 (บน) = pullback จริง
+        crossed_ema100 = (e200 * 0.999 <= last_close <= e100 * (1 + _ema100_tol / 100))
     else:
-        crossed_ema100 = last_close > e100 * 0.999  # price pulled back above/near EMA100
+        # ต้องอยู่ระหว่าง EMA200 (ล่าง) กับ EMA100 (บน) = pullback จริง
+        crossed_ema100 = (e100 * (1 - _ema100_tol / 100) <= last_close <= e200 * 1.001)
     
     # ════════════════════════════════════════════════════════════════════════
     # EVALUATE ALL 10 CONDITIONS
@@ -489,18 +494,29 @@ def score_setup(
     # ════════════════════════════════════════════════════════════════════════
     # TIER DETERMINATION
     # ════════════════════════════════════════════════════════════════════════
+    _IMP1_MIN_CONDITIONS = int(cfg.get("importance1_min_conditions", 4))
     
-    if importance1:
-        # ═══ IMPORTANCE 1: แท่งล่าสุดแตะ EMA200 + ราคายังอยู่ใกล้ → FIRE IMMEDIATELY ═══
+    if importance1 and passed_count >= _IMP1_MIN_CONDITIONS:
+        # ═══ IMPORTANCE 1: แตะ EMA200 + ผ่านอย่างน้อย N เงื่อนไข → FIRE ═══
         importance = 1
         tier = "FIRE"
         entry_trigger = True
         note_parts = [
-            f"🚨 IMPORTANCE 1 — ราคาแตะ EMA200 แล้ว!",
-            f"EMA200 = {e200:.2f} | ผ่าน {passed_count}/10 เงื่อนไข",
-            f"เก็บ log ทุกเงื่อนไขเพื่อวิเคราะห์อนาคต",
+            f"🚨 IMPORTANCE 1 — ราคาแตะ EMA200 + ผ่าน {passed_count}/10 เงื่อนไข",
+            f"EMA200 = {e200:.2f} | ต้อง >= {_IMP1_MIN_CONDITIONS}",
+            f"เข้า {direction} ตามเทรน {bias}",
         ]
     
+    elif importance1 and passed_count < _IMP1_MIN_CONDITIONS:
+        # ═══ IMPORTANCE 1 แต่เงื่อนไขไม่พอ → WATCH ═══
+        importance = 1
+        tier = "WATCH"
+        entry_trigger = False
+        note_parts = [
+            f"⚠️ IMPORTANCE 1 — แตะ EMA200 แล้ว แต่ผ่านแค่ {passed_count}/10 (ต้อง >= {_IMP1_MIN_CONDITIONS})",
+            f"EMA200 = {e200:.2f} | รอ confirm เพิ่ม",
+        ]
+
     elif crossed_ema100:
         # ═══ IMPORTANCE 2: EMA100 CROSSED → WAIT FOR 7/10 ═══
         importance = 2
