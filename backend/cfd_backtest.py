@@ -40,8 +40,8 @@ DEFAULTS = {
     "spread_pips": 1.5,
     "risk_pct": 0.01,
     "max_hold_min": 60,
-    "pip_size": 0.10,          # XAUUSD: 1 pip = $0.10
-    "pip_value_per_lot": 10.0,  # XAUUSD: $10/pip/lot (100 oz × $0.10)
+    "pip_size": 1.0,           # XAUUSD: 1 pip = $1.00
+    "pip_value_per_lot": 100.0, # XAUUSD: $100/pip/lot (100 oz × $1.00)
 }
 
 
@@ -84,7 +84,7 @@ class CFDBacktest:
 
     def _calc_lot(self):
         risk = self.capital * self.risk_pct
-        return round(risk / (self.sl_pips * self.pip_value_per_lot), 2)
+        return round(risk / (self.sl_pips * self.pip_value_per_lot), 3)
 
     def _connect(self):
         conn = sqlite3.connect(DB_PATH, timeout=15)
