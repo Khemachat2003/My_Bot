@@ -40,8 +40,8 @@ DEFAULTS = {
     "spread_pips": 1.5,
     "risk_pct": 0.01,
     "max_hold_min": 60,
-    "pip_size": 0.01,
-    "pip_value_per_lot": 1.0,  # XAUUSD: $1/pip/lot
+    "pip_size": 0.10,          # XAUUSD: 1 pip = $0.10
+    "pip_value_per_lot": 10.0,  # XAUUSD: $10/pip/lot (100 oz × $0.10)
 }
 
 
