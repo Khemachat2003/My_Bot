@@ -9,14 +9,14 @@ cfd_backtest.py — CFD Backtest Engine
   - TP2: 60 pips (R:R 1:3)
   - Spread: 1.5 pips
   - Risk: 1% ของทุนต่อไม้
-  - pip_size: 0.01 (XAUUSD)
+  - pip_size: 1.0 (XAUUSD)
 
 Logic:
   สำหรับ signal เดียว จะเช็คทั้ง TP1 และ TP2 แยกกันอิสระ:
     - TP1 = ถ้าราคาไปถึง 40 pips ก่อน SL → WIN_TP1
     - TP2 = ถ้าราคาไปถึง 60 pips ก่อน SL → WIN_TP2
     - SL โดนก่อน → LOSE ทั้งคู่
-    - หมดเวลา → TIMEOUT (ไม่ WIN ไม่ LOSE)
+    - ไม่มี timeout — ถือจนกว่าจะชน SL หรือ TP
 
 ทำให้เรารู้ว่า system เหมาะกับ R:R แบบไหนมากกว่ากัน
 """
@@ -39,7 +39,6 @@ DEFAULTS = {
     "tp2_pips": 60,
     "spread_pips": 1.5,
     "risk_pct": 0.01,
-    "max_hold_min": 60,
     "pip_size": 1.0,           # XAUUSD: 1 pip = $1.00
     "pip_value_per_lot": 100.0, # XAUUSD: $100/pip/lot (100 oz × $1.00)
 }
@@ -60,8 +59,8 @@ class TradeResult:
     tp2_price: float
     effective_entry: float
     spread_cost: float
-    tp1_result: str = "TIMEOUT"
-    tp2_result: str = "TIMEOUT"
+    tp1_result: str = "LOSE"
+    tp2_result: str = "LOSE"
     tp1_pnl: float = 0.0
     tp2_pnl: float = 0.0
     tp1_hold_bars: int = 0
@@ -77,7 +76,6 @@ class CFDBacktest:
         self.tp2_pips = p["tp2_pips"]
         self.spread_pips = p["spread_pips"]
         self.risk_pct = p["risk_pct"]
-        self.max_hold_min = p["max_hold_min"]
         self.pip_size = p["pip_size"]
         self.pip_value_per_lot = p["pip_value_per_lot"]
         self.lot_size = self._calc_lot()
@@ -127,8 +125,7 @@ class CFDBacktest:
         return out
 
     # ── Fetch 1-min price candles ────────────────────────────────────────────
-    def get_price_path(self, symbol: str, entry_time: str, entry_price: float,
-                       max_bars: int) -> list[dict]:
+    def get_price_path(self, symbol: str, entry_time: str, entry_price: float) -> list[dict]:
         conn = self._connect()
 
         rows = conn.execute("""
@@ -136,8 +133,7 @@ class CFDBacktest:
             FROM prices
             WHERE symbol = ? AND ts > ?
             ORDER BY ts ASC
-            LIMIT ?
-        """, (symbol, entry_time, max_bars + 5)).fetchall()
+        """, (symbol, entry_time)).fetchall()
         conn.close()
 
         candles = [dict(r) for r in rows]
@@ -173,7 +169,7 @@ class CFDBacktest:
             tp1 = eff - self.tp1_pips * ps
             tp2 = eff - self.tp2_pips * ps
 
-        candles = self.get_price_path(sym, et, entry, self.max_hold_min)
+        candles = self.get_price_path(sym, et, entry)
         if not candles:
             return None
 
@@ -242,8 +238,8 @@ class CFDBacktest:
 
         tp1_pnl = 0.0
         tp2_pnl = 0.0
-        tp1_res = "TIMEOUT"
-        tp2_res = "TIMEOUT"
+        tp1_res = "LOSE"
+        tp2_res = "LOSE"
 
         if tp1_hit:
             tp1_pnl = (self.tp1_pips * self.pip_value_per_lot * self.lot_size) - spread_cost
@@ -375,7 +371,7 @@ class CFDBacktest:
 
 
 def _blank_bucket() -> dict:
-    return {"total": 0, "wins": 0, "losses": 0, "timeouts": 0, "pnl": 0.0, "wr": 0.0}
+    return {"total": 0, "wins": 0, "losses": 0, "pnl": 0.0, "wr": 0.0}
 
 
 def _add(b: dict, result: str, pnl: float):
@@ -383,10 +379,8 @@ def _add(b: dict, result: str, pnl: float):
     b["pnl"] = round(b["pnl"] + pnl, 2)
     if result == "WIN":
         b["wins"] += 1
-    elif result == "LOSE":
-        b["losses"] += 1
     else:
-        b["timeouts"] += 1
+        b["losses"] += 1
 
 
 def _calc_wr(b: dict):
