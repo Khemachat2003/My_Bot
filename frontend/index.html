@@ -897,23 +897,25 @@
   <section id="tab-cfd" style="display:none;">
     <div class="j-col">
       <!-- params bar -->
-      <div class="j-section-head open" onclick="this.parentElement.classList.toggle('open')">
-        <h3>⚙️ CFD Parameters</h3><span class="j-arrow">▾</span>
-      </div>
-      <div class="j-section-body" style="padding:12px;">
-        <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center; font-size:11px;">
-          <label>ทุน $<input id="cfdCapital" type="number" value="5000" min="100" max="100000" style="width:70px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
-          <label>SL (pip) <input id="cfdSL" type="number" value="20" min="5" max="100" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
-          <label>TP1 (pip) <input id="cfdTP1" type="number" value="40" min="10" max="200" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
-          <label>TP2 (pip) <input id="cfdTP2" type="number" value="60" min="10" max="300" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
-          <label>Spread <input id="cfdSpread" type="number" value="1.5" min="0" max="10" step="0.1" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
-          <label>Risk % <input id="cfdRisk" type="number" value="1" min="0.1" max="10" step="0.1" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
-          <select id="cfdSignalType" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 8px;font-size:11px;">
-            <option value="ALL">All Systems</option>
-            <option value="SETUP">Rule-Based Only</option>
-            <option value="ML">ML Only</option>
-          </select>
-          <button onclick="runCFDBacktest()" style="background:var(--yellow);color:#000;border:none;border-radius:4px;padding:4px 14px;font-size:11px;font-weight:700;cursor:pointer;">Run Backtest</button>
+      <div class="j-section open">
+        <div class="j-section-head" onclick="this.parentElement.classList.toggle('open')">
+          <h3>⚙️ CFD Parameters</h3><span class="j-arrow">▾</span>
+        </div>
+        <div class="j-section-body" style="padding:12px;">
+          <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center; font-size:11px;">
+            <label>ทุน $<input id="cfdCapital" type="number" value="5000" min="100" max="100000" style="width:70px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <label>SL (pip) <input id="cfdSL" type="number" value="20" min="5" max="100" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <label>TP1 (pip) <input id="cfdTP1" type="number" value="40" min="10" max="200" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <label>TP2 (pip) <input id="cfdTP2" type="number" value="60" min="10" max="300" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <label>Spread <input id="cfdSpread" type="number" value="1.5" min="0" max="10" step="0.1" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <label>Risk % <input id="cfdRisk" type="number" value="1" min="0.1" max="10" step="0.1" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <select id="cfdSignalType" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 8px;font-size:11px;">
+              <option value="ALL">All Systems</option>
+              <option value="SETUP">Rule-Based Only</option>
+              <option value="ML">ML Only</option>
+            </select>
+            <button onclick="runCFDBacktest()" style="background:var(--yellow);color:#000;border:none;border-radius:4px;padding:4px 14px;font-size:11px;font-weight:700;cursor:pointer;">Run Backtest</button>
+          </div>
         </div>
       </div>
 
@@ -921,40 +923,44 @@
       <div id="cfdSummary" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:14px;"></div>
 
       <!-- TP1 vs TP2 comparison -->
-      <div class="j-section-head open" onclick="this.parentElement.classList.toggle('open')" style="margin-top:14px;">
-        <h3>📊 TP1 vs TP2 Comparison</h3><span class="j-arrow">▾</span>
-      </div>
-      <div class="j-section-body">
-        <div class="tbl-wrap">
-          <table id="cfdCompareTable">
-            <thead><tr>
-              <th>System</th><th>Direction</th>
-              <th colspan="3">TP1 (R:R 1:2)</th>
-              <th colspan="3">TP2 (R:R 1:3)</th>
-            </tr>
-            <tr>
-              <th></th><th></th>
-              <th>Trades</th><th>WR%</th><th>P&L</th>
-              <th>Trades</th><th>WR%</th><th>P&L</th>
-            </tr></thead>
-            <tbody></tbody>
-          </table>
+      <div class="j-section" style="margin-top:14px;">
+        <div class="j-section-head" onclick="this.parentElement.classList.toggle('open')">
+          <h3>📊 TP1 vs TP2 Comparison</h3><span class="j-arrow">▾</span>
+        </div>
+        <div class="j-section-body">
+          <div class="tbl-wrap">
+            <table id="cfdCompareTable">
+              <thead><tr>
+                <th>System</th><th>Direction</th>
+                <th colspan="3">TP1 (R:R 1:2)</th>
+                <th colspan="3">TP2 (R:R 1:3)</th>
+              </tr>
+              <tr>
+                <th></th><th></th>
+                <th>Trades</th><th>WR%</th><th>P&L</th>
+                <th>Trades</th><th>WR%</th><th>P&L</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
       <!-- trade list -->
-      <div class="j-section-head" onclick="this.parentElement.classList.toggle('open')" style="margin-top:14px;">
-        <h3>📋 Trade List</h3><span class="j-arrow">▾</span>
-      </div>
-      <div class="j-section-body">
-        <div class="tbl-wrap">
-          <table id="cfdTradeTable">
-            <thead><tr>
-              <th>#</th><th>System</th><th>Dir</th><th>Entry</th>
-              <th>TP1</th><th>TP2</th><th>P&L (TP1)</th><th>P&L (TP2)</th>
-            </tr></thead>
-            <tbody></tbody>
-          </table>
+      <div class="j-section" style="margin-top:14px;">
+        <div class="j-section-head" onclick="this.parentElement.classList.toggle('open')">
+          <h3>📋 Trade List</h3><span class="j-arrow">▾</span>
+        </div>
+        <div class="j-section-body">
+          <div class="tbl-wrap">
+            <table id="cfdTradeTable">
+              <thead><tr>
+                <th>#</th><th>System</th><th>Dir</th><th>Entry</th>
+                <th>TP1</th><th>TP2</th><th>P&L (TP1)</th><th>P&L (TP2)</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
