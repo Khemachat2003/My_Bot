@@ -127,17 +127,48 @@ class CFDBacktest:
         return out
 
     # ── Fetch 1-min price candles ────────────────────────────────────────────
-    def get_price_path(self, symbol: str, entry_time: str, max_bars: int) -> list[dict]:
+    def get_price_path(self, symbol: str, entry_time: str, entry_price: float,
+                       max_bars: int) -> list[dict]:
         conn = self._connect()
+
+        anchor = conn.execute("""
+            SELECT ts FROM prices
+            WHERE symbol = ? AND ts <= ?
+            ORDER BY ts DESC LIMIT 1
+        """, (symbol, entry_time)).fetchone()
+
+        if anchor:
+            start_ts = anchor["ts"]
+        else:
+            row_next = conn.execute("""
+                SELECT ts FROM prices
+                WHERE symbol = ? AND ts >= ?
+                ORDER BY ts ASC LIMIT 1
+            """, (symbol, entry_time)).fetchone()
+            if not row_next:
+                conn.close()
+                return []
+            start_ts = row_next["ts"]
+
         rows = conn.execute("""
             SELECT ts, open, high, low, close
             FROM prices
             WHERE symbol = ? AND ts >= ?
             ORDER BY ts ASC
             LIMIT ?
-        """, (symbol, entry_time, max_bars + 5)).fetchall()
+        """, (symbol, start_ts, max_bars + 5)).fetchall()
         conn.close()
-        return [dict(r) for r in rows]
+
+        candles = [dict(r) for r in rows]
+        if not candles:
+            return []
+
+        first_close = float(candles[0]["close"])
+        pct_diff = abs(first_close - entry_price) / entry_price if entry_price else 1.0
+        if pct_diff > 0.05:
+            return []
+
+        return candles
 
     # ── Simulate one CFD trade ──────────────────────────────────────────────
     def simulate(self, sig: dict) -> Optional[TradeResult]:
@@ -161,7 +192,7 @@ class CFDBacktest:
             tp1 = eff - self.tp1_pips * ps
             tp2 = eff - self.tp2_pips * ps
 
-        candles = self.get_price_path(sym, et, self.max_hold_min)
+        candles = self.get_price_path(sym, et, entry, self.max_hold_min)
         if not candles:
             return None
 
