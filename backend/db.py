@@ -954,14 +954,13 @@ def fetch_cfd_stats() -> dict:
     sl_count = sum(1 for r in rows if r["result"] == "SL")
     tp1_count = sum(1 for r in rows if r["result"] == "TP1")
     tp2_count = sum(1 for r in rows if r["result"] == "TP2")
-    to_count = sum(1 for r in rows if r["result"] == "TIMEOUT")
     total_pnl = sum(r["pnl"] or 0 for r in rows)
 
     by_type = {}
     for r in rows:
         st = r["signal_type"]
         if st not in by_type:
-            by_type[st] = {"total": 0, "sl": 0, "tp1": 0, "tp2": 0, "timeout": 0, "pnl": 0.0}
+            by_type[st] = {"total": 0, "sl": 0, "tp1": 0, "tp2": 0, "pnl": 0.0}
         by_type[st]["total"] += 1
         by_type[st][r["result"].lower()] = by_type[st].get(r["result"].lower(), 0) + 1
         by_type[st]["pnl"] = round(by_type[st]["pnl"] + (r["pnl"] or 0), 2)
@@ -970,7 +969,7 @@ def fetch_cfd_stats() -> dict:
     for r in rows:
         d = r["direction"]
         if d not in by_dir:
-            by_dir[d] = {"total": 0, "sl": 0, "tp1": 0, "tp2": 0, "timeout": 0, "pnl": 0.0}
+            by_dir[d] = {"total": 0, "sl": 0, "tp1": 0, "tp2": 0, "pnl": 0.0}
         by_dir[d]["total"] += 1
         by_dir[d][r["result"].lower()] = by_dir[d].get(r["result"].lower(), 0) + 1
         by_dir[d]["pnl"] = round(by_dir[d]["pnl"] + (r["pnl"] or 0), 2)
@@ -984,7 +983,6 @@ def fetch_cfd_stats() -> dict:
         "sl": sl_count,
         "tp1": tp1_count,
         "tp2": tp2_count,
-        "timeout": to_count,
         "wr": round(100 * (tp1_count + tp2_count) / total, 1) if total else 0.0,
         "total_pnl": round(total_pnl, 2),
         "by_type": by_type,
@@ -1027,8 +1025,6 @@ def check_cfd_trades(current_price: float, now_iso: str) -> list[dict]:
             result = "TP1"
         elif hit_sl:
             result = "SL"
-        elif elapsed_min >= 60:
-            result = "TIMEOUT"
 
         if result:
             update_cfd_result(t["id"], result, current_price, now_iso, hold_bars)

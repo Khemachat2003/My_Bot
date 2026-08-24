@@ -305,7 +305,7 @@ class MLFeedEngine:
         try:
             cfd_resolved = db.check_cfd_trades(last_price, now.isoformat())
             for cr in cfd_resolved:
-                icon = {"SL": "🔴", "TP1": "🟢", "TP2": "🟢", "TIMEOUT": "⏰"}.get(cr["result"], "❓")
+                icon = {"SL": "🔴", "TP1": "🟢", "TP2": "🟢"}.get(cr["result"], "❓")
                 msg = (
                     f"📊 [CFD PAPER] | {cr['signal_type']} #{cr['signal_id']}\n"
                     f"ทิศทาง: {cr['direction']} | ผลลัพธ์: {icon} {cr['result']}\n"
