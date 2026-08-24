@@ -562,6 +562,13 @@ def get_cfd_backtest(
     return bt.run(signal_type)
 
 
+@app.get("/api/cfd/paper")
+def get_cfd_paper(_auth=Depends(require_auth)):
+    """CFD Paper Trading — สถิติ realtime จาก signal ที่กำลังเทรดจริง"""
+    from backend.db import fetch_cfd_stats
+    return fetch_cfd_stats()
+
+
 # ── serve หน้าเว็บ dashboard ────────────────────────────────────────────────
 @app.get("/")
 def index(_auth=Depends(require_auth)):

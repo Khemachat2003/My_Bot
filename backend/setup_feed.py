@@ -258,6 +258,21 @@ class SetupFeedEngine:
             print(f"[SetupFeed:{self.symbol}] Error ในการสรุปผล PENDING signals:")
             traceback.print_exc()
 
+        try:
+            cfd_resolved = db.check_cfd_trades(self.last_price, now.isoformat())
+            for cr in cfd_resolved:
+                icon = {"SL": "🔴", "TP1": "🟢", "TP2": "🟢", "TIMEOUT": "⏰"}.get(cr["result"], "❓")
+                msg = (
+                    f"📊 [CFD PAPER] | {cr['signal_type']} #{cr['signal_id']}\n"
+                    f"ทิศทาง: {cr['direction']} | ผลลัพธ์: {icon} {cr['result']}\n"
+                    f"Entry: {cr['entry_price']:.2f} ➔ Exit: {cr['exit_price']:.2f}\n"
+                    f"P&L: ${cr.get('pnl', 0):+.2f} | Hold: {cr['hold_bars']} bars"
+                )
+                send_telegram(msg)
+                print(f"[SetupFeed:{self.symbol}] CFD #{cr['id']} → {cr['result']} P&L=${cr.get('pnl',0):+.2f}")
+        except Exception:
+            pass
+
     # 🛡️ Regime-Gate (shadow mode): คำนวณ gold 1h slope + DXY slope/RSI + agree
     # ตอนยิงสัญญาณ — ยังไม่บล็อก แค่บันทึกไว้วิเคราะห์ forward ว่า "เห็นพ้อง" ได้ winrate ≥60% จริง
     def _gate_features(self) -> tuple[float | None, float | None, float | None, int | None]:
@@ -420,6 +435,11 @@ class SetupFeedEngine:
                     )
                     print(f"[SetupFeed:{self.symbol}] บันทึกสัญญาณ ID #{new_sig_id} [{tf_label}] "
                           f"ลง setup_signals (รอวัดผลในอีก {hold_min} นาที)")
+                    db.insert_cfd_paper_trade(
+                        signal_id=new_sig_id, signal_type="SETUP",
+                        symbol=self.symbol, direction=result.direction,
+                        entry_price=self.last_price, entry_time=now.isoformat(),
+                    )
                 except Exception:
                     print(f"[SetupFeed:{self.symbol}] ไม่สามารถบันทึกสัญญาณลง DB ได้:")
                     traceback.print_exc()

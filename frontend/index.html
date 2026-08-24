@@ -922,6 +922,26 @@
       <!-- summary cards -->
       <div id="cfdSummary" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:14px;"></div>
 
+      <!-- ═══ CFD PAPER TRADING ═══ -->
+      <div class="j-section open" style="margin-top:14px;">
+        <div class="j-section-head" onclick="this.parentElement.classList.toggle('open')">
+          <h3>📊 CFD Paper Trading (Real-time)</h3><span class="j-arrow">▾</span>
+        </div>
+        <div class="j-section-body" style="padding:12px;">
+          <div id="cfdPaperSummary" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px;"></div>
+          <div class="tbl-wrap" style="margin-top:12px;">
+            <table id="cfdPaperTable">
+              <thead><tr>
+                <th>#</th><th>Time</th><th>System</th><th>Dir</th><th>Entry</th>
+                <th>SL</th><th>TP1</th><th>TP2</th><th>Result</th><th>Exit</th>
+                <th>Hold</th><th>P&L</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- TP1 vs TP2 comparison -->
       <div class="j-section" style="margin-top:14px;">
         <div class="j-section-head" onclick="this.parentElement.classList.toggle('open')">
@@ -2330,12 +2350,60 @@ function renderCFDTrades(d){
   </tr>`).join('');
 }
 
+async function refreshCFDPaper(){
+  try{
+    const d=await fetchJSON('/api/cfd/paper');
+    renderCFDPaperSummary(d);
+    renderCFDPaperTrades(d);
+  }catch(e){}
+}
+function renderCFDPaperSummary(d){
+  const el=document.getElementById('cfdPaperSummary');
+  if(!el) return;
+  const wrColor=d.wr>=54.95?'var(--green)':d.wr>=40?'var(--yellow)':'var(--red)';
+  const pnlColor=d.total_pnl>=0?'var(--green)':'var(--red)';
+  const items=[
+    {label:'Total Trades',val:d.total,color:'var(--text)'},
+    {label:'Open',val:d.open,color:'var(--cyan)'},
+    {label:'TP1 Hits',val:d.tp1,color:'var(--green)'},
+    {label:'TP2 Hits',val:d.tp2,color:'var(--green)'},
+    {label:'SL Hits',val:d.sl,color:'var(--red)'},
+    {label:'Timeout',val:d.timeout,color:'var(--yellow)'},
+    {label:'Win Rate',val:d.wr+'%',color:wrColor},
+    {label:'Total P&L',val:'$'+d.total_pnl.toFixed(2),color:pnlColor},
+  ];
+  el.innerHTML=items.map(i=>`<div class="j-card"><div class="j-card-label">${i.label}</div><div class="val" style="color:${i.color};font-size:15px;font-weight:800;">${i.val}</div></div>`).join('');
+}
+function renderCFDPaperTrades(d){
+  const tbody=document.querySelector('#cfdPaperTable tbody');
+  if(!tbody) return;
+  const trades=d.trades.slice(-50).reverse();
+  tbody.innerHTML=trades.map(t=>{
+    const rc=t.result==='TP1'||t.result==='TP2'?'var(--green)':t.result==='SL'?'var(--red)':'var(--yellow)';
+    const rcClass=t.result==='TP1'||t.result==='TP2'?'dir-call':t.result==='SL'?'dir-put':'';
+    return `<tr>
+      <td>${t.id}</td>
+      <td>${fmtHM(t.entry_time)}</td>
+      <td>${t.signal_type}</td>
+      <td class="${t.direction==='CALL'?'dir-call':'dir-put'}">${t.direction}</td>
+      <td>${t.entry_price?.toFixed(2)}</td>
+      <td>${t.sl_price?.toFixed(2)}</td>
+      <td>${t.tp1_price?.toFixed(2)}</td>
+      <td>${t.tp2_price?.toFixed(2)}</td>
+      <td style="color:${rc}">${t.result}</td>
+      <td>${t.exit_price?.toFixed(2)??'–'}</td>
+      <td>${t.hold_bars??'–'}</td>
+      <td style="color:${(t.pnl||0)>=0?'var(--green)':'var(--red)'}">${t.pnl!=null?'$'+t.pnl.toFixed(2):'–'}</td>
+    </tr>`;
+  }).join('');
+}
+
 async function refreshAll(){
   updateClock();
   await Promise.all([
     refreshOverview(),refreshPrice(),refreshGauges(),refreshHeaderSignals(),
     refreshMlTab(),refreshSetupTab(),refreshSetupMini(),refreshSetupAll(),
-    refreshJournalTab(),refreshJournalMoney(),
+    refreshJournalTab(),refreshJournalMoney(),refreshCFDPaper(),
   ]);
   await refreshWatchlist();
 }

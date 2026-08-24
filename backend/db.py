@@ -156,6 +156,33 @@ def init_db() -> None:
         CREATE INDEX IF NOT EXISTS idx_trade_journal_tf ON trade_journal(timeframe);
         CREATE INDEX IF NOT EXISTS idx_trade_journal_result ON trade_journal(result);
 
+        -- CFD PAPER TRADING (จำลอง SL/TP แบบ realtime alongside binary signals) ---
+        CREATE TABLE IF NOT EXISTS cfd_paper_trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            signal_id INTEGER,
+            signal_type TEXT NOT NULL,          -- SETUP / ML
+            symbol TEXT NOT NULL DEFAULT 'frxXAUUSD',
+            direction TEXT NOT NULL,            -- CALL / PUT
+            entry_price REAL NOT NULL,
+            entry_time TEXT NOT NULL,
+            sl_price REAL NOT NULL,
+            tp1_price REAL NOT NULL,
+            tp2_price REAL NOT NULL,
+            effective_entry REAL NOT NULL,
+            lot_size REAL NOT NULL,
+            pip_size REAL NOT NULL,
+            spread_pips REAL NOT NULL,
+            result TEXT DEFAULT 'OPEN',         -- OPEN / SL / TP1 / TP2 / TIMEOUT
+            exit_price REAL,
+            exit_time TEXT,
+            pnl REAL,
+            hold_bars INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_cfd_paper_time ON cfd_paper_trades(entry_time);
+        CREATE INDEX IF NOT EXISTS idx_cfd_paper_result ON cfd_paper_trades(result);
+        CREATE INDEX IF NOT EXISTS idx_cfd_paper_open ON cfd_paper_trades(result) WHERE result = 'OPEN';
+
         -- MODEL REGISTRY (ติดตาม version โมเดล ใช้ A/B เปรียบเทียบ) -----------
         CREATE TABLE IF NOT EXISTS model_registry (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -814,6 +841,201 @@ def compute_journal_stats(payout: float = 0.82) -> dict:
         "breakeven": breakeven, "total_pnl": round(total_pnl, 4),
         "equity": equity[-200:], "daily": daily_list[:30],
     }
+
+
+# ─── CFD PAPER TRADING ───────────────────────────────────────────────────────
+
+CFD_SL_PIPS = 20
+CFD_TP1_PIPS = 40
+CFD_TP2_PIPS = 60
+CFD_SPREAD_PIPS = 1.5
+CFD_PIP_SIZE = 1.0
+CFD_PIP_VALUE = 100.0
+CFD_CAPITAL = 5000.0
+CFD_RISK_PCT = 0.01
+
+def _cfd_lot_size() -> float:
+    risk = CFD_CAPITAL * CFD_RISK_PCT
+    return round(risk / (CFD_SL_PIPS * CFD_PIP_VALUE), 3)
+
+
+def insert_cfd_paper_trade(signal_id: int, signal_type: str, symbol: str,
+                           direction: str, entry_price: float,
+                           entry_time: str) -> int | None:
+    """สร้าง CFD paper trade เมื่อ signal ใหม่ถูกสร้าง"""
+    ps = CFD_PIP_SIZE
+    spread = CFD_SPREAD_PIPS * ps
+    eff = entry_price + spread / 2 if direction == "CALL" else entry_price - spread / 2
+    lot = _cfd_lot_size()
+
+    if direction == "CALL":
+        sl  = eff - CFD_SL_PIPS * ps
+        tp1 = eff + CFD_TP1_PIPS * ps
+        tp2 = eff + CFD_TP2_PIPS * ps
+    else:
+        sl  = eff + CFD_SL_PIPS * ps
+        tp1 = eff - CFD_TP1_PIPS * ps
+        tp2 = eff - CFD_TP2_PIPS * ps
+
+    conn = get_conn()
+    cur = conn.execute(
+        """INSERT INTO cfd_paper_trades
+           (signal_id, signal_type, symbol, direction, entry_price, entry_time,
+            sl_price, tp1_price, tp2_price, effective_entry, lot_size,
+            pip_size, spread_pips, result)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN')""",
+        (signal_id, signal_type, symbol, direction, entry_price, entry_time,
+         round(sl, 5), round(tp1, 5), round(tp2, 5), round(eff, 5),
+         lot, ps, CFD_SPREAD_PIPS),
+    )
+    conn.commit()
+    new_id = cur.lastrowid
+    conn.close()
+    return new_id
+
+
+def fetch_open_cfd_trades() -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM cfd_paper_trades WHERE result = 'OPEN' ORDER BY entry_time ASC"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def update_cfd_result(cfd_id: int, result: str, exit_price: float,
+                      exit_time: str, hold_bars: int) -> None:
+    """บันทึกผล CFD trade: SL / TP1 / TP2 / TIMEOUT"""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT direction, effective_entry, lot_size, pip_size, spread_pips FROM cfd_paper_trades WHERE id = ?",
+        (cfd_id,)
+    ).fetchone()
+    if row is None:
+        conn.close()
+        return
+
+    ps = row["pip_size"]
+    lot = row["lot_size"]
+    spread_cost = row["spread_pips"] * ps * CFD_PIP_VALUE * lot
+    risk_amt = CFD_SL_PIPS * CFD_PIP_VALUE * lot
+
+    if result == "TP1":
+        pnl = CFD_TP1_PIPS * CFD_PIP_VALUE * lot - spread_cost
+    elif result == "TP2":
+        pnl = CFD_TP2_PIPS * CFD_PIP_VALUE * lot - spread_cost
+    else:
+        pnl = -risk_amt - spread_cost
+
+    conn.execute(
+        """UPDATE cfd_paper_trades
+           SET result = ?, exit_price = ?, exit_time = ?, hold_bars = ?, pnl = ?
+           WHERE id = ?""",
+        (result, round(exit_price, 5), exit_time, hold_bars, round(pnl, 2), cfd_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def fetch_cfd_stats() -> dict:
+    """สถิติ CFD paper trading ทั้งหมด"""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM cfd_paper_trades WHERE result != 'OPEN' ORDER BY exit_time ASC"
+    ).fetchall()
+    open_rows = conn.execute(
+        "SELECT * FROM cfd_paper_trades WHERE result = 'OPEN' ORDER BY entry_time ASC"
+    ).fetchall()
+    conn.close()
+    rows = [dict(r) for r in rows]
+    open_rows = [dict(r) for r in open_rows]
+
+    total = len(rows)
+    sl_count = sum(1 for r in rows if r["result"] == "SL")
+    tp1_count = sum(1 for r in rows if r["result"] == "TP1")
+    tp2_count = sum(1 for r in rows if r["result"] == "TP2")
+    to_count = sum(1 for r in rows if r["result"] == "TIMEOUT")
+    total_pnl = sum(r["pnl"] or 0 for r in rows)
+
+    by_type = {}
+    for r in rows:
+        st = r["signal_type"]
+        if st not in by_type:
+            by_type[st] = {"total": 0, "sl": 0, "tp1": 0, "tp2": 0, "timeout": 0, "pnl": 0.0}
+        by_type[st]["total"] += 1
+        by_type[st][r["result"].lower()] = by_type[st].get(r["result"].lower(), 0) + 1
+        by_type[st]["pnl"] = round(by_type[st]["pnl"] + (r["pnl"] or 0), 2)
+
+    by_dir = {}
+    for r in rows:
+        d = r["direction"]
+        if d not in by_dir:
+            by_dir[d] = {"total": 0, "sl": 0, "tp1": 0, "tp2": 0, "timeout": 0, "pnl": 0.0}
+        by_dir[d]["total"] += 1
+        by_dir[d][r["result"].lower()] = by_dir[d].get(r["result"].lower(), 0) + 1
+        by_dir[d]["pnl"] = round(by_dir[d]["pnl"] + (r["pnl"] or 0), 2)
+
+    for d in [*by_type.values(), *by_dir.values()]:
+        d["wr"] = round(100 * (d.get("tp1", 0) + d.get("tp2", 0)) / d["total"], 1) if d["total"] else 0.0
+
+    return {
+        "total": total,
+        "open": len(open_rows),
+        "sl": sl_count,
+        "tp1": tp1_count,
+        "tp2": tp2_count,
+        "timeout": to_count,
+        "wr": round(100 * (tp1_count + tp2_count) / total, 1) if total else 0.0,
+        "total_pnl": round(total_pnl, 2),
+        "by_type": by_type,
+        "by_direction": by_dir,
+        "trades": rows[-100:],
+    }
+
+
+def check_cfd_trades(current_price: float, now_iso: str) -> list[dict]:
+    """ตรวจ trades ที่ OPEN ทั้งหมด — คืน list ของ trades ที่เพิ่ง resolve"""
+    open_trades = fetch_open_cfd_trades()
+    resolved = []
+    for t in open_trades:
+        d = t["direction"]
+        sl = t["sl_price"]
+        tp1 = t["tp1_price"]
+        tp2 = t["tp2_price"]
+        entry_t = pd.Timestamp(t["entry_time"])
+        now_t = pd.Timestamp(now_iso)
+        hold_bars = int((now_t - entry_t).total_seconds() / 60)
+
+        sig_time = pd.Timestamp(t["entry_time"])
+        elapsed_min = (now_t - sig_time).total_seconds() / 60.0
+
+        if d == "CALL":
+            hit_sl = current_price <= sl
+            hit_tp1 = current_price >= tp1
+            hit_tp2 = current_price >= tp2
+        else:
+            hit_sl = current_price >= sl
+            hit_tp1 = current_price <= tp1
+            hit_tp2 = current_price <= tp2
+
+        result = None
+        if hit_sl and (hit_tp1 or hit_tp2):
+            result = "SL"
+        elif hit_tp2:
+            result = "TP2"
+        elif hit_tp1:
+            result = "TP1"
+        elif hit_sl:
+            result = "SL"
+        elif elapsed_min >= 60:
+            result = "TIMEOUT"
+
+        if result:
+            update_cfd_result(t["id"], result, current_price, now_iso, hold_bars)
+            resolved.append({**t, "result": result, "exit_price": current_price,
+                             "exit_time": now_iso, "hold_bars": hold_bars})
+
+    return resolved
 
 
 # ─── MODEL REGISTRY ──────────────────────────────────────────────────────────

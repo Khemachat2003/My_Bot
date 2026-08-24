@@ -302,6 +302,21 @@ class MLFeedEngine:
             print("[MLFeed] Error ในการสรุปผล PENDING signals:")
             traceback.print_exc()
 
+        try:
+            cfd_resolved = db.check_cfd_trades(last_price, now.isoformat())
+            for cr in cfd_resolved:
+                icon = {"SL": "🔴", "TP1": "🟢", "TP2": "🟢", "TIMEOUT": "⏰"}.get(cr["result"], "❓")
+                msg = (
+                    f"📊 [CFD PAPER] | {cr['signal_type']} #{cr['signal_id']}\n"
+                    f"ทิศทาง: {cr['direction']} | ผลลัพธ์: {icon} {cr['result']}\n"
+                    f"Entry: {cr['entry_price']:.2f} ➔ Exit: {cr['exit_price']:.2f}\n"
+                    f"P&L: ${cr.get('pnl', 0):+.2f} | Hold: {cr['hold_bars']} bars"
+                )
+                send_telegram(msg)
+                print(f"[MLFeed] CFD #{cr['id']} → {cr['result']} P&L=${cr.get('pnl',0):+.2f}")
+        except Exception:
+            pass
+
     def _notify_symbol_switch(self, old_symbol: str, new_symbol: str):
         """แจ้งเมื่อระบบสลับไปใช้สัญลักษณ์สำรอง (เช่น เสาร์-อาทิตย์)"""
         self._symbol_switch_notified = True
@@ -402,6 +417,11 @@ class MLFeedEngine:
                         )
                         print(f"[MLFeed] บันทึกสัญญาณ ID #{new_sig_id} [{cfg['label']}] ลง ml_signals "
                               f"(รอวัดผลในอีก {hold_min} นาที)")
+                        db.insert_cfd_paper_trade(
+                            signal_id=new_sig_id, signal_type="ML",
+                            symbol=symbol, direction=res["signal"],
+                            entry_price=last_price, entry_time=now.isoformat(),
+                        )
                     except Exception:
                         print("[MLFeed] ไม่สามารถบันทึกสัญญาณลง DB ได้:")
                         traceback.print_exc()
