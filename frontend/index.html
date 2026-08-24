@@ -98,6 +98,7 @@
   .nav-btn[data-tab=setup] .ndot{background:var(--blue);}
   .nav-btn[data-tab=journal] .ndot{background:var(--purple);}
   .nav-btn[data-tab=overview] .ndot{background:var(--cyan);}
+  .nav-btn[data-tab=cfd] .ndot{background:var(--yellow);}
   .nav-btn[data-tab=pro] .ndot{background:var(--yellow);}
 
   /* ═══ MAIN ═══ */
@@ -528,6 +529,7 @@
   <button class="nav-btn" data-tab="ml"><span class="ndot"></span>ML สัญญาณ</button>
   <button class="nav-btn" data-tab="setup"><span class="ndot"></span>Rule-Based</button>
   <button class="nav-btn" data-tab="journal"><span class="ndot"></span>Journal / P&amp;L</button>
+  <button class="nav-btn" data-tab="cfd"><span class="ndot"></span>CFD Backtest</button>
 </div>
 
 <!-- ═══════════ MAIN ═══════════ -->
@@ -884,6 +886,73 @@
         <div class="tbl-wrap">
           <table id="modelTable">
             <thead><tr><th>Key</th><th>Version</th><th>Horizon</th><th>n_rows</th><th>AUC</th><th>Conf</th><th>Feature Set</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ CFD BACKTEST TAB ═══════════ -->
+  <section id="tab-cfd" style="display:none;">
+    <div class="j-col">
+      <!-- params bar -->
+      <div class="j-section-head open" onclick="this.parentElement.classList.toggle('open')">
+        <h3>⚙️ CFD Parameters</h3><span class="j-arrow">▾</span>
+      </div>
+      <div class="j-section-body" style="padding:12px;">
+        <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center; font-size:11px;">
+          <label>ทุน $<input id="cfdCapital" type="number" value="5000" min="100" max="100000" style="width:70px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+          <label>SL (pip) <input id="cfdSL" type="number" value="20" min="5" max="100" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+          <label>TP1 (pip) <input id="cfdTP1" type="number" value="40" min="10" max="200" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+          <label>TP2 (pip) <input id="cfdTP2" type="number" value="60" min="10" max="300" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+          <label>Spread <input id="cfdSpread" type="number" value="1.5" min="0" max="10" step="0.1" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+          <label>Risk % <input id="cfdRisk" type="number" value="1" min="0.1" max="10" step="0.1" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+          <select id="cfdSignalType" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 8px;font-size:11px;">
+            <option value="ALL">All Systems</option>
+            <option value="SETUP">Rule-Based Only</option>
+            <option value="ML">ML Only</option>
+          </select>
+          <button onclick="runCFDBacktest()" style="background:var(--yellow);color:#000;border:none;border-radius:4px;padding:4px 14px;font-size:11px;font-weight:700;cursor:pointer;">Run Backtest</button>
+        </div>
+      </div>
+
+      <!-- summary cards -->
+      <div id="cfdSummary" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:14px;"></div>
+
+      <!-- TP1 vs TP2 comparison -->
+      <div class="j-section-head open" onclick="this.parentElement.classList.toggle('open')" style="margin-top:14px;">
+        <h3>📊 TP1 vs TP2 Comparison</h3><span class="j-arrow">▾</span>
+      </div>
+      <div class="j-section-body">
+        <div class="tbl-wrap">
+          <table id="cfdCompareTable">
+            <thead><tr>
+              <th>System</th><th>Direction</th>
+              <th colspan="3">TP1 (R:R 1:2)</th>
+              <th colspan="3">TP2 (R:R 1:3)</th>
+            </tr>
+            <tr>
+              <th></th><th></th>
+              <th>Trades</th><th>WR%</th><th>P&L</th>
+              <th>Trades</th><th>WR%</th><th>P&L</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- trade list -->
+      <div class="j-section-head" onclick="this.parentElement.classList.toggle('open')" style="margin-top:14px;">
+        <h3>📋 Trade List</h3><span class="j-arrow">▾</span>
+      </div>
+      <div class="j-section-body">
+        <div class="tbl-wrap">
+          <table id="cfdTradeTable">
+            <thead><tr>
+              <th>#</th><th>System</th><th>Dir</th><th>Entry</th>
+              <th>TP1</th><th>TP2</th><th>P&L (TP1)</th><th>P&L (TP2)</th>
+            </tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -2176,6 +2245,84 @@ document.getElementById('btnExport').addEventListener('click', ()=>{
   const qs=q.toString();
   window.location.href='/api/journal/export'+(qs?'?'+qs:'');
 });
+
+async function runCFDBacktest(){
+  const cap=document.getElementById('cfdCapital').value;
+  const sl=document.getElementById('cfdSL').value;
+  const tp1=document.getElementById('cfdTP1').value;
+  const tp2=document.getElementById('cfdTP2').value;
+  const spread=document.getElementById('cfdSpread').value;
+  const risk=document.getElementById('cfdRisk').value/100;
+  const stype=document.getElementById('cfdSignalType').value;
+  const q=new URLSearchParams({capital:cap,sl_pips:sl,tp1_pips:tp1,tp2_pips:tp2,
+    spread_pips:spread,risk_pct:risk,signal_type:stype});
+  try{
+    const s=document.getElementById('cfdSummary');
+    s.innerHTML='<div style="color:var(--muted);font-size:11px;">กำลังคำนวณ...</div>';
+    const data=await fetchJSON('/api/cfd/backtest?'+q);
+    renderCFDSummary(data);
+    renderCFDCompare(data);
+    renderCFDTrades(data);
+  }catch(e){
+    document.getElementById('cfdSummary').innerHTML='<div style="color:var(--red);">Error: '+e.message+'</div>';
+  }
+}
+function renderCFDSummary(d){
+  const el=document.getElementById('cfdSummary');
+  const p=d.params;
+  const items=[
+    {label:'Signals',val:d.total,color:'var(--text)'},
+    {label:'Lot Size',val:p.lot_size,color:'var(--cyan)'},
+    {label:'Risk/Trade',val:'$'+p.risk_per_trade,color:'var(--yellow)'},
+    {label:'TP1 WR',val:d.tp1.wr+'%',color:d.tp1.wr>=54.95?'var(--green)':'var(--red)'},
+    {label:'TP1 P&L',val:'$'+d.tp1.pnl.toFixed(2),color:d.tp1.pnl>=0?'var(--green)':'var(--red)'},
+    {label:'TP2 WR',val:d.tp2.wr+'%',color:d.tp2.wr>=40?'var(--green)':'var(--red)'},
+    {label:'TP2 P&L',val:'$'+d.tp2.pnl.toFixed(2),color:d.tp2.pnl>=0?'var(--green)':'var(--red)'},
+  ];
+  el.innerHTML=items.map(i=>`<div class="j-card"><div class="j-card-label">${i.label}</div><div class="val" style="color:${i.color};font-size:16px;font-weight:800;">${i.val}</div></div>`).join('');
+}
+function renderCFDCompare(d){
+  const tbody=document.querySelector('#cfdCompareTable tbody');
+  let html='';
+  const all=['SETUP','ML'];
+  for(const sys of all){
+    const sd=d.by_type[sys]; if(!sd) continue;
+    for(const dir of ['CALL','PUT']){
+      const key=sys+'_'+dir;
+      const td=d.by_type_dir[key]; if(!td) continue;
+      const t1=td.tp1,t2=td.tp2;
+      html+=`<tr>
+        <td>${sys}</td><td class="${dir==='CALL'?'dir-call':'dir-put'}">${dir}</td>
+        <td>${t1.total}</td><td style="color:${t1.wr>=54.95?'var(--green)':'var(--red)'}">${t1.wr}%</td>
+        <td style="color:${t1.pnl>=0?'var(--green)':'var(--red)'}">$${t1.pnl.toFixed(2)}</td>
+        <td>${t2.total}</td><td style="color:${t2.wr>=40?'var(--green)':'var(--red)'}">${t2.wr}%</td>
+        <td style="color:${t2.pnl>=0?'var(--green)':'var(--red)'}">$${t2.pnl.toFixed(2)}</td>
+      </tr>`;
+    }
+  }
+  // total rows
+  html+=`<tr style="border-top:2px solid var(--border);font-weight:700;">
+    <td colspan="2">TOTAL</td>
+    <td>${d.tp1.total}</td><td style="color:${d.tp1.wr>=54.95?'var(--green)':'var(--red)'}">${d.tp1.wr}%</td>
+    <td style="color:${d.tp1.pnl>=0?'var(--green)':'var(--red)'}">$${d.tp1.pnl.toFixed(2)}</td>
+    <td>${d.tp2.total}</td><td style="color:${d.tp2.wr>=40?'var(--green)':'var(--red)'}">${d.tp2.wr}%</td>
+    <td style="color:${d.tp2.pnl>=0?'var(--green)':'var(--red)'}">$${d.tp2.pnl.toFixed(2)}</td>
+  </tr>`;
+  tbody.innerHTML=html;
+}
+function renderCFDTrades(d){
+  const tbody=document.querySelector('#cfdTradeTable tbody');
+  const trades=d.trades.slice(-100).reverse();
+  tbody.innerHTML=trades.map((t,i)=>`<tr>
+    <td>${t.id}</td><td>${t.sys}</td>
+    <td class="${t.dir==='CALL'?'dir-call':'dir-put'}">${t.dir}</td>
+    <td>${t.entry}</td>
+    <td style="color:${t.tp1==='WIN'?'var(--green)':'var(--red)'}">${t.tp1}</td>
+    <td style="color:${t.tp2==='WIN'?'var(--green)':'var(--red)'}">${t.tp2}</td>
+    <td style="color:${t.pnl1>=0?'var(--green)':'var(--red)'}">$${t.pnl1.toFixed(2)}</td>
+    <td style="color:${t.pnl2>=0?'var(--green)':'var(--red)'}">$${t.pnl2.toFixed(2)}</td>
+  </tr>`).join('');
+}
 
 async function refreshAll(){
   updateClock();

@@ -542,6 +542,26 @@ def get_models(_auth=Depends(require_auth)):
     return db.fetch_model_registry(limit=50)
 
 
+@app.get("/api/cfd/backtest")
+def get_cfd_backtest(
+    signal_type: str = Query("ALL", pattern="^(ALL|ML|SETUP)$"),
+    capital: float = Query(5000, ge=100, le=100000),
+    sl_pips: int = Query(20, ge=5, le=100),
+    tp1_pips: int = Query(40, ge=10, le=200),
+    tp2_pips: int = Query(60, ge=10, le=300),
+    spread_pips: float = Query(1.5, ge=0, le=10),
+    risk_pct: float = Query(0.01, ge=0.001, le=0.1),
+    _auth=Depends(require_auth),
+):
+    """CFD Backtest — จำลองเทรด CFD ด้วย signal เก่า + price data"""
+    from backend.cfd_backtest import CFDBacktest
+    bt = CFDBacktest(
+        capital=capital, sl_pips=sl_pips, tp1_pips=tp1_pips, tp2_pips=tp2_pips,
+        spread_pips=spread_pips, risk_pct=risk_pct,
+    )
+    return bt.run(signal_type)
+
+
 # ── serve หน้าเว็บ dashboard ────────────────────────────────────────────────
 @app.get("/")
 def index(_auth=Depends(require_auth)):
