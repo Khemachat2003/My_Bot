@@ -337,6 +337,39 @@ def get_signals(limit: int = Query(100, ge=1, le=1000),
     return db.fetch_recent_setup_signals(limit=limit, symbol=symbol)
 
 
+@app.get("/api/signals/markers")
+def get_signal_markers(symbol: str = Query("frxXAUUSD"),
+                       limit: int = Query(50, ge=1, le=200),
+                       _auth=Depends(require_auth)):
+    """ส่งสัญญาณทั้ง SETUP + ML สำหรับแสดง entry markers บนกราฟ"""
+    setup_rows = db.fetch_recent_setup_signals(limit=limit, symbol=symbol)
+    ml_rows = db.fetch_recent_ml_signals(limit=limit)
+    markers = []
+    for r in setup_rows:
+        markers.append({
+            "type": "SETUP",
+            "ts": r.get("signal_time"),
+            "price": r.get("entry_price"),
+            "direction": r.get("direction"),
+            "result": r.get("result"),
+            "importance": r.get("importance"),
+            "touch_case": (json.loads(r.get("conditions_log_json") or "{}")).get("_touch_case", ""),
+            "id": r.get("id"),
+        })
+    for r in ml_rows:
+        markers.append({
+            "type": "ML",
+            "ts": r.get("signal_time"),
+            "price": r.get("entry_price"),
+            "direction": r.get("direction"),
+            "result": r.get("result"),
+            "confidence": r.get("confidence"),
+            "id": r.get("id"),
+        })
+    markers.sort(key=lambda x: x.get("ts") or "", reverse=True)
+    return markers[:limit]
+
+
 @app.get("/api/stats")
 def get_stats(payout: float = Query(0.82, ge=0.0, le=5.0), _auth=Depends(require_auth)):
     return db.compute_setup_stats(payout=payout)

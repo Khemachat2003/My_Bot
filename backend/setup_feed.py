@@ -197,12 +197,86 @@ class SetupFeedEngine:
         )
         db.insert_tick(now.isoformat(), self.last_price)
 
+        # 4.5 🚨 TICK_TOUCH: ตรวจ real-time ว่าราคาแตะ EMA200 ณ ขณะนี้ (ไม่ต้องรอจบแท่ง)
+        self._check_tick_touch(now)
+
         # 4. ถ้ามีแท่งใหม่จริงๆ (timestamp เปลี่ยน) → ประเมิน checklist + สรุปผลสัญญาณ
         last_ts = pd.Timestamp(self.buffer.index[-1])
         if self._last_processed_ts is None or last_ts != self._last_processed_ts:
             self._last_processed_ts = last_ts
             self._check_setup_scorer(now)
             self._resolve_pending_signals(now)
+
+    def _check_tick_touch(self, now: pd.Timestamp):
+        """ตรวจ real-time ว่าราคาปัจจุบันแตะ EMA200 หรือไม่
+        ถ้าแตะ → FIRE Importance 1 ทันที (TICK_TOUCH)
+        ป้องกันซ้ำ: ไม่ FIRE ถ้ามี signal เดียวกันภายใน 5 นาที
+        """
+        if len(self.buffer) < 210:
+            return
+        try:
+            close = self.buffer["close"]
+            ema200 = close.ewm(span=200, adjust=False).mean()
+            e200 = float(ema200.iloc[-1])
+            if e200 <= 0:
+                return
+            dist = abs(self.last_price - e200) / e200 * 100.0
+            if dist > 0.05:
+                return
+
+            # ป้องกันซ้ำ: ดู signal ล่าสุดที่มี importance=1
+            recent = db.fetch_recent_setup_signals(limit=1, symbol=self.symbol)
+            if recent and recent[0].get("importance") == 1:
+                sig_time = pd.to_datetime(recent[0]["signal_time"])
+                if (now - sig_time).total_seconds() < 300:
+                    return
+
+            if self.last_price >= e200:
+                direction, bias = "CALL", "EMA200_TICK_BOUNCE"
+            else:
+                direction, bias = "PUT", "EMA200_TICK_BOUNCE"
+
+            hold_min = 30
+            target_time = (now + pd.Timedelta(minutes=hold_min)).isoformat()
+            from backend.setup_scorer import score_setup
+            result = score_setup(self.buffer, timeframe="TICK", target_hold_minutes=hold_min)
+            new_sig_id = db.insert_setup_signal(
+                signal_time=now.isoformat(),
+                entry_price=self.last_price,
+                direction=direction,
+                confidence=1.0,
+                horizon_min=hold_min,
+                target_time=target_time,
+                timeframe="TICK",
+                score=0,
+                total=0,
+                tier="FIRE",
+                symbol=self.symbol,
+                ema200_price=e200,
+                dist200_pct=round(dist, 4),
+                near_ema200=True,
+                crossed_ema100=False,
+                importance=1,
+                conditions_passed=result.conditions_passed,
+                conditions_log_json=json.dumps(result.conditions_log, ensure_ascii=False, default=str),
+            )
+            db.insert_cfd_paper_trade(
+                signal_id=new_sig_id, signal_type="SETUP",
+                symbol=self.symbol, direction=direction,
+                entry_price=self.last_price, entry_time=now.isoformat(),
+            )
+            sym_text = symbol_label(self.symbol)
+            msg = (
+                f"⚡ [TICK TOUCH] Importance 1\n"
+                f"Symbol: {sym_text} | ราคา {self.last_price:.5f} แตะ EMA200 ({e200:.5f}) ณ ขณะนี้\n"
+                f"Direction: {direction} | Hold: {hold_min}m\n"
+                f"กรุณาสังเกตว่าเข้าจุดไหน winrate ดีสุด"
+            )
+            send_telegram(msg)
+            print(f"[SetupFeed:{self.symbol}] 🚨 TICK_TOUCH → EMA200 = {e200:.5f}, "
+                  f"price = {self.last_price:.5f}, dist = {dist:.4f}%")
+        except Exception:
+            pass
 
     # 🏁 ตรวจสัญญาณ PENDING ที่ครบเวลาถือออเดอร์ → ประเมิน WIN/LOSE
     def _resolve_pending_signals(self, now: pd.Timestamp):
@@ -430,8 +504,10 @@ class SetupFeedEngine:
                         gate_agree=gate_agree,
                         importance=result.importance,
                         conditions_passed=result.conditions_passed,
-                        conditions_log_json=json.dumps(
-                            result.conditions_log, ensure_ascii=False, default=str),
+                        conditions_log_json=json.dumps({
+                            "_touch_case": result.touch_case,
+                            **result.conditions_log,
+                        }, ensure_ascii=False, default=str),
                     )
                     print(f"[SetupFeed:{self.symbol}] บันทึกสัญญาณ ID #{new_sig_id} [{tf_label}] "
                           f"ลง setup_signals (รอวัดผลในอีก {hold_min} นาที)")
@@ -452,15 +528,38 @@ class SetupFeedEngine:
                 passed_names = [k.replace("c","").replace("_"," ") 
                                 for k, v in result.conditions_log.items() if v.get("pass")]
                 checklist_txt = ", ".join(passed_names) if passed_names else "none"
+
+                # แสดง checklist values ทั้งหมด (pass + fail)
+                all_checks = []
+                for k, v in result.conditions_log.items():
+                    label = k.replace("c","").replace("_"," ")
+                    val = "✅" if v.get("pass") else "❌"
+                    note = (v.get("note") or "")[:40]
+                    all_checks.append(f"{val} {label}: {note}")
+                all_checks_txt = "\n".join(all_checks)
+
+                touch_label = ""
+                if result.touch_case:
+                    touch_labels = {
+                        "TICK_TOUCH": "⏱ TICK_TOUCH (ราคากดแตะ ณ ขณะนี้)",
+                        "WICK_TOUCH": "📉 WICK_TOUCH (wick แตะ, แท่งปิดห่าง)",
+                        "CLOSE_TOUCH": "📍 CLOSE_TOUCH (ปิดตรง EMA200)",
+                    }
+                    touch_label = touch_labels.get(result.touch_case, result.touch_case)
+
+                imp_label = f"Importance {result.importance}" if result.importance else ""
                 msg_trigger = (
-                    f"🔵 [RULE-BASED ALERT]\n"
+                    f"🔵 [RULE-BASED ALERT] {imp_label}\n"
                     f"Symbol: {sym_text} | TF: {tf_label} | Tier: {result.tier}\n"
                     f"Direction: {result.direction} | Entry: {self.last_price:.5f}\n"
+                    f"EMA200: {result.ema200_price:.5f} | Dist: {result.dist200_pct:.3f}%\n"
                     f"Score: {result.score}/{result.max_score} | Hold: {hold_min}m\n"
-                    f"Checklist PASS ({result.conditions_passed}/10): {checklist_txt}\n"
-                    f"Regime-Gate (shadow): {gate_txt}\n"
+                    f"{'-touch_case: ' + touch_label if touch_label else ''}\n"
+                    f"Checklist ({result.conditions_passed}/10): {checklist_txt}\n"
+                    f"Regime-Gate: {gate_txt}\n"
                     f"เหตุผล: {result.entry_trigger_note}\n"
-                    f"เวลาเข้า: {now.strftime('%H:%M:%S')} UTC"
+                    f"เวลา: {now.strftime('%H:%M:%S')} UTC\n"
+                    f"─── รายการเงื่อนไข ───\n{all_checks_txt}"
                 )
                 ok = send_telegram(msg_trigger)
                 print(f"[SetupFeed:{self.symbol}] Telegram ALERT [{tf_label}] "

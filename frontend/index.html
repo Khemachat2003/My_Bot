@@ -1338,6 +1338,37 @@ function drawCandles(canvas, data){
     ctx.fillRect(x-bw/2,top,bw,hgt);
   });
 
+  // ── Signal markers: แสดงจุดเข้า ML + SETUP บนกราฟ ──
+  if(window._signalMarkers){
+    const tsMap={};
+    view.forEach((d,i)=>{ tsMap[d.t]=i; });
+    window._signalMarkers.forEach(m=>{
+      if(!m.ts||!m.price||!m.direction) return;
+      let idx=-1;
+      for(const [t,i] of Object.entries(tsMap)){
+        if(Math.abs(new Date(t)-new Date(m.ts))<300000){ idx=parseInt(i); break; }
+      }
+      if(idx<0) return;
+      const x=pxForData(idx+start), y=py(m.price);
+      const isWin=m.result==='WIN', isLose=m.result==='LOSE';
+      const color=m.type==='ML'?(isWin?'#22c98a':isLose?'#f6465d':'#38e1c4'):(isWin?'#22c98a':isLose?'#f6465d':'#f7b847');
+      if(m.direction==='CALL'){
+        ctx.fillStyle=color;
+        ctx.beginPath(); ctx.moveTo(x,y+4); ctx.lineTo(x-5,y+12); ctx.lineTo(x+5,y+12); ctx.closePath(); ctx.fill();
+      } else {
+        ctx.fillStyle=color;
+        ctx.beginPath(); ctx.moveTo(x,y-4); ctx.lineTo(x-5,y-12); ctx.lineTo(x+5,y-12); ctx.closePath(); ctx.fill();
+      }
+      if(m.type==='ML'){
+        ctx.fillStyle=color; ctx.font='bold 7px Cascadia Mono,monospace'; ctx.textAlign='center';
+        ctx.fillText('ML',x,y-16); ctx.textAlign='left';
+      } else if(m.importance===1){
+        ctx.fillStyle='#ff4444'; ctx.font='bold 7px Cascadia Mono,monospace'; ctx.textAlign='center';
+        ctx.fillText('IMP1',x,y-16); ctx.textAlign='left';
+      }
+    });
+  }
+
   // ── last price: เส้น + tag pill ──
   const lp=view[view.length-1].c, lc=lp>=view[view.length-1].o?'#22c98a':'#f6465d';
   ctx.strokeStyle=lc; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(padL,py(lp)); ctx.lineTo(W-padR,py(lp)); ctx.stroke(); ctx.setLineDash([]);
@@ -1678,6 +1709,11 @@ async function refreshPrice(){
     if(!prices||!prices.length) return;
     const el=document.getElementById('candleChart');
     drawCandles(el,prices);
+    try{
+      const markers=await fetchJSON('/api/signals/markers?symbol='+encodeURIComponent(sym)+'&limit=50');
+      window._signalMarkers=markers;
+      drawCandles(el,prices);
+    }catch(e){}
     const last=prices[prices.length-1], prev=prices[prices.length-2];
     const chg=prev?last.c-prev.c:0;
     const chgPct=prev?chg/prev.c*100:0;

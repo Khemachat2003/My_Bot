@@ -77,6 +77,7 @@ class SetupResult:
     conditions_passed: int = 0   # How many of 10 conditions passed
     conditions_total: int = 10
     conditions_log: dict = field(default_factory=dict)  # Full log of all 10 conditions
+    touch_case: str = ""         # TICK_TOUCH / WICK_TOUCH / CLOSE_TOUCH / ""
 
 
 # ── Indicators ────────────────────────────────────────────────────────────────
@@ -363,27 +364,30 @@ def _cond10_mtf_trend(df: pd.DataFrame, direction: str) -> dict:
 # EMA200 TOUCH Detection
 # ══════════════════════════════════════════════════════════════════════════════
 def _ema200_touch检测(df: pd.DataFrame, ema200: pd.Series,
-                       lookback: int = 20) -> tuple[bool, str]:
+                       lookback: int = 20) -> tuple[bool, str, str]:
     """ตรวจว่าแท่งล่าสุด (k=0) มี wick แตะ EMA200 หรือไม่
-    ใช้ lookback=1 เท่านั้น — ต้องเป็นแท่งปัจจุบันเท่านั้น
-    แท่งเก่าไม่นับเพราะราคา move away ไปแล้ว
+    Returns: (touched, note, touch_case)
+    touch_case: WICK_TOUCH / CLOSE_TOUCH / ""
     """
     n = len(df)
     idx = n - 1
     if idx < 0:
-        return False, "ไม่มีข้อมูล"
+        return False, "ไม่มีข้อมูล", ""
 
     row = df.iloc[idx]
     candle_high = float(row["high"])
     candle_low = float(row["low"])
+    candle_close = float(row["close"])
     e_at_bar = float(ema200.iloc[idx]) if idx < len(ema200) else float(ema200.iloc[-1])
     e200 = float(ema200.iloc[-1])
-    dist_now = abs(float(df["close"].iloc[-1]) - e200) / e200 * 100.0
+    dist_now = abs(candle_close - e200) / e200 * 100.0
 
     if candle_low <= e_at_bar <= candle_high:
-        return True, f"ราคาแตะ EMA200 แล้ว! (แท่งล่าสุด wick ผ่าน {e200:.2f}, ห่าง {dist_now:.2f}%)"
+        if abs(candle_close - e200) / e200 * 100.0 <= 0.02:
+            return True, f"ปิดตรง EMA200 ({e200:.2f})", "CLOSE_TOUCH"
+        return True, f"wick แตะ EMA200 ({e200:.2f}, ห่าง {dist_now:.2f}%)", "WICK_TOUCH"
 
-    return False, f"แท่งล่าสุดไม่ได้แตะ EMA200 ({e200:.2f})"
+    return False, f"แท่งล่าสุดไม่ได้แตะ EMA200 ({e200:.2f})", ""
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -425,7 +429,7 @@ def score_setup(
     
     # ── CHECK EMA200 TOUCH FIRST (Importance 1 ต้องทำงานแม้ EMA ไม่เรียง) ──
     dist200 = abs(last_close - e200) / e200 * 100.0
-    touched, touch_note = _ema200_touch检测(df, ema200)
+    touched, touch_note, touch_case = _ema200_touch检测(df, ema200)
     near_ema200 = dist200 <= float(cfg.get("ema200_near_tol_pct", 0.20)) or touched
     importance1 = touched
 
@@ -498,10 +502,17 @@ def score_setup(
         tier = "FIRE"
         entry_trigger = True
         passed_names = [k for k, v in cond.items() if v["pass"]]
+        touch_labels = {
+            "TICK_TOUCH": "⏱ ราคากดแตะ EMA200 ณ ขณะนี้",
+            "WICK_TOUCH": "📉 Wick แตะ EMA200 (แท่งปิดห่าง)",
+            "CLOSE_TOUCH": "📍 ปิดตรง EMA200",
+        }
+        touch_txt = touch_labels.get(touch_case, touch_note)
         note_parts = [
-            f"🚨 IMPORTANCE 1 — ราคาแตะ EMA200 → FIRE ทันที",
-            f"EMA200 = {e200:.2f} | ผ่าน {passed_count}/10: {', '.join(passed_names) or 'none'}",
-            f"เข้า {direction} | ทุก checklist ถูกเก็บไว้วิเคราะห์น้ำหนัก",
+            f"🚨 IMPORTANCE 1 [{touch_case}]",
+            f"{touch_txt} | EMA200 = {e200:.2f}",
+            f"ผ่าน {passed_count}/10: {', '.join(passed_names) or 'none'}",
+            f"เข้า {direction} | กรุณาสังเกตว่าเข้าจุดไหน winrate ดีสุด",
         ]
 
     elif crossed_ema100:
@@ -567,4 +578,5 @@ def score_setup(
         conditions_passed=passed_count,
         conditions_total=10,
         conditions_log=cond,
+        touch_case=touch_case if importance1 else "",
     )
