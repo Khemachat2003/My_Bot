@@ -381,9 +381,6 @@ def _ema200_touch检测(df: pd.DataFrame, ema200: pd.Series,
     dist_now = abs(float(df["close"].iloc[-1]) - e200) / e200 * 100.0
 
     if candle_low <= e_at_bar <= candle_high:
-        if dist_now > 0.30:
-            return False, (f"แท่งล่าสุด wick ผ่าน EMA200 ({e200:.2f}) "
-                           f"แต่ราคาปิดห่าง {dist_now:.2f}% — ไม่ FIRE")
         return True, f"ราคาแตะ EMA200 แล้ว! (แท่งล่าสุด wick ผ่าน {e200:.2f}, ห่าง {dist_now:.2f}%)"
 
     return False, f"แท่งล่าสุดไม่ได้แตะ EMA200 ({e200:.2f})"
@@ -457,11 +454,11 @@ def score_setup(
     # ════════════════════════════════════════════════════════════════════════
     dist200 = abs(last_close - e200) / e200 * 100.0
     touched, touch_note = _ema200_touch检测(df, ema200)
-    near_ema200 = dist200 <= float(cfg.get("ema200_near_tol_pct", 0.20))
+    near_ema200 = dist200 <= float(cfg.get("ema200_near_tol_pct", 0.20)) or touched
     
-    # Importance 1: ต้องมีทั้ง touched (แท่งล่าสุด) AND near_ema200 (ราคาปิดยังอยู่ใกล้)
-    # กันกรณี: wick แตะ EMA200 แต่ราคาปิด move away ไปแล้ว
-    importance1 = touched and near_ema200
+    # Importance 1: ต้องมี touched (แท่งล่าสุด wick ผ่าน EMA200)
+    # near_ema200 ผ่อน: ถ้า wick แตะ EMA200 จริง ไม่ต้องสนว่า close ห่างแค่ไหน
+    importance1 = touched
     
     # Check if price crossed EMA100 (currently between EMA100 and EMA200)
     # BUG FIX: threshold เดิม 0.1% (10+ pips) หลวมเกิน → ราคาอยู่เหนือ EMA100 ก็ triggers
