@@ -131,32 +131,13 @@ class CFDBacktest:
                        max_bars: int) -> list[dict]:
         conn = self._connect()
 
-        anchor = conn.execute("""
-            SELECT ts FROM prices
-            WHERE symbol = ? AND ts <= ?
-            ORDER BY ts DESC LIMIT 1
-        """, (symbol, entry_time)).fetchone()
-
-        if anchor:
-            start_ts = anchor["ts"]
-        else:
-            row_next = conn.execute("""
-                SELECT ts FROM prices
-                WHERE symbol = ? AND ts >= ?
-                ORDER BY ts ASC LIMIT 1
-            """, (symbol, entry_time)).fetchone()
-            if not row_next:
-                conn.close()
-                return []
-            start_ts = row_next["ts"]
-
         rows = conn.execute("""
             SELECT ts, open, high, low, close
             FROM prices
-            WHERE symbol = ? AND ts >= ?
+            WHERE symbol = ? AND ts > ?
             ORDER BY ts ASC
             LIMIT ?
-        """, (symbol, start_ts, max_bars + 5)).fetchall()
+        """, (symbol, entry_time, max_bars + 5)).fetchall()
         conn.close()
 
         candles = [dict(r) for r in rows]
@@ -165,7 +146,7 @@ class CFDBacktest:
 
         first_close = float(candles[0]["close"])
         pct_diff = abs(first_close - entry_price) / entry_price if entry_price else 1.0
-        if pct_diff > 0.05:
+        if pct_diff > 0.02:
             return []
 
         return candles
