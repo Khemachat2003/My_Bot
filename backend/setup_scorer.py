@@ -423,6 +423,12 @@ def score_setup(
     adx_val = float(adx.iloc[-1]) if not np.isnan(adx.iloc[-1]) else 0.0
     rsi_val = float(rsi.iloc[-1])
     
+    # ── CHECK EMA200 TOUCH FIRST (Importance 1 ต้องทำงานแม้ EMA ไม่เรียง) ──
+    dist200 = abs(last_close - e200) / e200 * 100.0
+    touched, touch_note = _ema200_touch检测(df, ema200)
+    near_ema200 = dist200 <= float(cfg.get("ema200_near_tol_pct", 0.20)) or touched
+    importance1 = touched
+
     # ── Determine trend direction from EMA order ──
     trend_align_up = e50 > e100 > e200
     trend_align_down = e50 < e100 < e200
@@ -434,9 +440,15 @@ def score_setup(
     else:
         direction, bias = "", ""
     
-    # No clear trend → NONE
+    # Importance 1 แตะ EMA200 → infer direction จากตำแหน่งราคา vs EMA200
+    if importance1 and not direction:
+        if last_close >= e200:
+            direction, bias = "CALL", "EMA200_BOUNCE_UP"
+        else:
+            direction, bias = "PUT", "EMA200_BOUNCE_DOWN"
+    
+    # No clear trend and no EMA200 touch → NONE
     if not direction:
-        dist200 = abs(last_close - e200) / e200 * 100.0
         return SetupResult(
             timeframe=timeframe,
             target_hold_minutes=target_hold_minutes,
@@ -450,22 +462,10 @@ def score_setup(
         )
     
     # ════════════════════════════════════════════════════════════════════════
-    # CHECK EMA200 TOUCH & EMA100 CROSS
+    # CHECK EMA100 CROSS
     # ════════════════════════════════════════════════════════════════════════
-    dist200 = abs(last_close - e200) / e200 * 100.0
-    touched, touch_note = _ema200_touch检测(df, ema200)
-    near_ema200 = dist200 <= float(cfg.get("ema200_near_tol_pct", 0.20)) or touched
-    
-    # Importance 1: ต้องมี touched (แท่งล่าสุด wick ผ่าน EMA200)
-    # near_ema200 ผ่อน: ถ้า wick แตะ EMA200 จริง ไม่ต้องสนว่า close ห่างแค่ไหน
-    importance1 = touched
-    
-    # Check if price crossed EMA100 (currently between EMA100 and EMA200)
-    # BUG FIX: threshold เดิม 0.1% (10+ pips) หลวมเกิน → ราคาอยู่เหนือ EMA100 ก็ triggers
-    # แก้เป็น 0.02% (~2 pips) สำหรับ forex 5 ตำแหน่ง + ต้องอยู่ระหว่าง EMA100-EMA200 จริง
     _ema100_tol = float(cfg.get("ema100_tol_pct", 0.02))
     if direction == "CALL":
-        # ต้องอยู่ระหว่าง EMA100 (ล่าง) กับ EMA200 (บน) = pullback จริง
         crossed_ema100 = (e200 * 0.999 <= last_close <= e100 * (1 + _ema100_tol / 100))
     else:
         # ต้องอยู่ระหว่าง EMA200 (ล่าง) กับ EMA100 (บน) = pullback จริง
