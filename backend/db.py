@@ -254,6 +254,17 @@ def init_db() -> None:
         )
         conn.commit()
 
+    # Migration: V8 — เก็บ importance + conditions_log ลง setup_signals
+    # เพื่อวิเคราะห์ว่า checklist ตัวไหนมีน้ำหนักจริง (importance1 ยิงทันทีแต่เก็บ log
+    # ทุก conditions ไว้ — เมื่อรู้ผล WIN/LOSE จะคำนวณ feature importance ได้)
+    scols2 = {r["name"] for r in conn.execute("PRAGMA table_info(setup_signals)").fetchall()}
+    for _c in ("importance", "conditions_passed"):
+        if _c not in scols2:
+            conn.execute(f"ALTER TABLE setup_signals ADD COLUMN {_c} INTEGER")
+    if "conditions_log_json" not in scols2:
+        conn.execute("ALTER TABLE setup_signals ADD COLUMN conditions_log_json TEXT")
+    conn.commit()
+
     # Migration: ตาราง prices เก่า (ยุคก่อนมีคอลัมน์ symbol) → เพิ่ม symbol
     # แล้วสมมติว่าแถวเก่าทั้งหมดเป็น frxXAUUSD (ข้อมูลกราฟเดิม)
     try:
@@ -331,23 +342,28 @@ def insert_setup_signal(signal_time: str, entry_price: float, direction: str,
                          gold_slope_1h: Optional[float] = None,
                          dxy_slope_24: Optional[float] = None,
                          dxy_rsi: Optional[float] = None,
-                         gate_agree: Optional[bool] = None) -> int:
+                         gate_agree: Optional[bool] = None,
+                         importance: Optional[int] = None,
+                         conditions_passed: Optional[int] = None,
+                         conditions_log_json: Optional[str] = None) -> int:
     conn = get_conn()
     cur = conn.execute(
         """INSERT INTO setup_signals
            (signal_time, timeframe, entry_price, direction, confidence,
             score, total, tier, horizon_min, target_time, result, symbol,
             ema200_price, dist200_pct, near_ema200, crossed_ema100,
-            gold_slope_1h, dxy_slope_24, dxy_rsi, gate_agree)
+            gold_slope_1h, dxy_slope_24, dxy_rsi, gate_agree,
+            importance, conditions_passed, conditions_log_json)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?,
-                   ?, ?, ?, ?)""",
+                   ?, ?, ?, ?, ?, ?, ?)""",
         (signal_time, timeframe, entry_price, direction, confidence,
          score, total, tier, horizon_min, target_time, symbol,
          ema200_price, dist200_pct,
          (1 if near_ema200 else 0) if near_ema200 is not None else None,
          (1 if crossed_ema100 else 0) if crossed_ema100 is not None else None,
          gold_slope_1h, dxy_slope_24, dxy_rsi,
-         (1 if gate_agree else 0) if gate_agree is not None else None),
+         (1 if gate_agree else 0) if gate_agree is not None else None,
+         importance, conditions_passed, conditions_log_json),
     )
     conn.commit()
     new_id = cur.lastrowid

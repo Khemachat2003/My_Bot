@@ -20,6 +20,7 @@ setup_feed.py — 🔵 System 1: Rule-Based Setup Engine (Sniper Reversion 9 Che
 """
 from __future__ import annotations
 
+import json
 import os
 import sys
 import time
@@ -393,6 +394,10 @@ class SetupFeedEngine:
                         dxy_slope_24=dxy_slope,
                         dxy_rsi=dxy_rsi_v,
                         gate_agree=gate_agree,
+                        importance=result.importance,
+                        conditions_passed=result.conditions_passed,
+                        conditions_log_json=json.dumps(
+                            result.conditions_log, ensure_ascii=False, default=str),
                     )
                     print(f"[SetupFeed:{self.symbol}] บันทึกสัญญาณ ID #{new_sig_id} [{tf_label}] "
                           f"ลง setup_signals (รอวัดผลในอีก {hold_min} นาที)")
@@ -405,11 +410,15 @@ class SetupFeedEngine:
                 if gate_agree is not None:
                     gate_txt = ("เห็นพ้อง ✅" if gate_agree == 1 else "ขัดแย้ง ⛔")
                     gate_txt += f" (gold1h {gold_slope:+.2f}% | DXY24 {dxy_slope:+.2f}%)"
+                passed_names = [k.replace("c","").replace("_"," ") 
+                                for k, v in result.conditions_log.items() if v.get("pass")]
+                checklist_txt = ", ".join(passed_names) if passed_names else "none"
                 msg_trigger = (
                     f"🔵 [RULE-BASED ALERT]\n"
                     f"Symbol: {sym_text} | TF: {tf_label} | Tier: {result.tier}\n"
                     f"Direction: {result.direction} | Entry: {self.last_price:.5f}\n"
                     f"Score: {result.score}/{result.max_score} | Hold: {hold_min}m\n"
+                    f"Checklist PASS ({result.conditions_passed}/10): {checklist_txt}\n"
                     f"Regime-Gate (shadow): {gate_txt}\n"
                     f"เหตุผล: {result.entry_trigger_note}\n"
                     f"เวลาเข้า: {now.strftime('%H:%M:%S')} UTC"

@@ -494,27 +494,17 @@ def score_setup(
     # ════════════════════════════════════════════════════════════════════════
     # TIER DETERMINATION
     # ════════════════════════════════════════════════════════════════════════
-    _IMP1_MIN_CONDITIONS = int(cfg.get("importance1_min_conditions", 4))
     
-    if importance1 and passed_count >= _IMP1_MIN_CONDITIONS:
-        # ═══ IMPORTANCE 1: แตะ EMA200 + ผ่านอย่างน้อย N เงื่อนไข → FIRE ═══
+    if importance1:
+        # ═══ IMPORTANCE 1: แตะ EMA200 → FIRE ทันที (เก็บ log ทุก checklist ไว้วิเคราะห์น้ำหนัก) ═══
         importance = 1
         tier = "FIRE"
         entry_trigger = True
+        passed_names = [k for k, v in cond.items() if v["pass"]]
         note_parts = [
-            f"🚨 IMPORTANCE 1 — ราคาแตะ EMA200 + ผ่าน {passed_count}/10 เงื่อนไข",
-            f"EMA200 = {e200:.2f} | ต้อง >= {_IMP1_MIN_CONDITIONS}",
-            f"เข้า {direction} ตามเทรน {bias}",
-        ]
-    
-    elif importance1 and passed_count < _IMP1_MIN_CONDITIONS:
-        # ═══ IMPORTANCE 1 แต่เงื่อนไขไม่พอ → WATCH ═══
-        importance = 1
-        tier = "WATCH"
-        entry_trigger = False
-        note_parts = [
-            f"⚠️ IMPORTANCE 1 — แตะ EMA200 แล้ว แต่ผ่านแค่ {passed_count}/10 (ต้อง >= {_IMP1_MIN_CONDITIONS})",
-            f"EMA200 = {e200:.2f} | รอ confirm เพิ่ม",
+            f"🚨 IMPORTANCE 1 — ราคาแตะ EMA200 → FIRE ทันที",
+            f"EMA200 = {e200:.2f} | ผ่าน {passed_count}/10: {', '.join(passed_names) or 'none'}",
+            f"เข้า {direction} | ทุก checklist ถูกเก็บไว้วิเคราะห์น้ำหนัก",
         ]
 
     elif crossed_ema100:

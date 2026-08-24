@@ -9,7 +9,6 @@
   "ema200_tol_pct": 0.15,
   "ema200_near_tol_pct": 0.20,
   "ema100_tol_pct": 0.02,
-  "importance1_min_conditions": 4,
   "rejection_lookback": 10,
   "fractal": {
     "left": 7,
