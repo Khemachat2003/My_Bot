@@ -59,7 +59,39 @@ def market_open_cooldown(now: datetime | None = None, cooldown_min: int = 15) ->
 
 
 def symbol_label(symbol: str) -> str:
-    """ชื่อที่ใช้ใน Telegram message — XAUUSD สำหรับทองจริง, R100 สำหรับตัวสำรอง"""
+    """ชื่อที่ใช้ใน Telegram message — XAUUSD สำหรับทองจริง, R_100 สำหรับตัวสำรอง"""
     if symbol == "frxXAUUSD":
         return "XAUUSD"
     return symbol
+
+
+def get_session(now: datetime | None = None) -> str:
+    """ระบุ session ปัจจุบัน (UTC) — Asia/London/NY/Night"""
+    now = now or datetime.now(timezone.utc)
+    h = now.hour
+    if h < 7:
+        return "Asia"
+    elif h < 13:
+        return "London"
+    elif h < 18:
+        return "NY"
+    else:
+        return "Night"
+
+
+def should_block_call(now: datetime | None = None) -> bool:
+    """True ถ้าควรบล็อกสัญญาณ CALL ใน session นี้
+    
+    ข้อมูลจาก 482 trades:
+      CALL Night (18-24 UTC): 34.1% WR (41 trades) → บล็อก
+      CALL Asia: 43.8%, London: 46.2%, NY: 48.8% → ยังพอได้
+    """
+    return get_session(now) == "Night"
+
+
+def should_block_put(now: datetime | None = None) -> bool:
+    """True ถ้าควรบล็อกสัญญาณ PUT ใน session นี้
+    
+    PUT ทุก session ยัง OK (45-63%) — ไม่บล็อก แต่ London = Golden Zone
+    """
+    return False

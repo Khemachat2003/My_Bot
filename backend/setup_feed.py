@@ -40,7 +40,7 @@ import pandas as pd
 from backend import db, setup_db
 from backend.indicators import rsi
 from backend.telegram import send_telegram
-from backend.market_hours import is_forex_like, market_open_now, market_open_cooldown, symbol_label
+from backend.market_hours import is_forex_like, market_open_now, market_open_cooldown, symbol_label, should_block_call
 from backend.setup_scorer import score_setup
 
 try:
@@ -371,8 +371,25 @@ class SetupFeedEngine:
                         self._last_entry_trigger[tf_label] = result.entry_trigger
                         continue
 
+                # 🚦 session block: CALL Night (18-24 UTC) = 34.1% WR — บล็อก
+                if result.direction == "CALL" and should_block_call(now):
+                    print(f"[SetupFeed:{self.symbol}] ข้าม CALL [{tf_label}] — "
+                          f"Night session (34.1% WR จาก 482 trades)")
+                    self._last_entry_trigger[tf_label] = result.entry_trigger
+                    continue
+
                 target_time = (now + pd.Timedelta(minutes=hold_min)).isoformat()
                 gold_slope, dxy_slope, dxy_rsi_v, gate_agree = self._gate_features()
+
+                # 🚦 gate inversion: CALL + gate_agree=1 → 35.5% WR (กลับหัว)
+                # ข้อมูล: gate_agree=1 CALL ชนะแค่ 11/31 = 35.5%
+                # เมื่อ DXY "เห็นพ้อง" กับ CALL ทอง → มักจะเป็น false signal
+                if (result.direction == "CALL" and gate_agree == 1):
+                    print(f"[SetupFeed:{self.symbol}] ข้าม CALL [{tf_label}] — "
+                          f"gate_agree=1 inverted (35.5% WR)")
+                    self._last_entry_trigger[tf_label] = result.entry_trigger
+                    continue
+
                 try:
                     new_sig_id = db.insert_setup_signal(
                         signal_time=now.isoformat(),
