@@ -329,12 +329,27 @@ def init_db() -> None:
 
     # Migration: backfill CFD paper trades สำหรับ PENDING signals ที่ยังไม่มี CFD record
     try:
-        # ลบ CFD trades ที่ resolve ผิด (hold_bars=0 จาก pip_size เดิมผิด)
         conn2 = get_conn()
+        # ลบ CFD trades ที่ resolve ผิด (hold_bars=0 จาก pip_size เดิมผิด)
         conn2.execute(
             "DELETE FROM cfd_paper_trades WHERE hold_bars = 0 AND result != 'OPEN'"
         )
+        # ลบ CFD trades ที่ signal ถูก resolve แล้ว (WIN/LOSE/DRAW) แต่ CFD ยัง OPEN
+        conn2.execute(
+            """DELETE FROM cfd_paper_trades
+               WHERE result = 'OPEN' AND signal_id IN (
+                   SELECT id FROM setup_signals WHERE result IN ('WIN','LOSE','DRAW')
+               )"""
+        )
+        # ลบ CFD trades OPEN ที่เก่าเกิน 4 ชั่วโมง (stale)
+        from datetime import datetime, timezone, timedelta
+        stale_cutoff = (datetime.now(timezone.utc) - timedelta(hours=4)).isoformat()
+        conn2.execute(
+            "DELETE FROM cfd_paper_trades WHERE result = 'OPEN' AND entry_time < ?",
+            (stale_cutoff,)
+        )
         conn2.commit()
+        print("[DB] Migration: cleaned stale CFD paper trades")
         conn2.close()
     except Exception:
         pass
@@ -345,21 +360,27 @@ def init_db() -> None:
 
 
 def _backfill_cfd_paper_trades():
-    """สร้าง CFD paper trades สำหรับ signals ที่ยัง PENDING แต่ไม่มี CFD record"""
+    """สร้าง CFD paper trades สำหรับ signals ที่ยัง PENDING แต่ไม่มี CFD record
+    จำกัดเฉพาะ signals ที่สร้างภายใน 1 ชั่วโมงล่าสุดเท่านั้น (ป้องกัน flood)"""
+    from datetime import datetime, timezone, timedelta
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
     conn = get_conn()
     cfd_ids = {r[0] for r in conn.execute(
         "SELECT signal_id FROM cfd_paper_trades"
     ).fetchall()}
     pending_setup = conn.execute(
         "SELECT id, symbol, direction, entry_price, signal_time "
-        "FROM setup_signals WHERE result = 'PENDING'"
+        "FROM setup_signals WHERE result = 'PENDING' AND signal_time > ?",
+        (cutoff,)
     ).fetchall()
     pending_ml = conn.execute(
         "SELECT id, symbol, direction, entry_price, signal_time "
-        "FROM ml_signals WHERE result = 'PENDING'"
+        "FROM ml_signals WHERE result = 'PENDING' AND signal_time > ?",
+        (cutoff,)
     ).fetchall()
     conn.close()
 
+    count = 0
     for row in pending_setup:
         if row[0] not in cfd_ids:
             try:
@@ -368,7 +389,7 @@ def _backfill_cfd_paper_trades():
                     symbol=row[1] or "frxXAUUSD", direction=row[2],
                     entry_price=row[3], entry_time=row[4],
                 )
-                print(f"[DB] Backfilled CFD paper trade for SETUP signal #{row[0]}")
+                count += 1
             except Exception:
                 pass
     for row in pending_ml:
@@ -379,9 +400,11 @@ def _backfill_cfd_paper_trades():
                     symbol=row[1] or "frxXAUUSD", direction=row[2],
                     entry_price=row[3], entry_time=row[4],
                 )
-                print(f"[DB] Backfilled CFD paper trade for ML signal #{row[0]}")
+                count += 1
             except Exception:
                 pass
+    if count:
+        print(f"[DB] Backfilled {count} CFD paper trades (signals < 1h old)")
 def upsert_macro_dxy(ts: str, dxy_close: float) -> None:
     conn = get_conn()
     conn.execute(
@@ -940,7 +963,18 @@ def _cfd_lot_size(symbol: str = "frxXAUUSD") -> float:
 def insert_cfd_paper_trade(signal_id: int, signal_type: str, symbol: str,
                            direction: str, entry_price: float,
                            entry_time: str) -> int | None:
-    """สร้าง CFD paper trade เมื่อ signal ใหม่ถูกสร้าง"""
+    """สร้าง CFD paper trade เมื่อ signal ใหม่ถูกสร้าง
+    จำกัดสูงสุด 10 OPEN trades ต่อ symbol"""
+    CFD_MAX_OPEN_PER_SYMBOL = 10
+    conn = get_conn()
+    open_count = conn.execute(
+        "SELECT COUNT(*) FROM cfd_paper_trades WHERE symbol = ? AND result = 'OPEN'",
+        (symbol,)
+    ).fetchone()[0]
+    if open_count >= CFD_MAX_OPEN_PER_SYMBOL:
+        conn.close()
+        print(f"[DB] Skip CFD trade: {symbol} already has {open_count} OPEN trades")
+        return None
     ps = get_pip_size(symbol)
     pv = get_pip_value(symbol)
     spread = CFD_SPREAD_PIPS * ps
@@ -956,7 +990,6 @@ def insert_cfd_paper_trade(signal_id: int, signal_type: str, symbol: str,
         tp1 = eff - CFD_TP1_PIPS * ps
         tp2 = eff - CFD_TP2_PIPS * ps
 
-    conn = get_conn()
     cur = conn.execute(
         """INSERT INTO cfd_paper_trades
            (signal_id, signal_type, symbol, direction, entry_price, entry_time,
