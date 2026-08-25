@@ -802,9 +802,14 @@
         <div class="jh-sub" id="jWrSub">–</div>
       </div>
       <div class="j-hero-card bal">
-        <div class="jh-lbl">Balance</div>
+        <div class="jh-lbl">💰 Option Balance</div>
         <div class="jh-val" id="mBalance">–</div>
         <div class="jh-sub" id="mBalanceSub">–</div>
+      </div>
+      <div class="j-hero-card bal" style="border-left:2px solid var(--cyan);">
+        <div class="jh-lbl">📈 CFD Balance</div>
+        <div class="jh-val" id="mCfdBalance">–</div>
+        <div class="jh-sub" id="mCfdBalanceSub">–</div>
       </div>
     </div>
 
@@ -2263,6 +2268,17 @@ async function refreshJournalMoney(){
     const bal=r.daily.length?r.daily[r.daily.length-1].balance:r.settings.capital;
     document.getElementById('mBalance').textContent=Number(bal).toLocaleString('th-TH',{maximumFractionDigits:2})+' '+cur;
     document.getElementById('mBalanceSub').textContent='ทุน '+Number(r.settings.capital).toLocaleString('th-TH')+' '+cur;
+    // CFD Balance
+    const cfd=r.cfd_summary||{};
+    const cfdBal=cfd.balance!=null?cfd.balance:cfd.capital||5000;
+    const cfdPnl=cfd.pnl_money||0;
+    const cfdEl=document.getElementById('mCfdBalance');
+    if(cfdEl){
+      cfdEl.textContent=Number(cfdBal).toLocaleString('th-TH',{maximumFractionDigits:2})+' '+cur;
+      cfdEl.style.color=cfdPnl>0?'var(--green)':(cfdPnl<0?'var(--red)':'var(--text)');
+    }
+    const cfdSubEl=document.getElementById('mCfdBalanceSub');
+    if(cfdSubEl) cfdSubEl.textContent='ทุน '+Number(cfd.capital||5000).toLocaleString('th-TH')+' '+cur+' · P&L '+(cfdPnl>=0?'+':'')+Number(cfdPnl).toLocaleString('th-TH',{maximumFractionDigits:2});
     renderPeriodTable();
   }catch(e){}
 }

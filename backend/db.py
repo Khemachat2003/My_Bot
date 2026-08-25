@@ -366,6 +366,13 @@ def init_db() -> None:
             "DELETE FROM cfd_paper_trades WHERE result = 'OPEN' AND entry_time < ?",
             (stale_cutoff,)
         )
+        # ลบ trade_journal ที่ไม่ใช่ ML/SETUP (สัญญาณ TICK ที่หลุดเข้ามา)
+        bad_trades = conn2.execute(
+            "SELECT COUNT(*) FROM trade_journal WHERE signal_type NOT IN ('ML','SETUP')"
+        ).fetchone()[0]
+        if bad_trades:
+            conn2.execute("DELETE FROM trade_journal WHERE signal_type NOT IN ('ML','SETUP')")
+            print(f"[DB] Migration: ลบ {bad_trades} trade_journal entries ที่ไม่ใช่ ML/SETUP")
         conn2.commit()
         if tick_count:
             print(f"[DB] Migration: ลบ {tick_count} TICK signals + CFD trades ที่ผูกกัน")
@@ -1376,9 +1383,33 @@ def compute_money_report(start: str | None = None, end: str | None = None) -> di
             out[s] = a
         return out
 
+    # CFD summary (แยกจาก option)
+    cfd_summary = {"n": 0, "wins": 0, "losses": 0, "winrate": 0.0,
+                   "pnl_money": 0.0, "capital": CFD_CAPITAL, "balance": CFD_CAPITAL}
+    try:
+        conn2 = get_conn()
+        cfd_rows = conn2.execute(
+            "SELECT result, pnl FROM cfd_paper_trades WHERE result IN ('TP1','TP2','SL')"
+        ).fetchall()
+        conn2.close()
+        if cfd_rows:
+            cfd_n = len(cfd_rows)
+            cfd_wins = sum(1 for r in cfd_rows if r["result"] in ("TP1", "TP2"))
+            cfd_pnl = sum(r["pnl"] or 0 for r in cfd_rows)
+            cfd_summary = {
+                "n": cfd_n, "wins": cfd_wins, "losses": cfd_n - cfd_wins,
+                "winrate": round(100 * cfd_wins / cfd_n, 2) if cfd_n else 0.0,
+                "pnl_money": round(cfd_pnl, 2),
+                "capital": CFD_CAPITAL,
+                "balance": round(CFD_CAPITAL + cfd_pnl, 2),
+            }
+    except Exception:
+        pass
+
     return {
         "settings": {"capital": capital, "stake": stake, "currency": currency},
         "summary": summary(),
+        "cfd_summary": cfd_summary,
         "daily": build("day", lambda k: k),
         "weekly": build("week", lambda k: k),
         "monthly": build("month", lambda k: k),
