@@ -2480,9 +2480,9 @@ function renderCFDPaperTrades(d){
       const progress=t.direction==='CALL'
         ? ((lp-t.entry_price)/(t.tp2_price-t.entry_price)*100)
         : ((t.entry_price-lp)/(t.entry_price-t.tp2_price)*100);
-      return `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;">
+      return `<div style="background:var(--bg);border:1px solid ${t.tp1_hit?'var(--yellow)':'var(--border)'};border-radius:8px;padding:10px;margin-bottom:8px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <span style="color:${dirCol};font-weight:700;">${t.direction} ${t.signal_type} #${t.signal_id}</span>
+          <span style="color:${dirCol};font-weight:700;">${t.direction} ${t.signal_type} #${t.signal_id} ${t.tp1_hit?'<span style="color:var(--yellow);font-size:10px;">TP1 HIT →</span>':''}</span>
           <span style="color:var(--muted);font-size:11px;">${fmtHM(t.entry_time)}</span>
         </div>
         <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;font-size:12px;">

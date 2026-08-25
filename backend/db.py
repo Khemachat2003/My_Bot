@@ -177,6 +177,7 @@ def init_db() -> None:
             exit_time TEXT,
             pnl REAL,
             hold_bars INTEGER DEFAULT 0,
+            tp1_hit INTEGER DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
         CREATE INDEX IF NOT EXISTS idx_cfd_paper_time ON cfd_paper_trades(entry_time);
@@ -330,6 +331,10 @@ def init_db() -> None:
     # Migration: backfill CFD paper trades สำหรับ PENDING signals ที่ยังไม่มี CFD record
     try:
         conn2 = get_conn()
+        # เพิ่มคอลัมน์ tp1_hit ถ้ายังไม่มี
+        cfd_cols = {r[1] for r in conn2.execute("PRAGMA table_info(cfd_paper_trades)").fetchall()}
+        if "tp1_hit" not in cfd_cols:
+            conn2.execute("ALTER TABLE cfd_paper_trades ADD COLUMN tp1_hit INTEGER DEFAULT 0")
         # ลบ CFD trades ที่ resolve ผิด (hold_bars=0 จาก pip_size เดิมผิด)
         conn2.execute(
             "DELETE FROM cfd_paper_trades WHERE hold_bars = 0 AND result != 'OPEN'"
@@ -1017,7 +1022,7 @@ def fetch_open_cfd_trades() -> list[dict]:
 
 def update_cfd_result(cfd_id: int, result: str, exit_price: float,
                       exit_time: str, hold_bars: int) -> None:
-    """บันทึกผล CFD trade: SL / TP1 / TP2 / TIMEOUT"""
+    """บันทึกผล CFD trade: SL / TP1 (partial) / TP2 (full)"""
     conn = get_conn()
     row = conn.execute(
         "SELECT direction, effective_entry, lot_size, pip_size, spread_pips FROM cfd_paper_trades WHERE id = ?",
@@ -1106,7 +1111,8 @@ def fetch_cfd_stats() -> dict:
 
 
 def check_cfd_trades(current_price: float, now_iso: str, symbol: str = "") -> list[dict]:
-    """ตรวจ trades ที่ OPEN ของ symbol ที่ระบุ — คืน list ของ trades ที่เพิ่ง resolve"""
+    """ตรวจ trades ที่ OPEN ของ symbol ที่ระบุ — คืน list ของ trades ที่เพิ่ง resolve
+    Logic ใหม่: TP1 โดนแล้วไม่ปิด → ปล่อยวิ่งต่อ → TP2 = WIN, กลับลงมา = TP1 WIN"""
     open_trades = fetch_open_cfd_trades()
     if symbol:
         open_trades = [t for t in open_trades if t.get("symbol") == symbol]
@@ -1116,12 +1122,10 @@ def check_cfd_trades(current_price: float, now_iso: str, symbol: str = "") -> li
         sl = t["sl_price"]
         tp1 = t["tp1_price"]
         tp2 = t["tp2_price"]
+        tp1_hit = t.get("tp1_hit", 0) or 0
         entry_t = pd.Timestamp(t["entry_time"])
         now_t = pd.Timestamp(now_iso)
         hold_bars = int((now_t - entry_t).total_seconds() / 60)
-
-        sig_time = pd.Timestamp(t["entry_time"])
-        elapsed_min = (now_t - sig_time).total_seconds() / 60.0
 
         if d == "CALL":
             hit_sl = current_price <= sl
@@ -1133,14 +1137,26 @@ def check_cfd_trades(current_price: float, now_iso: str, symbol: str = "") -> li
             hit_tp2 = current_price <= tp2
 
         result = None
-        if hit_sl and (hit_tp1 or hit_tp2):
+
+        # SL โดน → ปิดทันที
+        if hit_sl:
             result = "SL"
-        elif hit_tp2:
-            result = "TP2"
-        elif hit_tp1:
-            result = "TP1"
-        elif hit_sl:
-            result = "SL"
+
+        # TP1 โดนครั้งแรก → ตั้ง tp1_hit=1 แต่ไม่ปิด ปล่อยวิ่งต่อ
+        elif hit_tp1 and not tp1_hit:
+            _update_tp1_hit(t["id"])
+            continue
+
+        # TP1 เคยโดนแล้ว (tp1_hit=1)
+        elif tp1_hit:
+            if hit_tp2:
+                result = "TP2"
+            elif hit_sl:
+                result = "SL"
+            elif d == "CALL" and current_price < tp1:
+                result = "TP1"
+            elif d == "PUT" and current_price > tp1:
+                result = "TP1"
 
         if result:
             update_cfd_result(t["id"], result, current_price, now_iso, hold_bars)
@@ -1148,6 +1164,14 @@ def check_cfd_trades(current_price: float, now_iso: str, symbol: str = "") -> li
                              "exit_time": now_iso, "hold_bars": hold_bars})
 
     return resolved
+
+
+def _update_tp1_hit(cfd_id: int) -> None:
+    """บันทึกว่า TP1 โดนแล้ว (ยังไม่ปิด trade)"""
+    conn = get_conn()
+    conn.execute("UPDATE cfd_paper_trades SET tp1_hit = 1 WHERE id = ?", (cfd_id,))
+    conn.commit()
+    conn.close()
 
 
 # ─── MODEL REGISTRY ──────────────────────────────────────────────────────────

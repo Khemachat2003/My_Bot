@@ -210,7 +210,7 @@ class SetupFeedEngine:
     def _check_tick_touch(self, now: pd.Timestamp):
         """ตรวจ real-time ว่าราคาปัจจุบันแตะ EMA200 หรือไม่
         ถ้าแตะ → FIRE Importance 1 ทันที (TICK_TOUCH)
-        ป้องกันซ้ำ: ไม่ FIRE ถ้ามี TICK_TOUCH จาก symbol ใดก็ตามภายใน 30 นาที
+        ป้องกันซ้ำ: ไม่ FIRE ถ้ามี signal importance=1 จาก symbol เดียวกันภายใน 30 นาที
         """
         if len(self.buffer) < 210:
             return
@@ -220,19 +220,11 @@ class SetupFeedEngine:
             e200 = float(ema200.iloc[-1])
             if e200 <= 0:
                 return
-
-            # ใช้ absolute pip distance แทน % — forex 0.5 pip, gold 3 points
-            ps = db.get_pip_size(self.symbol)
-            pip_dist = abs(self.last_price - e200) / ps
-            if ps >= 1.0:
-                max_dist = 3.0  # XAUUSD: ต้องแตะภายใน 3 points
-            else:
-                max_dist = 0.5  # forex: ต้องแตะภายใน 0.5 pip
-            if pip_dist > max_dist:
+            dist = abs(self.last_price - e200) / e200 * 100.0
+            if dist > 0.02:
                 return
 
-            # ป้องกันซ้ำ GLOBAL: ดู TICK_TOUCH ล่าสุดจากทุก symbol (ไม่ใช่แค่ตัวเอง)
-            recent = db.fetch_recent_setup_signals(limit=1)
+            recent = db.fetch_recent_setup_signals(limit=1, symbol=self.symbol)
             if recent and recent[0].get("importance") == 1:
                 sig_time = pd.to_datetime(recent[0]["signal_time"])
                 if (now - sig_time).total_seconds() < 1800:
@@ -273,6 +265,7 @@ class SetupFeedEngine:
                 symbol=self.symbol, direction=direction,
                 entry_price=self.last_price, entry_time=now.isoformat(),
             )
+            ps = db.get_pip_size(self.symbol)
             spread = db.CFD_SPREAD_PIPS * ps
             eff = self.last_price + spread/2 if direction == "CALL" else self.last_price - spread/2
             if direction == "CALL":
@@ -299,7 +292,7 @@ class SetupFeedEngine:
             )
             send_telegram(msg)
             print(f"[SetupFeed:{self.symbol}] 🚨 TICK_TOUCH → EMA200 = {e200:.5f}, "
-                  f"price = {self.last_price:.5f}, pip_dist = {pip_dist:.1f}")
+                  f"price = {self.last_price:.5f}, dist = {dist:.4f}%")
         except Exception:
             pass
 
