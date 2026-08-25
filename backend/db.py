@@ -336,7 +336,31 @@ def init_db() -> None:
         if "tp1_hit" not in cfd_cols:
             conn2.execute("ALTER TABLE cfd_paper_trades ADD COLUMN tp1_hit INTEGER DEFAULT 0")
 
-        # ลบ CFD trades ทั้งหมดที่ผูกกับ TICK signals (signal_id ที่ timeframe='TICK')
+        # ── ลบ trade_journal จาก TICK ก่อน (ต้องทำก่อนลบ setup_signals) ──
+        bad_tj = conn2.execute(
+            "SELECT COUNT(*) FROM trade_journal WHERE timeframe = 'TICK'"
+        ).fetchone()[0]
+        if bad_tj:
+            conn2.execute("DELETE FROM trade_journal WHERE timeframe = 'TICK'")
+            print(f"[DB] Migration: ลบ {bad_tj} trade_journal entries (TICK)")
+        bad_tj2 = conn2.execute(
+            """SELECT COUNT(*) FROM trade_journal
+               WHERE signal_id IN (SELECT id FROM setup_signals WHERE timeframe = 'TICK')"""
+        ).fetchone()[0]
+        if bad_tj2:
+            conn2.execute(
+                """DELETE FROM trade_journal
+                   WHERE signal_id IN (SELECT id FROM setup_signals WHERE timeframe = 'TICK')"""
+            )
+            print(f"[DB] Migration: ลบ {bad_tj2} trade_journal entries (via signal_id → TICK)")
+        bad_trades = conn2.execute(
+            "SELECT COUNT(*) FROM trade_journal WHERE signal_type NOT IN ('ML','SETUP')"
+        ).fetchone()[0]
+        if bad_trades:
+            conn2.execute("DELETE FROM trade_journal WHERE signal_type NOT IN ('ML','SETUP')")
+            print(f"[DB] Migration: ลบ {bad_trades} trade_journal entries (ไม่ใช่ ML/SETUP)")
+
+        # ── ลบ CFD trades ที่ผูกกับ TICK signals ──
         conn2.execute(
             """DELETE FROM cfd_paper_trades
                WHERE signal_id IN (
@@ -348,35 +372,29 @@ def init_db() -> None:
             "SELECT COUNT(*) FROM setup_signals WHERE timeframe = 'TICK'"
         ).fetchone()[0]
         conn2.execute("DELETE FROM setup_signals WHERE timeframe = 'TICK'")
-        # ลบ CFD trades ที่ resolve ผิด (hold_bars=0 จาก pip_size เดิมผิด)
+        # ลบ CFD trades ที่ resolve ผิด (hold_bars=0)
         conn2.execute(
             "DELETE FROM cfd_paper_trades WHERE hold_bars = 0 AND result != 'OPEN'"
         )
-        # ลบ CFD trades ที่ signal ถูก resolve แล้วแต่ CFD ยัง OPEN
+        # ลบ CFD trades ที่ signal resolve แล้วแต่ CFD ยัง OPEN
         conn2.execute(
             """DELETE FROM cfd_paper_trades
                WHERE result = 'OPEN' AND signal_id IN (
                    SELECT id FROM setup_signals WHERE result IN ('WIN','LOSE','DRAW')
                )"""
         )
-        # ลบ CFD trades OPEN ที่เก่าเกิน 1 ชั่วโมง (stale จาก TICK ที่มั่ว)
+        # ลบ CFD trades OPEN ที่เก่าเกิน 1 ชั่วโมง
         from datetime import datetime, timezone, timedelta
         stale_cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
         conn2.execute(
             "DELETE FROM cfd_paper_trades WHERE result = 'OPEN' AND entry_time < ?",
             (stale_cutoff,)
         )
-        # ลบ trade_journal ที่ไม่ใช่ ML/SETUP (สัญญาณ TICK ที่หลุดเข้ามา)
-        bad_trades = conn2.execute(
-            "SELECT COUNT(*) FROM trade_journal WHERE signal_type NOT IN ('ML','SETUP')"
-        ).fetchone()[0]
-        if bad_trades:
-            conn2.execute("DELETE FROM trade_journal WHERE signal_type NOT IN ('ML','SETUP')")
-            print(f"[DB] Migration: ลบ {bad_trades} trade_journal entries ที่ไม่ใช่ ML/SETUP")
         conn2.commit()
-        if tick_count:
-            print(f"[DB] Migration: ลบ {tick_count} TICK signals + CFD trades ที่ผูกกัน")
-        print("[DB] Migration: cleaned stale CFD paper trades")
+        total_cleaned = (bad_tj or 0) + (bad_tj2 or 0) + (bad_trades or 0) + (tick_count or 0)
+        if total_cleaned:
+            print(f"[DB] Migration: ลบ {total_cleaned} รายการที่เกี่ยวกับ TICK ออกหมดแล้ว")
+        print("[DB] Migration: cleaned all stale data")
         conn2.close()
     except Exception:
         pass
