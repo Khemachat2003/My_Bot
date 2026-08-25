@@ -328,32 +328,47 @@ def init_db() -> None:
     conn.commit()
     conn.close()
 
-    # Migration: backfill CFD paper trades สำหรับ PENDING signals ที่ยังไม่มี CFD record
+    # Migration: cleanup สัญญาณ TICK ที่ยิงรั่ว + CFD trades ที่ผิด
     try:
         conn2 = get_conn()
         # เพิ่มคอลัมน์ tp1_hit ถ้ายังไม่มี
         cfd_cols = {r[1] for r in conn2.execute("PRAGMA table_info(cfd_paper_trades)").fetchall()}
         if "tp1_hit" not in cfd_cols:
             conn2.execute("ALTER TABLE cfd_paper_trades ADD COLUMN tp1_hit INTEGER DEFAULT 0")
+
+        # ลบ CFD trades ทั้งหมดที่ผูกกับ TICK signals (signal_id ที่ timeframe='TICK')
+        conn2.execute(
+            """DELETE FROM cfd_paper_trades
+               WHERE signal_id IN (
+                   SELECT id FROM setup_signals WHERE timeframe = 'TICK'
+               )"""
+        )
+        # ลบ TICK signals ทั้งหมด
+        tick_count = conn2.execute(
+            "SELECT COUNT(*) FROM setup_signals WHERE timeframe = 'TICK'"
+        ).fetchone()[0]
+        conn2.execute("DELETE FROM setup_signals WHERE timeframe = 'TICK'")
         # ลบ CFD trades ที่ resolve ผิด (hold_bars=0 จาก pip_size เดิมผิด)
         conn2.execute(
             "DELETE FROM cfd_paper_trades WHERE hold_bars = 0 AND result != 'OPEN'"
         )
-        # ลบ CFD trades ที่ signal ถูก resolve แล้ว (WIN/LOSE/DRAW) แต่ CFD ยัง OPEN
+        # ลบ CFD trades ที่ signal ถูก resolve แล้วแต่ CFD ยัง OPEN
         conn2.execute(
             """DELETE FROM cfd_paper_trades
                WHERE result = 'OPEN' AND signal_id IN (
                    SELECT id FROM setup_signals WHERE result IN ('WIN','LOSE','DRAW')
                )"""
         )
-        # ลบ CFD trades OPEN ที่เก่าเกิน 4 ชั่วโมง (stale)
+        # ลบ CFD trades OPEN ที่เก่าเกิน 1 ชั่วโมง (stale จาก TICK ที่มั่ว)
         from datetime import datetime, timezone, timedelta
-        stale_cutoff = (datetime.now(timezone.utc) - timedelta(hours=4)).isoformat()
+        stale_cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
         conn2.execute(
             "DELETE FROM cfd_paper_trades WHERE result = 'OPEN' AND entry_time < ?",
             (stale_cutoff,)
         )
         conn2.commit()
+        if tick_count:
+            print(f"[DB] Migration: ลบ {tick_count} TICK signals + CFD trades ที่ผูกกัน")
         print("[DB] Migration: cleaned stale CFD paper trades")
         conn2.close()
     except Exception:
