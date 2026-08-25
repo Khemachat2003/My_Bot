@@ -929,7 +929,9 @@
         </div>
         <div class="j-section-body" style="padding:12px;">
           <div id="cfdPaperSummary" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px;"></div>
+          <div id="cfdOpenTrades" style="margin-top:12px;"></div>
           <div class="tbl-wrap" style="margin-top:12px;">
+            <h4 style="color:var(--muted);font-size:11px;margin-bottom:6px;">Resolved Trades</h4>
             <table id="cfdPaperTable">
               <thead><tr>
                 <th>#</th><th>Time</th><th>System</th><th>Dir</th><th>Entry</th>
@@ -1338,7 +1340,7 @@ function drawCandles(canvas, data){
     ctx.fillRect(x-bw/2,top,bw,hgt);
   });
 
-  // ── Signal markers: แสดงจุดเข้า ML + SETUP บนกราฟ ──
+  // ── Signal markers: แสดงจุดเข้า ML + SETUP + CFD levels บนกราฟ ──
   if(window._signalMarkers){
     const tsMap={};
     view.forEach((d,i)=>{ tsMap[d.t]=i; });
@@ -1350,8 +1352,12 @@ function drawCandles(canvas, data){
       }
       if(idx<0) return;
       const x=pxForData(idx+start), y=py(m.price);
-      const isWin=m.result==='WIN', isLose=m.result==='LOSE';
+      const isWin=m.result==='WIN'||m.result==='TP1'||m.result==='TP2';
+      const isLose=m.result==='LOSE'||m.result==='SL';
+      const isOpen=m.result==='PENDING';
       const color=m.type==='ML'?(isWin?'#22c98a':isLose?'#f6465d':'#38e1c4'):(isWin?'#22c98a':isLose?'#f6465d':'#f7b847');
+
+      // Entry triangle
       if(m.direction==='CALL'){
         ctx.fillStyle=color;
         ctx.beginPath(); ctx.moveTo(x,y+4); ctx.lineTo(x-5,y+12); ctx.lineTo(x+5,y+12); ctx.closePath(); ctx.fill();
@@ -1359,12 +1365,43 @@ function drawCandles(canvas, data){
         ctx.fillStyle=color;
         ctx.beginPath(); ctx.moveTo(x,y-4); ctx.lineTo(x-5,y-12); ctx.lineTo(x+5,y-12); ctx.closePath(); ctx.fill();
       }
-      if(m.type==='ML'){
-        ctx.fillStyle=color; ctx.font='bold 7px Cascadia Mono,monospace'; ctx.textAlign='center';
-        ctx.fillText('ML',x,y-16); ctx.textAlign='left';
-      } else if(m.importance===1){
-        ctx.fillStyle='#ff4444'; ctx.font='bold 7px Cascadia Mono,monospace'; ctx.textAlign='center';
-        ctx.fillText('IMP1',x,y-16); ctx.textAlign='left';
+      // Label
+      ctx.fillStyle=color; ctx.font='bold 7px Cascadia Mono,monospace'; ctx.textAlign='center';
+      const label=m.type==='ML'?'ML':m.importance===1?'IMP1':'RBF';
+      ctx.fillText(label,x,y-16); ctx.textAlign='left';
+
+      // CFD levels: SL / TP1 / TP2 lines (เฉพาะที่มี cfd data)
+      if(m.cfd){
+        const eIdx=idx+start;
+        const lineLen=Math.min(40, (W-padR-padL)/4);
+        const xEnd=x+lineLen;
+        // SL line (red)
+        if(m.cfd.sl){
+          const ySL=py(m.cfd.sl);
+          ctx.strokeStyle='#f6465d'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+          ctx.beginPath(); ctx.moveTo(x,ySL); ctx.lineTo(xEnd,ySL); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle='#f6465d'; ctx.font='6px Cascadia Mono,monospace';
+          ctx.fillText('SL '+m.cfd.sl.toFixed(2),xEnd+3,ySL+3);
+        }
+        // TP1 line (yellow)
+        if(m.cfd.tp1){
+          const yTP1=py(m.cfd.tp1);
+          ctx.strokeStyle='#f7b847'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+          ctx.beginPath(); ctx.moveTo(x,yTP1); ctx.lineTo(xEnd,yTP1); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle='#f7b847'; ctx.font='6px Cascadia Mono,monospace';
+          ctx.fillText('TP1 '+m.cfd.tp1.toFixed(2),xEnd+3,yTP1+3);
+        }
+        // TP2 line (green)
+        if(m.cfd.tp2){
+          const yTP2=py(m.cfd.tp2);
+          ctx.strokeStyle='#22c98a'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+          ctx.beginPath(); ctx.moveTo(x,yTP2); ctx.lineTo(xEnd,yTP2); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle='#22c98a'; ctx.font='6px Cascadia Mono,monospace';
+          ctx.fillText('TP2 '+m.cfd.tp2.toFixed(2),xEnd+3,yTP2+3);
+        }
       }
     });
   }
@@ -2415,7 +2452,6 @@ function renderCFDPaperTrades(d){
   const trades=d.trades.slice(-50).reverse();
   tbody.innerHTML=trades.map(t=>{
     const rc=t.result==='TP1'||t.result==='TP2'?'var(--green)':t.result==='SL'?'var(--red)':'var(--yellow)';
-    const rcClass=t.result==='TP1'||t.result==='TP2'?'dir-call':t.result==='SL'?'dir-put':'';
     return `<tr>
       <td>${t.id}</td>
       <td>${fmtHM(t.entry_time)}</td>
@@ -2431,6 +2467,43 @@ function renderCFDPaperTrades(d){
       <td style="color:${(t.pnl||0)>=0?'var(--green)':'var(--red)'}">${t.pnl!=null?'$'+t.pnl.toFixed(2):'–'}</td>
     </tr>`;
   }).join('');
+
+  const openDiv=document.getElementById('cfdOpenTrades');
+  if(!openDiv) return;
+  const open=d.open_trades||[];
+  if(!open.length){openDiv.innerHTML='';return;}
+  openDiv.innerHTML='<h4 style="color:var(--cyan);font-size:12px;margin-bottom:8px;">🟢 OPEN TRADES ('+open.length+')</h4>'+
+    open.map(t=>{
+      const lp=t.live_price||t.entry_price;
+      const pnlCol=(t.unrealized_pnl||0)>=0?'var(--green)':'var(--red)';
+      const dirCol=t.direction==='CALL'?'var(--green)':'var(--red)';
+      const progress=t.direction==='CALL'
+        ? ((lp-t.entry_price)/(t.tp2_price-t.entry_price)*100)
+        : ((t.entry_price-lp)/(t.entry_price-t.tp2_price)*100);
+      return `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="color:${dirCol};font-weight:700;">${t.direction} ${t.signal_type} #${t.signal_id}</span>
+          <span style="color:var(--muted);font-size:11px;">${fmtHM(t.entry_time)}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;font-size:12px;">
+          <div><span style="color:var(--muted);">Entry</span><br><b>${t.effective_entry?.toFixed(2)||'?'}</b></div>
+          <div><span style="color:var(--cyan);">Live</span><br><b>${lp?.toFixed(2)||'?'}</b></div>
+          <div><span style="color:var(--red);">SL (${t.dist_to_sl??'?'})</span><br><b style="color:var(--red)">${t.sl_price?.toFixed(2)}</b></div>
+          <div><span style="color:var(--yellow);">TP1 (${t.dist_to_tp1??'?'})</span><br><b style="color:var(--yellow)">${t.tp1_price?.toFixed(2)}</b></div>
+          <div><span style="color:var(--green);">TP2 (${t.dist_to_tp2??'?'})</span><br><b style="color:var(--green)">${t.tp2_price?.toFixed(2)}</b></div>
+        </div>
+        <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <span style="font-size:11px;color:var(--muted);">P&L: </span>
+            <span style="font-weight:700;color:${pnlCol}">${t.unrealized_pnl!=null?'$'+t.unrealized_pnl.toFixed(2):'–'}</span>
+            <span style="font-size:11px;color:var(--muted);margin-left:8px;">(${t.unrealized_pips??'–'} pips)</span>
+          </div>
+          <div style="width:120px;height:6px;background:var(--bg2);border-radius:3px;overflow:hidden;">
+            <div style="height:100%;width:${Math.min(Math.max(progress||0,0),100)}%;background:${dirCol};border-radius:3px;transition:width 1s;"></div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
 }
 
 async function refreshAll(){

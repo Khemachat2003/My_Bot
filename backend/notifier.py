@@ -306,10 +306,13 @@ class MLFeedEngine:
             cfd_resolved = db.check_cfd_trades(last_price, now.isoformat())
             for cr in cfd_resolved:
                 icon = {"SL": "🔴", "TP1": "🟢", "TP2": "🟢"}.get(cr["result"], "❓")
+                win_emoji = "WIN" if cr["result"] in ("TP1","TP2") else "LOSE"
                 msg = (
-                    f"📊 [CFD PAPER] | {cr['signal_type']} #{cr['signal_id']}\n"
-                    f"ทิศทาง: {cr['direction']} | ผลลัพธ์: {icon} {cr['result']}\n"
-                    f"Entry: {cr['entry_price']:.2f} ➔ Exit: {cr['exit_price']:.2f}\n"
+                    f"📊 [CFD RESOLVED] {icon} {win_emoji}\n"
+                    f"{cr['signal_type']} #{cr['signal_id']} | {cr['direction']}\n"
+                    f"Entry (eff): {cr.get('effective_entry', cr['entry_price']):.2f}\n"
+                    f"SL: {cr['sl_price']:.2f} | TP1: {cr['tp1_price']:.2f} | TP2: {cr['tp2_price']:.2f}\n"
+                    f"Exit: {cr['exit_price']:.2f} | Result: {cr['result']}\n"
                     f"P&L: ${cr.get('pnl', 0):+.2f} | Hold: {cr['hold_bars']} bars"
                 )
                 send_telegram(msg)
@@ -429,11 +432,29 @@ class MLFeedEngine:
                     sym_text = symbol_label(symbol)
                     if symbol != DERIV_SYMBOL:
                         sym_text = f"{sym_text} (สำรอง — ตลาดทองปิด)"
+                    ps = db.CFD_PIP_SIZE
+                    spread = db.CFD_SPREAD_PIPS * ps
+                    eff = last_price + spread/2 if res["signal"] == "CALL" else last_price - spread/2
+                    if res["signal"] == "CALL":
+                        cfd_sl = eff - db.CFD_SL_PIPS * ps
+                        cfd_tp1 = eff + db.CFD_TP1_PIPS * ps
+                        cfd_tp2 = eff + db.CFD_TP2_PIPS * ps
+                    else:
+                        cfd_sl = eff + db.CFD_SL_PIPS * ps
+                        cfd_tp1 = eff - db.CFD_TP1_PIPS * ps
+                        cfd_tp2 = eff - db.CFD_TP2_PIPS * ps
+                    lot = db._cfd_lot_size()
                     msg = (
                         f"🟢 [ML MODEL ALERT]\n"
                         f"Symbol: {sym_text} | TF: {cfg['label']} | Direction: {res['signal']}\n"
                         f"Entry: {last_price:.2f} | Win Prob: {res['confidence']:.1%} | Hold: {hold_min}m\n"
-                        f"เวลาเข้า: {now.strftime('%H:%M:%S')} UTC"
+                        f"เวลาเข้า: {now.strftime('%H:%M:%S')} UTC\n"
+                        f"─── CFD Paper Trade ───\n"
+                        f"Entry (eff): {eff:.2f} | Lot: {lot}\n"
+                        f"SL: {cfd_sl:.2f} | TP1: {cfd_tp1:.2f} | TP2: {cfd_tp2:.2f}\n"
+                        f"Risk: ${db.CFD_CAPITAL * db.CFD_RISK_PCT:.0f} (1%)\n"
+                        f"TP1 Reward: ${db.CFD_TP1_PIPS * db.CFD_PIP_VALUE * lot:.2f}\n"
+                        f"TP2 Reward: ${db.CFD_TP2_PIPS * db.CFD_PIP_VALUE * lot:.2f}"
                     )
                     ok = send_telegram(msg)
                     print(f"[MLFeed] Telegram ALERT [{cfg['label']}] {'ส่งสำเร็จ' if ok else 'ส่งไม่สำเร็จ (ดู log ด้านบน)'}")

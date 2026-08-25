@@ -341,12 +341,27 @@ def get_signals(limit: int = Query(100, ge=1, le=1000),
 def get_signal_markers(symbol: str = Query("frxXAUUSD"),
                        limit: int = Query(50, ge=1, le=200),
                        _auth=Depends(require_auth)):
-    """ส่งสัญญาณทั้ง SETUP + ML สำหรับแสดง entry markers บนกราฟ"""
+    """ส่งสัญญาณทั้ง SETUP + ML + CFD สำหรับแสดง entry markers + levels บนกราฟ"""
     setup_rows = db.fetch_recent_setup_signals(limit=limit, symbol=symbol)
     ml_rows = db.fetch_recent_ml_signals(limit=limit)
+
+    # CFD trades: PENDING + resolved → map signal_id → cfd data
+    conn = db.get_conn()
+    cfd_rows = conn.execute(
+        "SELECT signal_id, signal_type, direction, entry_price, effective_entry, "
+        "sl_price, tp1_price, tp2_price, result, exit_price, pnl "
+        "FROM cfd_paper_trades ORDER BY id DESC LIMIT 200"
+    ).fetchall()
+    conn.close()
+    cfd_map = {}
+    for cr in cfd_rows:
+        key = (cr["signal_type"], cr["signal_id"])
+        if key not in cfd_map:
+            cfd_map[key] = dict(cr)
+
     markers = []
     for r in setup_rows:
-        markers.append({
+        m = {
             "type": "SETUP",
             "ts": r.get("signal_time"),
             "price": r.get("entry_price"),
@@ -355,9 +370,20 @@ def get_signal_markers(symbol: str = Query("frxXAUUSD"),
             "importance": r.get("importance"),
             "touch_case": (json.loads(r.get("conditions_log_json") or "{}")).get("_touch_case", ""),
             "id": r.get("id"),
-        })
+        }
+        cfd = cfd_map.get(("SETUP", r.get("id")), {})
+        if cfd:
+            m["cfd"] = {
+                "effective_entry": cfd.get("effective_entry"),
+                "sl": cfd.get("sl_price"),
+                "tp1": cfd.get("tp1_price"),
+                "tp2": cfd.get("tp2_price"),
+                "pnl": cfd.get("pnl"),
+                "cfd_result": cfd.get("result"),
+            }
+        markers.append(m)
     for r in ml_rows:
-        markers.append({
+        m = {
             "type": "ML",
             "ts": r.get("signal_time"),
             "price": r.get("entry_price"),
@@ -365,7 +391,18 @@ def get_signal_markers(symbol: str = Query("frxXAUUSD"),
             "result": r.get("result"),
             "confidence": r.get("confidence"),
             "id": r.get("id"),
-        })
+        }
+        cfd = cfd_map.get(("ML", r.get("id")), {})
+        if cfd:
+            m["cfd"] = {
+                "effective_entry": cfd.get("effective_entry"),
+                "sl": cfd.get("sl_price"),
+                "tp1": cfd.get("tp1_price"),
+                "tp2": cfd.get("tp2_price"),
+                "pnl": cfd.get("pnl"),
+                "cfd_result": cfd.get("result"),
+            }
+        markers.append(m)
     markers.sort(key=lambda x: x.get("ts") or "", reverse=True)
     return markers[:limit]
 
@@ -597,9 +634,30 @@ def get_cfd_backtest(
 
 @app.get("/api/cfd/paper")
 def get_cfd_paper(_auth=Depends(require_auth)):
-    """CFD Paper Trading — สถิติ realtime จาก signal ที่กำลังเทรดจริง"""
-    from backend.db import fetch_cfd_stats
-    return fetch_cfd_stats()
+    """CFD Paper Trading — สถิติ realtime + live P&L สำหรับ OPEN trades"""
+    from backend.db import fetch_cfd_stats, get_conn
+    stats = fetch_cfd_stats()
+    open_trades = stats.get("open_trades", [])
+    if open_trades:
+        conn = get_conn()
+        for t in open_trades:
+            row = conn.execute(
+                "SELECT close FROM prices WHERE symbol = ? ORDER BY ts DESC LIMIT 1",
+                (t.get("symbol", "frxXAUUSD"),)
+            ).fetchone()
+            if row:
+                live_price = float(row[0])
+                t["live_price"] = live_price
+                if t["direction"] == "CALL":
+                    t["unrealized_pips"] = round((live_price - t["effective_entry"]) / t["pip_size"], 1)
+                else:
+                    t["unrealized_pips"] = round((t["effective_entry"] - live_price) / t["pip_size"], 1)
+                t["unrealized_pnl"] = round(t["unrealized_pips"] * t["pip_size"] * 100 * t["lot_size"], 2)
+                t["dist_to_sl"] = round(abs(live_price - t["sl_price"]) / t["pip_size"], 1)
+                t["dist_to_tp1"] = round(abs(t["tp1_price"] - live_price) / t["pip_size"], 1)
+                t["dist_to_tp2"] = round(abs(t["tp2_price"] - live_price) / t["pip_size"], 1)
+        conn.close()
+    return stats
 
 
 # ── serve หน้าเว็บ dashboard ────────────────────────────────────────────────

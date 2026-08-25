@@ -265,12 +265,29 @@ class SetupFeedEngine:
                 symbol=self.symbol, direction=direction,
                 entry_price=self.last_price, entry_time=now.isoformat(),
             )
+            ps = db.CFD_PIP_SIZE
+            spread = db.CFD_SPREAD_PIPS * ps
+            eff = self.last_price + spread/2 if direction == "CALL" else self.last_price - spread/2
+            if direction == "CALL":
+                cfd_sl = eff - db.CFD_SL_PIPS * ps
+                cfd_tp1 = eff + db.CFD_TP1_PIPS * ps
+                cfd_tp2 = eff + db.CFD_TP2_PIPS * ps
+            else:
+                cfd_sl = eff + db.CFD_SL_PIPS * ps
+                cfd_tp1 = eff - db.CFD_TP1_PIPS * ps
+                cfd_tp2 = eff - db.CFD_TP2_PIPS * ps
+            lot = db._cfd_lot_size()
             sym_text = symbol_label(self.symbol)
             msg = (
                 f"⚡ [TICK TOUCH] Importance 1\n"
-                f"Symbol: {sym_text} | ราคา {self.last_price:.5f} แตะ EMA200 ({e200:.5f}) ณ ขณะนี้\n"
+                f"Symbol: {sym_text} | ราคา {self.last_price:.5f} แตะ EMA200 ({e200:.5f})\n"
                 f"Direction: {direction} | Hold: {hold_min}m\n"
-                f"กรุณาสังเกตว่าเข้าจุดไหน winrate ดีสุด"
+                f"─── CFD Paper Trade ───\n"
+                f"Entry (eff): {eff:.2f} | Lot: {lot}\n"
+                f"SL: {cfd_sl:.2f} | TP1: {cfd_tp1:.2f} | TP2: {cfd_tp2:.2f}\n"
+                f"Risk: ${db.CFD_CAPITAL * db.CFD_RISK_PCT:.0f} (1%)\n"
+                f"TP1 Reward: ${db.CFD_TP1_PIPS * db.CFD_PIP_VALUE * lot:.2f}\n"
+                f"TP2 Reward: ${db.CFD_TP2_PIPS * db.CFD_PIP_VALUE * lot:.2f}"
             )
             send_telegram(msg)
             print(f"[SetupFeed:{self.symbol}] 🚨 TICK_TOUCH → EMA200 = {e200:.5f}, "
@@ -336,10 +353,13 @@ class SetupFeedEngine:
             cfd_resolved = db.check_cfd_trades(self.last_price, now.isoformat())
             for cr in cfd_resolved:
                 icon = {"SL": "🔴", "TP1": "🟢", "TP2": "🟢"}.get(cr["result"], "❓")
+                win_emoji = "WIN" if cr["result"] in ("TP1","TP2") else "LOSE"
                 msg = (
-                    f"📊 [CFD PAPER] | {cr['signal_type']} #{cr['signal_id']}\n"
-                    f"ทิศทาง: {cr['direction']} | ผลลัพธ์: {icon} {cr['result']}\n"
-                    f"Entry: {cr['entry_price']:.2f} ➔ Exit: {cr['exit_price']:.2f}\n"
+                    f"📊 [CFD RESOLVED] {icon} {win_emoji}\n"
+                    f"{cr['signal_type']} #{cr['signal_id']} | {cr['direction']}\n"
+                    f"Entry (eff): {cr.get('effective_entry', cr['entry_price']):.2f}\n"
+                    f"SL: {cr['sl_price']:.2f} | TP1: {cr['tp1_price']:.2f} | TP2: {cr['tp2_price']:.2f}\n"
+                    f"Exit: {cr['exit_price']:.2f} | Result: {cr['result']}\n"
                     f"P&L: ${cr.get('pnl', 0):+.2f} | Hold: {cr['hold_bars']} bars"
                 )
                 send_telegram(msg)
@@ -548,6 +568,18 @@ class SetupFeedEngine:
                     touch_label = touch_labels.get(result.touch_case, result.touch_case)
 
                 imp_label = f"Importance {result.importance}" if result.importance else ""
+                ps = db.CFD_PIP_SIZE
+                spread = db.CFD_SPREAD_PIPS * ps
+                eff = self.last_price + spread/2 if result.direction == "CALL" else self.last_price - spread/2
+                if result.direction == "CALL":
+                    cfd_sl = eff - db.CFD_SL_PIPS * ps
+                    cfd_tp1 = eff + db.CFD_TP1_PIPS * ps
+                    cfd_tp2 = eff + db.CFD_TP2_PIPS * ps
+                else:
+                    cfd_sl = eff + db.CFD_SL_PIPS * ps
+                    cfd_tp1 = eff - db.CFD_TP1_PIPS * ps
+                    cfd_tp2 = eff - db.CFD_TP2_PIPS * ps
+                lot = db._cfd_lot_size()
                 msg_trigger = (
                     f"🔵 [RULE-BASED ALERT] {imp_label}\n"
                     f"Symbol: {sym_text} | TF: {tf_label} | Tier: {result.tier}\n"
@@ -559,6 +591,12 @@ class SetupFeedEngine:
                     f"Regime-Gate: {gate_txt}\n"
                     f"เหตุผล: {result.entry_trigger_note}\n"
                     f"เวลา: {now.strftime('%H:%M:%S')} UTC\n"
+                    f"─── CFD Paper Trade ───\n"
+                    f"Entry (eff): {eff:.2f} | Lot: {lot}\n"
+                    f"SL: {cfd_sl:.2f} | TP1: {cfd_tp1:.2f} | TP2: {cfd_tp2:.2f}\n"
+                    f"Risk: ${db.CFD_CAPITAL * db.CFD_RISK_PCT:.0f} (1%)\n"
+                    f"TP1 Reward: ${db.CFD_TP1_PIPS * db.CFD_PIP_VALUE * lot:.2f}\n"
+                    f"TP2 Reward: ${db.CFD_TP2_PIPS * db.CFD_PIP_VALUE * lot:.2f}\n"
                     f"─── รายการเงื่อนไข ───\n{all_checks_txt}"
                 )
                 ok = send_telegram(msg_trigger)

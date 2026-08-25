@@ -327,8 +327,51 @@ def init_db() -> None:
     conn.commit()
     conn.close()
 
+    # Migration: backfill CFD paper trades สำหรับ PENDING signals ที่ยังไม่มี CFD record
+    try:
+        _backfill_cfd_paper_trades()
+    except Exception:
+        pass
 
-# ── MACRO (DXY รายชั่วโมง — ข้อมูลสำหรับ Regime-Gate) ─────────────────────────
+
+def _backfill_cfd_paper_trades():
+    """สร้าง CFD paper trades สำหรับ signals ที่ยัง PENDING แต่ไม่มี CFD record"""
+    conn = get_conn()
+    cfd_ids = {r[0] for r in conn.execute(
+        "SELECT signal_id FROM cfd_paper_trades"
+    ).fetchall()}
+    pending_setup = conn.execute(
+        "SELECT id, symbol, direction, entry_price, signal_time "
+        "FROM setup_signals WHERE result = 'PENDING'"
+    ).fetchall()
+    pending_ml = conn.execute(
+        "SELECT id, symbol, direction, entry_price, signal_time "
+        "FROM ml_signals WHERE result = 'PENDING'"
+    ).fetchall()
+    conn.close()
+
+    for row in pending_setup:
+        if row[0] not in cfd_ids:
+            try:
+                insert_cfd_paper_trade(
+                    signal_id=row[0], signal_type="SETUP",
+                    symbol=row[1] or "frxXAUUSD", direction=row[2],
+                    entry_price=row[3], entry_time=row[4],
+                )
+                print(f"[DB] Backfilled CFD paper trade for SETUP signal #{row[0]}")
+            except Exception:
+                pass
+    for row in pending_ml:
+        if row[0] not in cfd_ids:
+            try:
+                insert_cfd_paper_trade(
+                    signal_id=row[0], signal_type="ML",
+                    symbol=row[1] or "frxXAUUSD", direction=row[2],
+                    entry_price=row[3], entry_time=row[4],
+                )
+                print(f"[DB] Backfilled CFD paper trade for ML signal #{row[0]}")
+            except Exception:
+                pass
 def upsert_macro_dxy(ts: str, dxy_close: float) -> None:
     conn = get_conn()
     conn.execute(
@@ -988,6 +1031,7 @@ def fetch_cfd_stats() -> dict:
         "by_type": by_type,
         "by_direction": by_dir,
         "trades": rows[-100:],
+        "open_trades": open_rows,
     }
 
 
