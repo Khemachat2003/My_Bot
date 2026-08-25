@@ -519,17 +519,22 @@ def fetch_pending_setup_signals(symbol: str | None = None) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def fetch_recent_setup_signals(limit: int = 100, symbol: str | None = None) -> list[dict]:
+def fetch_recent_setup_signals(limit: int = 100, symbol: str | None = None,
+                               exclude_tick: bool = False) -> list[dict]:
     conn = get_conn()
+    where_parts = []
+    params = []
     if symbol:
-        rows = conn.execute(
-            "SELECT * FROM setup_signals WHERE symbol = ? ORDER BY signal_time DESC LIMIT ?",
-            (symbol, limit),
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            "SELECT * FROM setup_signals ORDER BY signal_time DESC LIMIT ?", (limit,)
-        ).fetchall()
+        where_parts.append("symbol = ?")
+        params.append(symbol)
+    if exclude_tick:
+        where_parts.append("timeframe != 'TICK'")
+    where = (" WHERE " + " AND ".join(where_parts)) if where_parts else ""
+    params.append(limit)
+    rows = conn.execute(
+        f"SELECT * FROM setup_signals{where} ORDER BY signal_time DESC LIMIT ?",
+        params,
+    ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 

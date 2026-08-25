@@ -334,7 +334,7 @@ def get_prices(limit: int = Query(500, ge=1, le=5000),
 @app.get("/api/signals")
 def get_signals(limit: int = Query(100, ge=1, le=1000),
                 symbol: str | None = Query(None), _auth=Depends(require_auth)):
-    return db.fetch_recent_setup_signals(limit=limit, symbol=symbol)
+    return db.fetch_recent_setup_signals(limit=limit, symbol=symbol, exclude_tick=True)
 
 
 @app.get("/api/signals/markers")
@@ -342,7 +342,7 @@ def get_signal_markers(symbol: str = Query("frxXAUUSD"),
                        limit: int = Query(50, ge=1, le=200),
                        _auth=Depends(require_auth)):
     """ส่งสัญญาณทั้ง SETUP + ML + CFD สำหรับแสดง entry markers + levels บนกราฟ"""
-    setup_rows = db.fetch_recent_setup_signals(limit=limit, symbol=symbol)
+    setup_rows = db.fetch_recent_setup_signals(limit=limit, symbol=symbol, exclude_tick=True)
     ml_rows = db.fetch_recent_ml_signals(limit=limit)
 
     # CFD trades: PENDING + resolved → map signal_id → cfd data

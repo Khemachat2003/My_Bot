@@ -267,34 +267,13 @@ class SetupFeedEngine:
                 conditions_passed=result.conditions_passed,
                 conditions_log_json=json.dumps(result.conditions_log, ensure_ascii=False, default=str),
             )
-            db.insert_cfd_paper_trade(
-                signal_id=new_sig_id, signal_type="SETUP",
-                symbol=self.symbol, direction=direction,
-                entry_price=self.last_price, entry_time=now.isoformat(),
-            )
-            spread = db.CFD_SPREAD_PIPS * ps
-            eff = self.last_price + spread/2 if direction == "CALL" else self.last_price - spread/2
-            if direction == "CALL":
-                cfd_sl = eff - db.CFD_SL_PIPS * ps
-                cfd_tp1 = eff + db.CFD_TP1_PIPS * ps
-                cfd_tp2 = eff + db.CFD_TP2_PIPS * ps
-            else:
-                cfd_sl = eff + db.CFD_SL_PIPS * ps
-                cfd_tp1 = eff - db.CFD_TP1_PIPS * ps
-                cfd_tp2 = eff - db.CFD_TP2_PIPS * ps
-            pv = db.get_pip_value(self.symbol)
-            lot = db._cfd_lot_size(self.symbol)
+            # TICK_TOUCH ไม่สร้าง CFD — CFD ต้องมาจาก rulebase/ML เท่านั้น
             sym_text = symbol_label(self.symbol)
             msg = (
                 f"⚡ [TICK TOUCH] Importance 1\n"
                 f"Symbol: {sym_text} | ราคา {self.last_price:.5f} แตะ EMA200 ({e200:.5f})\n"
                 f"Direction: {direction} | Hold: {hold_min}m\n"
-                f"─── CFD Paper Trade ───\n"
-                f"Entry (eff): {eff:.5f} | Lot: {lot}\n"
-                f"SL: {cfd_sl:.5f} | TP1: {cfd_tp1:.5f} | TP2: {cfd_tp2:.5f}\n"
-                f"Risk: ${db.CFD_CAPITAL * db.CFD_RISK_PCT:.0f} (1%)\n"
-                f"TP1 Reward: ${db.CFD_TP1_PIPS * pv * lot:.2f}\n"
-                f"TP2 Reward: ${db.CFD_TP2_PIPS * pv * lot:.2f}"
+                f"⚠️ สัญญาณเตือน — รอ rulebase/ML ยืนยันก่อนเข้า CFD"
             )
             send_telegram(msg)
             print(f"[SetupFeed:{self.symbol}] 🚨 TICK_TOUCH → EMA200 = {e200:.5f}, "
