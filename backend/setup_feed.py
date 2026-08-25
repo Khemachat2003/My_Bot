@@ -220,8 +220,15 @@ class SetupFeedEngine:
             e200 = float(ema200.iloc[-1])
             if e200 <= 0:
                 return
-            dist = abs(self.last_price - e200) / e200 * 100.0
-            if dist > 0.02:
+
+            # ใช้ absolute pip distance — XAUUSD ต้องแตะภายใน 1 point, forex 0.2 pip
+            ps = db.get_pip_size(self.symbol)
+            pip_dist = abs(self.last_price - e200) / ps
+            if ps >= 1.0:
+                max_pip = 1.0
+            else:
+                max_pip = 0.2
+            if pip_dist > max_pip:
                 return
 
             recent = db.fetch_recent_setup_signals(limit=1, symbol=self.symbol)
@@ -265,7 +272,6 @@ class SetupFeedEngine:
                 symbol=self.symbol, direction=direction,
                 entry_price=self.last_price, entry_time=now.isoformat(),
             )
-            ps = db.get_pip_size(self.symbol)
             spread = db.CFD_SPREAD_PIPS * ps
             eff = self.last_price + spread/2 if direction == "CALL" else self.last_price - spread/2
             if direction == "CALL":
@@ -292,7 +298,7 @@ class SetupFeedEngine:
             )
             send_telegram(msg)
             print(f"[SetupFeed:{self.symbol}] 🚨 TICK_TOUCH → EMA200 = {e200:.5f}, "
-                  f"price = {self.last_price:.5f}, dist = {dist:.4f}%")
+                  f"price = {self.last_price:.5f}, pip_dist = {pip_dist:.2f}")
         except Exception:
             pass
 
