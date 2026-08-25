@@ -635,7 +635,7 @@ def get_cfd_backtest(
 @app.get("/api/cfd/paper")
 def get_cfd_paper(_auth=Depends(require_auth)):
     """CFD Paper Trading — สถิติ realtime + live P&L สำหรับ OPEN trades"""
-    from backend.db import fetch_cfd_stats, get_conn
+    from backend.db import fetch_cfd_stats, get_conn, get_pip_value
     stats = fetch_cfd_stats()
     open_trades = stats.get("open_trades", [])
     if open_trades:
@@ -648,14 +648,16 @@ def get_cfd_paper(_auth=Depends(require_auth)):
             if row:
                 live_price = float(row[0])
                 t["live_price"] = live_price
+                ps = t["pip_size"]
+                pv = get_pip_value(t.get("symbol", "frxXAUUSD"))
                 if t["direction"] == "CALL":
-                    t["unrealized_pips"] = round((live_price - t["effective_entry"]) / t["pip_size"], 1)
+                    t["unrealized_pips"] = round((live_price - t["effective_entry"]) / ps, 1)
                 else:
-                    t["unrealized_pips"] = round((t["effective_entry"] - live_price) / t["pip_size"], 1)
-                t["unrealized_pnl"] = round(t["unrealized_pips"] * t["pip_size"] * 100 * t["lot_size"], 2)
-                t["dist_to_sl"] = round(abs(live_price - t["sl_price"]) / t["pip_size"], 1)
-                t["dist_to_tp1"] = round(abs(t["tp1_price"] - live_price) / t["pip_size"], 1)
-                t["dist_to_tp2"] = round(abs(t["tp2_price"] - live_price) / t["pip_size"], 1)
+                    t["unrealized_pips"] = round((t["effective_entry"] - live_price) / ps, 1)
+                t["unrealized_pnl"] = round(t["unrealized_pips"] * pv * t["lot_size"], 2)
+                t["dist_to_sl"] = round(abs(live_price - t["sl_price"]) / ps, 1)
+                t["dist_to_tp1"] = round(abs(t["tp1_price"] - live_price) / ps, 1)
+                t["dist_to_tp2"] = round(abs(t["tp2_price"] - live_price) / ps, 1)
         conn.close()
     return stats
 

@@ -329,6 +329,16 @@ def init_db() -> None:
 
     # Migration: backfill CFD paper trades สำหรับ PENDING signals ที่ยังไม่มี CFD record
     try:
+        # ลบ CFD trades ที่ resolve ผิด (hold_bars=0 จาก pip_size เดิมผิด)
+        conn2 = get_conn()
+        conn2.execute(
+            "DELETE FROM cfd_paper_trades WHERE hold_bars = 0 AND result != 'OPEN'"
+        )
+        conn2.commit()
+        conn2.close()
+    except Exception:
+        pass
+    try:
         _backfill_cfd_paper_trades()
     except Exception:
         pass
@@ -892,24 +902,50 @@ CFD_SL_PIPS = 20
 CFD_TP1_PIPS = 40
 CFD_TP2_PIPS = 60
 CFD_SPREAD_PIPS = 1.5
-CFD_PIP_SIZE = 1.0
-CFD_PIP_VALUE = 100.0
 CFD_CAPITAL = 5000.0
 CFD_RISK_PCT = 0.01
 
-def _cfd_lot_size() -> float:
+# ── pip_size per symbol ──
+_SYMBOL_PIP = {
+    "XAUUSD": 1.0, "frxXAUUSD": 1.0,
+    "USDJPY": 0.01, "frxUSDJPY": 0.01,
+    "EURJPY": 0.01, "frxEURJPY": 0.01,
+    "GBPJPY": 0.01, "frxGBPJPY": 0.01,
+    "AUDJPY": 0.01, "frxAUDJPY": 0.01,
+    "EURUSD": 0.0001, "frxEURUSD": 0.0001,
+    "GBPUSD": 0.0001, "frxGBPUSD": 0.0001,
+    "AUDUSD": 0.0001, "frxAUDUSD": 0.0001,
+    "NZDUSD": 0.0001, "frxNZDUSD": 0.0001,
+    "USDCAD": 0.0001, "frxUSDCAD": 0.0001,
+    "USDCHF": 0.0001, "frxUSDCHF": 0.0001,
+}
+_DEFAULT_PIP = 0.0001
+
+def get_pip_size(symbol: str) -> float:
+    return _SYMBOL_PIP.get(symbol, _DEFAULT_PIP)
+
+def get_pip_value(symbol: str) -> float:
+    """pip_value = profit per 1 pip for 1 lot (standard)"""
+    ps = get_pip_size(symbol)
+    if ps >= 1.0:
+        return 100.0
+    return 10.0
+
+def _cfd_lot_size(symbol: str = "frxXAUUSD") -> float:
     risk = CFD_CAPITAL * CFD_RISK_PCT
-    return round(risk / (CFD_SL_PIPS * CFD_PIP_VALUE), 3)
+    pv = get_pip_value(symbol)
+    return round(risk / (CFD_SL_PIPS * pv), 3)
 
 
 def insert_cfd_paper_trade(signal_id: int, signal_type: str, symbol: str,
                            direction: str, entry_price: float,
                            entry_time: str) -> int | None:
     """สร้าง CFD paper trade เมื่อ signal ใหม่ถูกสร้าง"""
-    ps = CFD_PIP_SIZE
+    ps = get_pip_size(symbol)
+    pv = get_pip_value(symbol)
     spread = CFD_SPREAD_PIPS * ps
     eff = entry_price + spread / 2 if direction == "CALL" else entry_price - spread / 2
-    lot = _cfd_lot_size()
+    lot = _cfd_lot_size(symbol)
 
     if direction == "CALL":
         sl  = eff - CFD_SL_PIPS * ps
@@ -960,13 +996,14 @@ def update_cfd_result(cfd_id: int, result: str, exit_price: float,
 
     ps = row["pip_size"]
     lot = row["lot_size"]
-    spread_cost = row["spread_pips"] * ps * CFD_PIP_VALUE * lot
-    risk_amt = CFD_SL_PIPS * CFD_PIP_VALUE * lot
+    pv = 100.0 if ps >= 1.0 else 10.0
+    spread_cost = row["spread_pips"] * ps * pv * lot
+    risk_amt = CFD_SL_PIPS * pv * lot
 
     if result == "TP1":
-        pnl = CFD_TP1_PIPS * CFD_PIP_VALUE * lot - spread_cost
+        pnl = CFD_TP1_PIPS * pv * lot - spread_cost
     elif result == "TP2":
-        pnl = CFD_TP2_PIPS * CFD_PIP_VALUE * lot - spread_cost
+        pnl = CFD_TP2_PIPS * pv * lot - spread_cost
     else:
         pnl = -risk_amt - spread_cost
 
@@ -1035,9 +1072,11 @@ def fetch_cfd_stats() -> dict:
     }
 
 
-def check_cfd_trades(current_price: float, now_iso: str) -> list[dict]:
-    """ตรวจ trades ที่ OPEN ทั้งหมด — คืน list ของ trades ที่เพิ่ง resolve"""
+def check_cfd_trades(current_price: float, now_iso: str, symbol: str = "") -> list[dict]:
+    """ตรวจ trades ที่ OPEN ของ symbol ที่ระบุ — คืน list ของ trades ที่เพิ่ง resolve"""
     open_trades = fetch_open_cfd_trades()
+    if symbol:
+        open_trades = [t for t in open_trades if t.get("symbol") == symbol]
     resolved = []
     for t in open_trades:
         d = t["direction"]
