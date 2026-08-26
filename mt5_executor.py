@@ -261,18 +261,28 @@ def place_order(symbol: str, direction: str, entry: float, sl: float, tp: float,
 def reconcile_open(conn) -> None:
     if mt5 is None:
         return
+    now = dt.datetime.now()
+    window_start = now - dt.timedelta(days=2)
     open_tickets = {p.ticket for p in mt5.positions_get(magic=MAGIC) or []}
     row = conn.execute(
         "SELECT ticket, signal_id, symbol, direction, entry, sl, tp, volume, opened_at "
         "FROM trades WHERE result IS NULL").fetchall()
     for r in row:
         ticket = r[0]
-        if ticket == 0 or ticket in open_tickets:
+        if ticket <= 0:
+            conn.execute("UPDATE trades SET result='DRY' WHERE ticket=?", (ticket,))
+            conn.commit()
             continue
-        deals = mt5.history_deals_get(position=ticket)
-        pnl = 0.0
-        if deals:
-            pnl = float(sum(d.profit for d in deals))
+        if ticket in open_tickets:
+            continue
+        try:
+            deals = mt5.history_deals_get(position=ticket)
+        except Exception:
+            deals = None
+        if not deals:
+            deals = mt5.history_deals_get(window_start, now) or []
+            deals = [d for d in deals if d.position_id == ticket and d.magic == MAGIC]
+        pnl = float(sum(d.profit for d in deals)) if deals else 0.0
         result = "WIN" if pnl > 0 else ("LOSE" if pnl < 0 else "DRAW")
         _log(f"ปิดไม้ ticket={ticket} {r[2]} {r[3]} pnl={pnl:.2f} -> {result}")
         conn.execute(

@@ -171,38 +171,44 @@ def _fractal_structure(piv_highs, piv_lows) -> str:
 # 10 CONDITIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
+def _build_fractal_zones(piv_highs, piv_lows, atr_val: float, atr_multiplier: float = 0.5):
+    """สร้างโซน S/R รอบ fractal ทุกตัว โดยใช้ Tolerance_Range = ATR * ATR_Multiplier
+    แล้ว merge โซนที่ซ้อนทับกัน (เก็บเฉพาะ fractal ตัวใหม่สุดในกลุ่มที่ overlap)"""
+    tolerance = atr_val * atr_multiplier
+    raw = [(idx, price, "H") for idx, price in piv_highs] + \
+          [(idx, price, "L") for idx, price in piv_lows]
+    raw.sort(key=lambda x: x[0])  # เรียงตามเวลา เก่า→ใหม่
+
+    zones = []  # each: {"idx","price","kind","lo","hi"}
+    for idx, price, kind in raw:
+        lo, hi = price - tolerance, price + tolerance
+        merged = False
+        for z in zones:
+            if not (hi < z["lo"] or lo > z["hi"]):  # overlap
+                if idx >= z["idx"]:  # เก็บตัวใหม่สุดในกลุ่ม overlap
+                    z.update(idx=idx, price=price, kind=kind, lo=lo, hi=hi)
+                merged = True
+                break
+        if not merged:
+            zones.append({"idx": idx, "price": price, "kind": kind, "lo": lo, "hi": hi})
+    return zones
+
+
 def _cond1_fractal_sr(df: pd.DataFrame, piv_highs, piv_lows, direction: str,
-                       zone_tol_pct: float = 0.3) -> dict:
-    """Fractal S/R zone — มองย้อนหลังหา fractal ที่อยู่ในโซนราคาเดียวกัน
-    ใช้ zone_tol_pct (default 0.3%) เป็นรัศมีจากตำแหน่ง fractal"""
+                       atr_val: float, atr_multiplier: float = 0.5) -> dict:
+    """Fractal S/R zone — Tolerance_Range = ATR(14) * ATR_Multiplier(0.5) รอบ fractal
+    โซนที่ซ้อนทับกันจะถูก merge (เก็บ fractal ใหม่สุด) ก่อนเช็คว่าราคาปัจจุบันอยู่ในโซนไหน"""
     last_close = float(df["close"].iloc[-1])
+    zones = _build_fractal_zones(piv_highs, piv_lows, atr_val, atr_multiplier)
 
-    # ตรวจ fractal ทุกตัว (most recent ก่อน) — ถ้าเจอตัวไหนตรงโซน → pass
-    for idx, price in reversed(piv_highs):
-        if idx < len(df):
-            row = df.iloc[idx]
-            body_top = max(float(row["open"]), float(row["close"]))
-            body_bot = min(float(row["open"]), float(row["close"]))
-            zone_hi = price * (1 + zone_tol_pct / 100)
-            zone_lo = body_bot * (1 - zone_tol_pct / 100)
-            if zone_lo <= last_close <= zone_hi:
-                return {"pass": True,
-                        "note": f"ราคาอยู่ในโซนแนวต้าน fractal "
-                                f"({body_bot:.2f}–{price:.2f}) ±{zone_tol_pct}%"}
+    for z in reversed(zones):  # เช็คโซนใหม่สุดก่อน
+        if z["lo"] <= last_close <= z["hi"]:
+            label = "แนวต้าน" if z["kind"] == "H" else "แนวรับ"
+            return {"pass": True, "zone": z,
+                    "note": f"ราคาอยู่ในโซน{label} fractal ({z['lo']:.2f}–{z['hi']:.2f}) "
+                            f"ATR-tol=±{atr_val * atr_multiplier:.2f}"}
 
-    for idx, price in reversed(piv_lows):
-        if idx < len(df):
-            row = df.iloc[idx]
-            body_top = max(float(row["open"]), float(row["close"]))
-            body_bot = min(float(row["open"]), float(row["close"]))
-            zone_hi = body_top * (1 + zone_tol_pct / 100)
-            zone_lo = price * (1 - zone_tol_pct / 100)
-            if zone_lo <= last_close <= zone_hi:
-                return {"pass": True,
-                        "note": f"ราคาอยู่ในโซนแนวรับ fractal "
-                                f"({price:.2f}–{body_top:.2f}) ±{zone_tol_pct}%"}
-
-    return {"pass": False, "note": "ราคาไม่ได้อยู่ในโซน S/R จาก fractal"}
+    return {"pass": False, "zone": None, "note": "ราคาไม่ได้อยู่ในโซน S/R จาก fractal (ATR-based)"}
 
 
 def _cond2_bb_break(df: pd.DataFrame, bb_up, bb_lo, direction: str) -> dict:
@@ -228,57 +234,48 @@ def _cond3_rsi_ob_os(rsi_val: float, direction: str) -> dict:
     return {"pass": False, "note": f"RSI={rsi_val:.1f} ไม่ใช่ OVB/OVS"}
 
 
-def _cond4_rsi_divergence(rsi: pd.Series, piv_highs, piv_lows, direction: str,
-                          last_close: float) -> dict:
-    """RSI Divergence — เทียบราคา vs RSI ณ จุด fractal vs จุดปัจจุบัน
-    Divergence เท่านั้น (ไม่ใช้ convergence)
-
-    CALL: หา fractal LOW ล่าสุด → ราคาจากจุดนั้นขึ้นมา แต่ RSI ลง = Bullish Div
-    PUT:  หา fractal HIGH ล่าสุด → ราคาจากจุดนั้นลงมา แต่ RSI ขึ้น = Bearish Div
+def _cond4_rsi_divergence(rsi: pd.Series, piv_highs_sig, piv_lows_sig,
+                           above_ema200: bool, last_close: float,
+                           cur_idx: int, rsi_ob: float = 70.0, rsi_os: float = 30.0,
+                           diff_threshold: float = 3.0, lookback: int = 100) -> dict:
+    """RSI Divergence ตามสเปก:
+    CASE A (ราคาเหนือ EMA200): หา Fractal Low นัยสำคัญ (period=15) ที่ใกล้ที่สุด
+        ภายใน lookback แท่ง ซึ่ง ณ แท่งนั้น RSI เคย <= OS มาก่อน แล้วเช็ค
+        ราคาปัจจุบัน <= ราคา fractal, RSI ปัจจุบัน > RSI อดีต, ห่างกัน >= threshold
+    CASE B (ราคาใต้ EMA200): กลับด้าน ใช้ Fractal High + OB
     """
     last_rsi = float(rsi.iloc[-1]) if len(rsi) > 0 else 50.0
 
-    # ── Approach 1: Single-fractal divergence (สเปคผู้ใช้) ──
-    if direction == "CALL" and len(piv_lows) >= 1:
-        i_frac, p_frac = piv_lows[-1]
-        if i_frac < len(rsi):
+    if above_ema200:
+        # เลือก fractal low นัยสำคัญตัวล่าสุดในช่วง lookback ที่เคย oversold
+        for i_frac, p_frac in reversed(piv_lows_sig):
+            if i_frac >= len(rsi) or (cur_idx - i_frac) > lookback:
+                continue
             r_frac = float(rsi.iloc[i_frac])
-            # ราคาจาก fractal low → ปัจจุบัน = ขึ้น (p_now > p_frac)
-            # RSI ลดลง (r_now < r_frac) = Bullish Divergence
-            if last_close > p_frac and last_rsi < r_frac:
+            if r_frac > rsi_os:
+                continue  # ต้องเคย oversold มาก่อนตามสเปก
+            diff = last_rsi - r_frac
+            if last_close <= p_frac and diff >= diff_threshold:
                 return {"pass": True,
-                        "note": (f"Bullish Divergence: ราคา {p_frac:.2f}→{last_close:.2f} (↑) "
-                                 f"RSI {r_frac:.1f}→{last_rsi:.1f} (↓)")}
+                        "note": (f"Bullish Divergence: ราคา {p_frac:.2f}→{last_close:.2f} (≤) "
+                                 f"RSI {r_frac:.1f}(OS)→{last_rsi:.1f} (Δ{diff:+.1f} ≥{diff_threshold})")}
+            break  # ใช้เฉพาะ fractal ที่นัยสำคัญและใกล้สุดตัวเดียว ตามสเปก
+        return {"pass": False, "note": "ไม่พบ Bullish Divergence (fractal low นัยสำคัญ+OS ในระยะ lookback)"}
 
-    if direction == "PUT" and len(piv_highs) >= 1:
-        i_frac, p_frac = piv_highs[-1]
-        if i_frac < len(rsi):
+    else:
+        for i_frac, p_frac in reversed(piv_highs_sig):
+            if i_frac >= len(rsi) or (cur_idx - i_frac) > lookback:
+                continue
             r_frac = float(rsi.iloc[i_frac])
-            # ราคาจาก fractal high → ปัจจุบัน = ลง (p_now < p_frac)
-            # RSI เพิ่มขึ้น (r_now > r_frac) = Bearish Divergence
-            if last_close < p_frac and last_rsi > r_frac:
+            if r_frac < rsi_ob:
+                continue  # ต้องเคย overbought มาก่อนตามสเปก
+            diff = r_frac - last_rsi
+            if last_close >= p_frac and diff >= diff_threshold:
                 return {"pass": True,
-                        "note": (f"Bearish Divergence: ราคา {p_frac:.2f}→{last_close:.2f} (↓) "
-                                 f"RSI {r_frac:.1f}→{last_rsi:.1f} (↑)")}
-
-    # ── Approach 2: 2-fractal divergence (standard) ──
-    if direction == "CALL" and len(piv_lows) >= 2:
-        (i1, p1), (i2, p2) = piv_lows[-2], piv_lows[-1]
-        r1, r2 = float(rsi.iloc[i1]), float(rsi.iloc[i2])
-        if p2 < p1 and r2 > r1:
-            return {"pass": True,
-                    "note": (f"Bullish Div (2-fractal): ราคา {p1:.2f}→{p2:.2f} (LL) "
-                             f"RSI {r1:.1f}→{r2:.1f} (HL)")}
-
-    if direction == "PUT" and len(piv_highs) >= 2:
-        (i1, p1), (i2, p2) = piv_highs[-2], piv_highs[-1]
-        r1, r2 = float(rsi.iloc[i1]), float(rsi.iloc[i2])
-        if p2 > p1 and r2 < r1:
-            return {"pass": True,
-                    "note": (f"Bearish Div (2-fractal): ราคา {p1:.2f}→{p2:.2f} (HH) "
-                             f"RSI {r1:.1f}→{r2:.1f} (LH)")}
-
-    return {"pass": False, "note": "ไม่พบ Divergence"}
+                        "note": (f"Bearish Divergence: ราคา {p_frac:.2f}→{last_close:.2f} (≥) "
+                                 f"RSI {r_frac:.1f}(OB)→{last_rsi:.1f} (Δ{diff:+.1f} ≥{diff_threshold})")}
+            break
+        return {"pass": False, "note": "ไม่พบ Bearish Divergence (fractal high นัยสำคัญ+OB ในระยะ lookback)"}
 
 
 def _cond5_adx(adx_val: float) -> dict:
@@ -288,94 +285,70 @@ def _cond5_adx(adx_val: float) -> dict:
     return {"pass": False, "note": f"ADX={adx_val:.1f} (<20) เทรนอ่อน"}
 
 
+def _classify_candle_pa(o: float, h: float, lo: float, c: float,
+                         hammer_body_ratio: float = 30.0,
+                         doji_body_ratio: float = 10.0,
+                         doji_shadow_diff: float = 15.0):
+    """คืน pa_type ('Hammer'/'Inverted_Hammer'/'Doji'/None) ตามสูตรสเปกเป๊ะ:
+    Body_Range=|C-O|, Total_Range=H-L, Upper=H-max(O,C), Lower=min(O,C)-L"""
+    total_range = h - lo
+    if total_range <= 0:
+        return None
+    body = abs(c - o)
+    body_pct = (body / total_range) * 100.0
+    upper = h - max(o, c)
+    lower = min(o, c) - lo
+
+    # Doji: body ต้องบางมาก + shadow สมดุลกันภายใน 15% ของ Total_Range
+    if body_pct <= doji_body_ratio:
+        shadow_diff_pct = (abs(upper - lower) / total_range) * 100.0
+        if shadow_diff_pct <= doji_shadow_diff:
+            return "Doji"
+
+    if body_pct <= hammer_body_ratio and body > 0:
+        if lower >= body * 2 and upper < body * 0.5:
+            return "Hammer"
+        if upper >= body * 2 and lower < body * 0.5:
+            return "Inverted_Hammer"
+    return None
+
+
 def _cond6_pa_confirmation(df: pd.DataFrame, direction: str,
-                            piv_highs=None, piv_lows=None,
-                            zone_tol_pct: float = 0.3) -> dict:
-    """PA ณ โซนราคาเดียวกัน — Hammer + Doji เท่านั้น
-    ดูแนวนอนย้อนหลังใน buffer หาแท่งที่อยู่ในโซนราคาเดียวกัน
-    กรณีพิเศษ: ถ้า PA ตรงกับ fractal zone → บอกระบุว่า 'PA point'"""
-    last_close = float(df["close"].iloc[-1])
-    zone_hi = last_close * (1 + zone_tol_pct / 100)
-    zone_lo = last_close * (1 - zone_tol_pct / 100)
+                            zone: dict | None, divergence_confirmed: bool,
+                            frac_zones_all=None) -> dict:
+    """PA confirmation — ตรวจ **เฉพาะแท่งปิดล่าสุด** ว่าเป็น Hammer/Inverted-Hammer/Doji
+    ตามสูตรสเปก (body/shadow ratio) และเช็คว่าอยู่ในระนาบราคาของ 'โซน Fractal S/R'
+    (จาก c1) ไหม — special case: ถ้าตรงกับตัว fractal price เป๊ะ ระบุ 'PA point'
 
-    # สร้าง set ของ fractal zones เพื่อตรวจ special case
-    frac_zones = set()
-    if piv_highs:
-        for idx, price in piv_highs:
-            if idx < len(df):
-                row = df.iloc[idx]
-                frac_zones.add((round(price, 2), "H"))
-    if piv_lows:
-        for idx, price in piv_lows:
-            if idx < len(df):
-                row = df.iloc[idx]
-                frac_zones.add((round(price, 2), "L"))
+    Execution Condition ตามสเปกล่าสุด: setup สมบูรณ์ก็ต่อเมื่อ zone (c1) มีจริง
+    AND divergence_confirmed (c4) เป็น True มาก่อนแล้วเท่านั้น — ฟังก์ชันนี้คืน
+    pass=True เฉพาะกรณีครบเงื่อนไข cascade เท่านั้น"""
+    if zone is None or not divergence_confirmed:
+        return {"pass": False,
+                "note": "รอ: ยังไม่มีโซน Fractal S/R (c1) และ/หรือ RSI Divergence (c4) ยืนยันก่อนหน้า"}
 
-    n = len(df)
-    search_limit = min(n, 200)
-    for k in range(search_limit):
-        idx = n - 1 - k
-        if idx < 0:
-            break
-        row = df.iloc[idx]
-        o = float(row["open"])
-        h = float(row["high"])
-        lo = float(row["low"])
-        c = float(row["close"])
+    row = df.iloc[-1]
+    o, h, lo, c = float(row["open"]), float(row["high"]), float(row["low"]), float(row["close"])
+    mid = (h + lo) / 2
+    if not (zone["lo"] <= mid <= zone["hi"]):
+        return {"pass": False, "note": "แท่งปิดล่าสุดไม่ได้อยู่ในโซน Fractal S/R (c1)"}
 
-        mid = (h + lo) / 2
-        if not (zone_lo <= mid <= zone_hi):
-            continue
+    pa_type = _classify_candle_pa(o, h, lo, c)
+    if pa_type is None:
+        return {"pass": False, "note": "แท่งปิดล่าสุดอยู่ในโซนแต่ไม่ใช่ Hammer/Inverted-Hammer/Doji"}
 
-        body = abs(c - o)
-        full_range = h - lo
-        if full_range == 0:
-            continue
-        upper_wick = h - max(o, c)
-        lower_wick = min(o, c) - lo
+    if direction == "CALL" and pa_type == "Inverted_Hammer":
+        return {"pass": False, "note": "เจอ Inverted Hammer แต่ทิศทาง CALL ต้องการ Hammer"}
+    if direction == "PUT" and pa_type == "Hammer":
+        return {"pass": False, "note": "เจอ Hammer แต่ทิศทาง PUT ต้องการ Inverted Hammer/Shooting Star"}
 
-        # ── Doji: body ≈ upper wick ≈ lower wick (ทั้ง 3 ใกล้เคียงกัน) ──
-        if body < full_range * 0.1:
-            avg_wick = (upper_wick + lower_wick) / 2
-            if avg_wick > 0 and abs(upper_wick - lower_wick) < avg_wick * 0.5:
-                pa_type = "Doji"
-                # ตรวจ special case: ตรงกับ fractal zone?
-                is_frac_point = any(
-                    abs(round(mid, 2) - fz[0]) / max(fz[0], 0.001) < 0.001
-                    for fz in frac_zones
-                )
-                note = f"Doji ที่โซนราคา {last_close:.2f}"
-                if is_frac_point:
-                    note = f"PA point — Doji ตรงโซน fractal ({last_close:.2f})"
-                return {"pass": True, "note": note}
-
-        # ── Hammer (CALL): body เล็ก + ไส้ล่างยาว ≥2x body + ไส้บนสั้น ──
-        if direction == "CALL" and body > 0:
-            if lower_wick >= body * 2 and upper_wick < body * 0.5:
-                pa_type = "Hammer"
-                is_frac_point = any(
-                    abs(round(mid, 2) - fz[0]) / max(fz[0], 0.001) < 0.001
-                    for fz in frac_zones
-                )
-                note = f"Hammer ที่โซนราคา {last_close:.2f}"
-                if is_frac_point:
-                    note = f"PA point — Hammer ตรงโซน fractal ({last_close:.2f})"
-                return {"pass": True, "note": note}
-
-        # ── Shooting Star (PUT): body เล็ก + ไส้บนยาว ≥2x body + ไส้ล่างสั้น ──
-        if direction == "PUT" and body > 0:
-            if upper_wick >= body * 2 and lower_wick < body * 0.5:
-                pa_type = "Shooting Star"
-                is_frac_point = any(
-                    abs(round(mid, 2) - fz[0]) / max(fz[0], 0.001) < 0.001
-                    for fz in frac_zones
-                )
-                note = f"Shooting Star ที่โซนราคา {last_close:.2f}"
-                if is_frac_point:
-                    note = f"PA point — Shooting Star ตรงโซน fractal ({last_close:.2f})"
-                return {"pass": True, "note": note}
-
-    return {"pass": False, "note": "ไม่พบ Hammer/Doji ในโซนราคา"}
+    is_frac_point = frac_zones_all and any(
+        abs(round(mid, 2) - round(fz[0], 2)) / max(fz[0], 0.001) < 0.001 for fz in frac_zones_all
+    )
+    note = f"{pa_type} ในโซน Fractal S/R ({zone['lo']:.2f}–{zone['hi']:.2f}) + RSI Div ยืนยันแล้ว"
+    if is_frac_point:
+        note = f"PA point — {pa_type} ตรงโซน fractal เป๊ะ + RSI Div ยืนยันแล้ว"
+    return {"pass": True, "note": note}
 
 
 def _cond7_fractal_trend(structure: str, direction: str) -> dict:
@@ -465,7 +438,7 @@ def _cond10_mtf_trend(df: pd.DataFrame, direction: str) -> dict:
     for tf_name, tf_minutes in tf_configs:
         try:
             resampled = close.resample(
-                f"{tf_minutes}min", closed="left", label="last"
+                f"{tf_minutes}min", closed="left", label="left"
             ).last().dropna()
             if len(resampled) < 200:
                 tf_results.append(f"{tf_name}: ข้อมูลไม่พอ")
@@ -636,16 +609,26 @@ def score_setup(
     rsi = _calc_rsi(close, 14)
     bb_mid, bb_up, bb_lo, bb_width = _calc_bollinger_bands(close)
     adx = _calc_adx(high, low, close, 14)
-    
+    atr = _calc_atr(high, low, close, 14)
+
+    # Fractal_Period = 5 (2 left + 1 + 2 right) → ใช้กับโซน S/R (c1) และ PA (c6)
+    frac5_left = int(cfg.get("fractal5", {}).get("left", 2))
+    frac5_right = int(cfg.get("fractal5", {}).get("right", 2))
+    piv_h5, piv_l5 = _find_fractals(high, low, left=frac5_left, right=frac5_right)
+
+    # Fractal_Significant_Period = 15 (7 left + 1 + 7 right) → ใช้เป็นจุดอ้างอิง
+    # RSI Divergence (c4) และโครงสร้างเทรนด์ fractal (c7)
     frac_left = int(cfg.get("fractal", {}).get("left", 7))
     frac_right = int(cfg.get("fractal", {}).get("right", 7))
     piv_h, piv_l = _find_fractals(high, low, left=frac_left, right=frac_right)
     structure = _fractal_structure(piv_h, piv_l)
-    
+
     last_close = float(close.iloc[-1])
     e50, e100, e200 = float(ema50.iloc[-1]), float(ema100.iloc[-1]), float(ema200.iloc[-1])
     adx_val = float(adx.iloc[-1]) if not np.isnan(adx.iloc[-1]) else 0.0
+    atr_val = float(atr.iloc[-1]) if not np.isnan(atr.iloc[-1]) else 0.0
     rsi_val = float(rsi.iloc[-1])
+    cur_idx = len(df) - 1
     
     # ── CHECK EMA200 TOUCH FIRST (Importance 1 ต้องทำงานแม้ EMA ไม่เรียง) ──
     dist200 = abs(last_close - e200) / e200 * 100.0
@@ -698,13 +681,30 @@ def score_setup(
     # ════════════════════════════════════════════════════════════════════════
     # EVALUATE ALL 10 CONDITIONS
     # ════════════════════════════════════════════════════════════════════════
+    cfg_div = cfg.get("rsi_divergence", {})
+    above_ema200 = last_close > e200
+
     cond = {}
-    cond["c1_fractal_sr"] = _cond1_fractal_sr(df, piv_h, piv_l, direction)
+    cond["c1_fractal_sr"] = _cond1_fractal_sr(
+        df, piv_h5, piv_l5, direction,
+        atr_val=atr_val, atr_multiplier=float(cfg.get("fractal_zone", {}).get("atr_multiplier", 0.5)),
+    )
     cond["c2_bb_break"] = _cond2_bb_break(df, bb_up, bb_lo, direction)
     cond["c3_rsi_ob_os"] = _cond3_rsi_ob_os(rsi_val, direction)
-    cond["c4_rsi_div"] = _cond4_rsi_divergence(rsi, piv_h, piv_l, direction, last_close)
+    cond["c4_rsi_div"] = _cond4_rsi_divergence(
+        rsi, piv_h, piv_l, above_ema200, last_close, cur_idx,
+        rsi_ob=float(cfg_div.get("ob", 70.0)), rsi_os=float(cfg_div.get("os", 30.0)),
+        diff_threshold=float(cfg_div.get("diff_threshold", 3.0)),
+        lookback=int(cfg_div.get("lookback", 100)),
+    )
     cond["c5_adx"] = _cond5_adx(adx_val)
-    cond["c6_pa"] = _cond6_pa_confirmation(df, direction, piv_h, piv_l)
+    _frac_zones_all = [(p, "H") for _, p in piv_h5] + [(p, "L") for _, p in piv_l5]
+    cond["c6_pa"] = _cond6_pa_confirmation(
+        df, direction,
+        zone=cond["c1_fractal_sr"].get("zone"),
+        divergence_confirmed=cond["c4_rsi_div"]["pass"],
+        frac_zones_all=_frac_zones_all,
+    )
     cond["c7_fractal_trend"] = _cond7_fractal_trend(structure, direction)
     cond["c8_grip"] = _cond8_grip(e200, cfg, symbol)
     cond["c9_bb_width"] = _cond9_bb_width(bb_width)

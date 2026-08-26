@@ -2,7 +2,7 @@
 -- วิเคราะห์น้ำหนักของ checklist แต่ละตัว จาก setup_signals ที่มีผล WIN/LOSE แล้ว
 -- รันบน VPS:  sqlite3 data/bot.db < analysis/condition_weight_analysis.sql
 --
--- เป้าหมาย: 找出ว่า checklist ตัวไหนมี "สัญญาณน้ำหนัก" จริง (ชนะเมื่อมี vs ชนะเมื่อไม่มี)
+-- เป้าหมาย: เพื่อดูว่า checklist ตัวไหนมี "สัญญาณน้ำหนัก" จริง (ชนะเมื่อมี vs ชนะเมื่อไม่มี)
 -- ถ้า c1_fractal_sr มีอยู่ใน 80% ของ WIN → weight สูง
 -- ถ้า c2_bb_break มีอยู่ในทั้ง WIN และ LOSE เท่ากัน → weight ต่ำ (noise)
 
