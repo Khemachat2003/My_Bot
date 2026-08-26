@@ -1449,10 +1449,22 @@ function drawCandles(canvas, data){
         ctx.fillStyle=color;
         ctx.beginPath(); ctx.moveTo(x,y-4); ctx.lineTo(x-5,y-12); ctx.lineTo(x+5,y-12); ctx.closePath(); ctx.fill();
       }
-      // Label
-      ctx.fillStyle=color; ctx.font='bold 7px Cascadia Mono,monospace'; ctx.textAlign='center';
+      // Label — CALL อยู่ในแท่ง, PUT อยู่ด้านล่างแท่ง
       const label=m.type==='ML'?'ML':m.importance===1?'IMP1':m.importance===2?'IMP2':'RBF';
-      ctx.fillText(label,x,y-16); ctx.textAlign='left';
+      ctx.font='bold 7px Cascadia Mono,monospace'; ctx.textAlign='center';
+      if(m.direction==='CALL'){
+        // อยู่ในแท่ง: วาดพื้นหลังโปร่งแสงทับบน body
+        const lw=ctx.measureText(label).width+4;
+        ctx.fillStyle='rgba(10,15,28,0.6)';
+        ctx.beginPath(); ctx.roundRect(x-lw/2,y-4,lw,9,2); ctx.fill();
+        ctx.fillStyle=color;
+        ctx.fillText(label,x,y+3);
+      } else {
+        // PUT: อยู่ด้านล่างแท่ง
+        ctx.fillStyle=color;
+        ctx.fillText(label,x,y+20);
+      }
+      ctx.textAlign='left';
 
       // CFD levels: SL / TP1 / TP2 lines (เฉพาะที่มี cfd data)
       if(m.cfd){
