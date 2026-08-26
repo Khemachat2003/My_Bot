@@ -755,7 +755,7 @@
         </h3>
         <div class="tbl-wrap" style="max-height:420px;overflow-y:auto;">
           <table id="setupTable">
-            <thead><tr><th>เวลา</th><th>คู่</th><th>TF</th><th>ทิศทาง</th><th>Entry</th><th>Exit</th><th>Score</th><th>Tier</th><th>ผ่าน</th><th>ผล</th></tr></thead>
+            <thead><tr><th>เวลา</th><th>คู่</th><th>TF</th><th>Imp</th><th>ทิศทาง</th><th>Entry</th><th>Exit</th><th>Score</th><th>Tier</th><th>ผ่าน</th><th>ผล</th></tr></thead>
             <tbody></tbody>
           </table>
           <div id="setEmpty" class="empty" style="display:none;">ยังไม่มีสัญญาณ — รอ setup_feed.py ทำงาน</div>
@@ -1040,6 +1040,55 @@
 
 <script>
 const REFRESH_MS = 5000;
+
+// ── Web Notification: แจ้งเตือนเมื่อมีสัญญาณใหม่ ──
+let _lastSignalId = 0;
+let _notifGranted = false;
+
+function requestNotifPermission(){
+  if(!('Notification' in window)) return;
+  if(Notification.permission === 'granted'){ _notifGranted = true; return; }
+  if(Notification.permission !== 'denied'){
+    Notification.requestPermission().then(p => { _notifGranted = (p === 'granted'); });
+  }
+}
+
+function showToast(msg, type){
+  let c = document.getElementById('_toast');
+  if(!c){
+    c = document.createElement('div');
+    c.id = '_toast';
+    c.style.cssText = 'position:fixed;top:16px;right:16px;z-index:9999;max-width:340px;';
+    document.body.appendChild(c);
+  }
+  const d = document.createElement('div');
+  const bg = type === 'CALL' ? '#22c98a' : type === 'PUT' ? '#f6465d' : '#38e1c4';
+  d.style.cssText = `background:${bg};color:#fff;padding:10px 14px;border-radius:8px;margin-bottom:8px;font-size:12px;font-family:monospace;box-shadow:0 2px 8px rgba(0,0,0,.3);opacity:0;transition:opacity .3s;`;
+  d.textContent = msg;
+  c.appendChild(d);
+  requestAnimationFrame(()=> d.style.opacity = '1');
+  setTimeout(()=> { d.style.opacity = '0'; setTimeout(()=> d.remove(), 400); }, 5000);
+}
+
+async function checkNewSignals(){
+  try {
+    const rows = await fetchJSON('/api/signals?limit=5');
+    if(!rows.length) return;
+    const latest = rows[0];
+    const id = latest.id || 0;
+    if(_lastSignalId === 0){ _lastSignalId = id; return; }
+    if(id > _lastSignalId){
+      _lastSignalId = id;
+      const src = latest.importance === 1 ? 'IMP1' : latest.importance === 2 ? 'IMP2' : 'RBF';
+      const sym = (latest.symbol||'XAUUSD').replace('frx','');
+      const msg = `${src} ${latest.direction} ${sym} @ ${latest.entry_price?.toFixed(2) || '–'} [${latest.tier||''}]`;
+      showToast(msg, latest.direction);
+      if(_notifGranted && Notification.permission === 'granted'){
+        new Notification('Signal Alert', { body: msg, icon: '/favicon.ico' });
+      }
+    }
+  } catch(e){}
+}
 let equityChart, equityFullChart;
 
 /* ═══════ HELPERS ═══════ */
@@ -1402,7 +1451,7 @@ function drawCandles(canvas, data){
       }
       // Label
       ctx.fillStyle=color; ctx.font='bold 7px Cascadia Mono,monospace'; ctx.textAlign='center';
-      const label=m.type==='ML'?'ML':m.importance===1?'IMP1':'RBF';
+      const label=m.type==='ML'?'ML':m.importance===1?'IMP1':m.importance===2?'IMP2':'RBF';
       ctx.fillText(label,x,y-16); ctx.textAlign='left';
 
       // CFD levels: SL / TP1 / TP2 lines (เฉพาะที่มี cfd data)
@@ -2092,27 +2141,32 @@ async function refreshSetupTab(){
     const empty=document.getElementById('setEmpty');
     if(!rows.length){body.innerHTML='';empty.style.display='block';return;}
     empty.style.display='none';
-    body.innerHTML=rows.map(r=>`<tr>
+    body.innerHTML=rows.map(r=>{
+      const impLabel=r.importance===1?'IMP1':r.importance===2?'IMP2':'';
+      const impColor=r.importance===1?'var(--red)':r.importance===2?'var(--yellow)':'var(--muted)';
+      return `<tr>
       <td>${fmtTime(r.signal_time)}</td>
       <td><b>${(r.symbol||'frxXAUUSD').replace('frx','')}</b></td>
       <td><b>${r.timeframe||'M1'}</b></td>
+      <td style="color:${impColor};font-weight:700;font-size:11px;">${impLabel||'–'}</td>
       <td class="${dirClass(r.direction)}">${r.direction}</td>
       <td class="mono">${r.entry_price!=null?r.entry_price.toFixed(5):'–'}</td>
       <td class="mono">${r.exit_price!=null?r.exit_price.toFixed(5):'–'}</td>
       <td class="mono">${r.score!=null?r.score.toFixed(1)+'/'+(r.total||'–'):'–'}</td>
       <td><span class="tier ${r.tier||'NONE'}">${TIER_ACTION[r.tier]?r.tier:'–'}</span></td>
-      <td class="mono">${r.details?Object.values(r.details).filter(d=>d.frac!=null?d.frac>=0.999:d.ok).length+'/10':'–'}</td>
+      <td class="mono">${r.details?Object.values(r.details).filter(d=>d.frac!=null?d.frac>=0.999:d.ok).length+'/11':'–'}</td>
       <td><span class="pill ${r.result}">${r.result}</span></td>
-    </tr>`).join('');
+    </tr>`;}).join('');
   }catch(e){}
   await refreshTickTouchResearch();
 }
 
 const TT_CASE_COLORS={'TICK_TOUCH':'var(--cyan)','WICK_BOUNCE':'var(--yellow)','BREAKOUT':'var(--green)'};
 const TT_COND_NAMES={
-  'c1_fractal_sr':'1. Fractal 15 S/R','c2_bb_break':'2. BB Break','c3_rsi_ob_os':'3. RSI OVB/OVS',
+  'c1_fractal_sr':'1. Fractal S/R','c2_bb_break':'2. BB Break','c3_rsi_ob_os':'3. RSI OVB/OVS',
   'c4_rsi_div':'4. RSI Divergence','c5_adx':'5. ADX > 20','c6_pa':'6. PA Confirmation',
-  'c7_fractal_trend':'7. Fractal Trend','c8_grip':'8. Grip','c9_bb_width':'9. BB Width','c10_mtf':'10. MTF Trend',
+  'c7_fractal_trend':'7. Fractal Trend','c8_grip':'8. Grip','c9_bb_width':'9. BB Width',
+  'c10_mtf':'10. MTF Trend','c11_ema_slope':'11. EMA Slope',
 };
 
 async function refreshTickTouchResearch(){
@@ -2616,10 +2670,12 @@ async function refreshAll(){
     refreshJournalTab(),refreshJournalMoney(),refreshCFDPaper(),
   ]);
   await refreshWatchlist();
+  checkNewSignals();
 }
 
 (async()=>{
   await loadSymbols();
+  requestNotifPermission();
   refreshAll();
   setInterval(refreshAll, REFRESH_MS);
 })();
