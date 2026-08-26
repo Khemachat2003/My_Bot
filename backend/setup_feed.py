@@ -427,7 +427,7 @@ class SetupFeedEngine:
                         continue
 
                 # 🚦 loss-streak cooldown: ข้ามถ้าสัญญาณล่าสุด 2 ไม้บน symbol นี้แพ้ทั้งคู่
-                # → หยุด 4 ชม. (กันระบบยิงซ้ำ direction เดิมบน symbol ที่กำลังขาดทุน)
+                # → หยุด 1 ชม. (กันระบบยิงซ้ำ direction เดิมบน symbol ที่กำลังขาดทุน)
                 recent = db.fetch_recent_setup_signals(limit=2, symbol=self.symbol)
                 recent_resolved = [s for s in recent
                                    if s.get("result") in ("WIN", "LOSE") and not s.get("phantom")]
@@ -435,9 +435,9 @@ class SetupFeedEngine:
                         and all(s["result"] == "LOSE" for s in recent_resolved)):
                     last_loss_time = pd.to_datetime(recent_resolved[0]["signal_time"])
                     loss_age_h = (now - last_loss_time).total_seconds() / 3600.0
-                    if loss_age_h < 4.0:
+                    if loss_age_h < 1.0:
                         print(f"[SetupFeed:{self.symbol}] ข้ามสัญญาณ [{tf_label}] — "
-                              f"แพ้ 2 ไม้ติด หยุด 4 ชม. (เหลือ {4.0 - loss_age_h:.1f} ชม.)")
+                              f"แพ้ 2 ไม้ติด หยุด 1 ชม. (เหลือ {60 - loss_age_h*60:.0f} นาที)")
                         self._last_entry_trigger[tf_label] = result.entry_trigger
                         continue
 

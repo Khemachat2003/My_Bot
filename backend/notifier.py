@@ -398,6 +398,17 @@ class MLFeedEngine:
 
             prev_state = self._last_signal_state.get(cfg["label"], "NEUTRAL")
             if res["signal"] in ("CALL", "PUT") and res["signal"] != prev_state:
+                # 🚦 loss-streak cooldown: แพ้ 2 ไม้ติด → พัก 1 ชม.
+                recent_ml = [s for s in db.fetch_recent_ml_signals(limit=4)
+                             if s.get("result") in ("WIN", "LOSE")]
+                if (len(recent_ml) >= 2
+                        and all(s["result"] == "LOSE" for s in recent_ml[:2])):
+                    last_loss_time = pd.to_datetime(recent_ml[0]["signal_time"])
+                    loss_age_min = (now - last_loss_time).total_seconds() / 60.0
+                    if loss_age_min < 60.0:
+                        print(f"[MLFeed] ข้ามสัญญาณ [{cfg['label']}] — "
+                              f"แพ้ 2 ไม้ติด หยุด 1 ชม. (เหลือ {60 - loss_age_min:.0f} นาที)")
+                        continue
                 if cfg["label"] in pending_tfs:
                     print(f"[MLFeed] ข้าม TF:{cfg['label']} — ยังมีสัญญาณ PENDING รอสรุปผล (กันซ้อน)")
                 else:
