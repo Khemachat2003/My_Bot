@@ -239,7 +239,7 @@ class SetupFeedEngine:
             hold_min = 30
             target_time = (now + pd.Timedelta(minutes=hold_min)).isoformat()
             from backend.setup_scorer import score_setup
-            result = score_setup(self.buffer, timeframe="TICK", target_hold_minutes=hold_min)
+            result = score_setup(self.buffer, timeframe="TICK", target_hold_minutes=hold_min, symbol=self.symbol)
             # RESEARCH MODE: เก็บข้อมูลลง tick_touch_log — ไม่ส่งสัญญาณจริง
             # ไม่ลง setup_signals/trade_journal ไม่เข้า CFD
             db.insert_tick_touch_log(
@@ -406,7 +406,7 @@ class SetupFeedEngine:
                 continue
 
             try:
-                result = score_setup(df_tf, timeframe=tf_label, target_hold_minutes=hold_min)
+                result = score_setup(df_tf, timeframe=tf_label, target_hold_minutes=hold_min, symbol=self.symbol)
                 setup_db.insert_setup_score(now.isoformat(), result, symbol=self.symbol)
             except Exception:
                 print(f"[SetupFeed:{self.symbol}] setup_scorer error ({tf_label}):")
