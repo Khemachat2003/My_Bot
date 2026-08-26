@@ -4,27 +4,30 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>XAUUSD Pro Trading Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   /* ═══ DESIGN TOKENS ═══ */
   :root{
-    --bg:#06090f; --panel:#0c1220; --panel2:#111a2c; --card:#0a0f1a;
-    --border:#1a2440; --border2:#263259;
-    --text:#e8eefb; --muted:#74809c; --dim:#4a5775;
-    --green:#22c98a; --red:#f6465d; --yellow:#f0b90b;
-    --blue:#4da3ff; --cyan:#38e1c4; --purple:#a78bfa;
+    --bg:#0A0C10; --panel:#12151C; --panel2:#171B24; --card:#12151C;
+    --border:#232732; --border2:#232732;
+    --text:#EDEFF3; --muted:#838B9C; --dim:#4C5566;
+    --green:#16C784; --red:#F0465C; --yellow:#E8A33D;
+    --blue:#4C8DFF; --cyan:#4C8DFF; --purple:#4C8DFF;
     --grid:#131c30;
-    --num:'Cascadia Mono','SF Mono','Consolas',ui-monospace,monospace;
+    --accent:var(--cyan);
+    --font-display:'Archivo',sans-serif;
+    --font-body:'IBM Plex Sans',sans-serif;
+    --font-mono:'IBM Plex Mono',ui-monospace,monospace;
+    --num:'IBM Plex Mono',ui-monospace,monospace;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   html,body{height:100%;}
   body{
-    background:
-      radial-gradient(1200px 500px at 80% -10%, rgba(56,225,196,.05), transparent 60%),
-      radial-gradient(900px 400px at 10% 110%, rgba(77,163,255,.06), transparent 60%),
-      var(--bg);
+    background:var(--bg);
     color:var(--text);
-    font-family:'Segoe UI',Roboto,system-ui,Arial,sans-serif;
+    font-family:var(--font-body);
     font-size:13.5px; display:flex; flex-direction:column; overflow:hidden;
   }
   ::-webkit-scrollbar{width:9px;height:9px;}
@@ -44,7 +47,7 @@
   .brand .logo{
     width:30px; height:30px; border-radius:8px; display:grid; place-items:center;
     background:linear-gradient(135deg,#22c98a,#4da3ff); font-weight:900; color:#04121a; font-size:14px;
-    box-shadow:0 0 14px rgba(34,201,138,.35);
+    box-shadow:0 1px 2px rgba(0,0,0,.3);
   }
   .brand .name{font-size:14px; font-weight:800; letter-spacing:.6px;}
   .brand .name span{color:var(--cyan);}
@@ -58,11 +61,11 @@
   .pricebox .price{font-family:var(--num); font-size:30px; font-weight:800; line-height:1; letter-spacing:.5px;}
   .pricebox .price.up{color:var(--green);} .pricebox .price.down{color:var(--red);}
   .pricebox .chg{font-family:var(--num); font-size:12.5px; font-weight:700; padding:2px 7px; border-radius:6px;}
-  .chg.up{color:var(--green); background:rgba(34,201,138,.1);}
-  .chg.down{color:var(--red); background:rgba(246,70,93,.1);}
+  .chg.up{color:var(--green); background:rgba(22,199,132,.1);}
+  .chg.down{color:var(--red); background:rgba(240,70,92,.1);}
   .live-badge{
     font-size:10px; font-weight:800; letter-spacing:1px; color:var(--green);
-    border:1px solid rgba(34,201,138,.4); border-radius:99px; padding:3px 9px;
+    border:1px solid rgba(22,199,132,.4); border-radius:99px; padding:3px 9px;
     display:inline-flex; align-items:center; gap:5px;
   }
   .live-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.6s infinite;}
@@ -78,31 +81,21 @@
   }
   .logout:hover{color:var(--red); border-color:var(--red);}
 
-  /* ═══ NAV ═══ */
-  .nav{
-    display:flex; gap:4px; padding:10px 18px 0; flex-shrink:0; border-bottom:1px solid var(--border);
+  /* ═══ NAV — SIDEBAR ═══ */
+  .shell{display:grid; grid-template-columns:200px 1fr; grid-template-rows:1fr; flex:1; overflow:hidden; min-height:0;}
+  .sidebar{border-right:1px solid var(--border); background:var(--panel); padding:18px 0; overflow-y:auto; flex-shrink:0;}
+  .nav-group{margin-bottom:20px;}
+  .nav-group-label{font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:.09em; font-weight:600; padding:0 18px; margin-bottom:8px;}
+  .nav-item{
+    display:flex; align-items:center; gap:10px; padding:9px 18px; font-size:13px;
+    color:var(--muted); cursor:pointer; border-left:2px solid transparent; font-weight:500; transition:.15s;
   }
-  .nav-btn{
-    background:transparent; border:none; color:var(--muted); cursor:pointer;
-    padding:9px 20px; font-size:12.5px; font-weight:700; font-family:inherit; letter-spacing:.3px;
-    border-radius:10px 10px 0 0; border:1px solid transparent; border-bottom:none;
-    display:flex; align-items:center; gap:8px; transition:.15s;
-  }
-  .nav-btn:hover{color:var(--text); background:rgba(255,255,255,.02);}
-  .nav-btn .ndot{width:7px;height:7px;border-radius:50%;}
-  .nav-btn.active{
-    color:var(--text); background:var(--panel); border-color:var(--border);
-    box-shadow:inset 0 2px 0 var(--cyan);
-  }
-  .nav-btn[data-tab=ml] .ndot{background:var(--green);}
-  .nav-btn[data-tab=setup] .ndot{background:var(--blue);}
-  .nav-btn[data-tab=journal] .ndot{background:var(--purple);}
-  .nav-btn[data-tab=overview] .ndot{background:var(--cyan);}
-  .nav-btn[data-tab=cfd] .ndot{background:var(--yellow);}
-  .nav-btn[data-tab=pro] .ndot{background:var(--yellow);}
+  .nav-item:hover{color:var(--text); background:rgba(255,255,255,.02);}
+  .nav-item.active{color:var(--text); border-left-color:var(--accent); background:rgba(255,255,255,.03);}
+  .nav-item .count{margin-left:auto; font-family:var(--num); font-size:10.5px; color:var(--dim);}
 
-  /* ═══ MAIN ═══ */
-  .main{flex:1; overflow-y:auto; padding:16px 18px 40px;}
+  /* ═══ CONTENT ═══ */
+  .content{overflow-y:auto; padding:16px 18px 40px; min-height:0;}
 
   /* KPI cards */
   .kpi-row{display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); margin-bottom:16px;}
@@ -112,13 +105,11 @@
     position:relative; overflow:hidden; transition:.15s;
   }
   .kpi:hover{border-color:var(--border2); transform:translateY(-1px);}
-  .kpi::before{content:''; position:absolute; inset:0 auto 0 0; width:3px; background:var(--accent,#4a5775); opacity:.7;}
+  .kpi::before{content:''; position:absolute; inset:0 auto 0 0; width:3px; background:var(--accent); opacity:.7;}
   .kpi .lbl{font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.09em; font-weight:700;}
   .kpi .val{font-family:var(--num); font-size:24px; font-weight:800; margin:6px 0 4px; line-height:1;}
   .kpi .sub{font-size:10.5px; color:var(--muted);}
   .kpi .sub b{color:var(--text);}
-  .kpi.cyan{--accent:var(--cyan);} .kpi.green{--accent:var(--green);} .kpi.blue{--accent:var(--blue);}
-  .kpi.purple{--accent:var(--purple);} .kpi.yellow{--accent:var(--yellow);} .kpi.red{--accent:var(--red);}
   .val.green{color:var(--green);} .val.red{color:var(--red);} .val.yellow{color:var(--yellow);}
   .val.blue{color:var(--blue);} .val.cyan{color:var(--cyan);} .val.purple{color:var(--purple);} .val.muted{color:var(--muted);}
 
@@ -136,12 +127,8 @@
     font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.1em;
     margin-bottom:12px; display:flex; align-items:center; gap:8px; font-weight:800;
   }
-  .panel h3 .ph{width:8px;height:8px;border-radius:2px;display:inline-block;}
-  .panel h3 .ph.cyan{background:var(--cyan);box-shadow:0 0 6px rgba(56,225,196,.5);}
-  .panel h3 .ph.green{background:var(--green);box-shadow:0 0 6px rgba(34,201,138,.5);}
-  .panel h3 .ph.blue{background:var(--blue);box-shadow:0 0 6px rgba(77,163,255,.5);}
-  .panel h3 .ph.purple{background:var(--purple);box-shadow:0 0 6px rgba(167,139,250,.5);}
-  .panel h3 .ph.red{background:var(--red);box-shadow:0 0 6px rgba(246,70,93,.5);}
+  .panel h3 .ph{width:3px;height:12px;border-radius:2px;display:inline-block;background:var(--accent);margin-right:8px;}
+  .panel h3 .ph.cyan,.panel h3 .ph.green,.panel h3 .ph.blue,.panel h3 .ph.purple,.panel h3 .ph.red{background:var(--accent);}
 
   /* chart */
   .chart-wrap{position:relative; height:330px;}
@@ -202,21 +189,21 @@
     display:flex; align-items:center; gap:8px; padding:11px 14px; font-size:10px; font-weight:800;
     color:var(--muted); text-transform:uppercase; letter-spacing:.12em; border-bottom:1px solid var(--border);
   }
-  .wlist-head .ph{width:8px;height:8px;border-radius:2px;background:var(--cyan);box-shadow:0 0 6px rgba(56,225,196,.5);}
+  .wlist-head .ph{width:3px;height:12px;border-radius:2px;background:var(--accent);}
   .wl-scroll{overflow-y:auto; max-height:600px;}
   .wl-row{
     display:grid; grid-template-columns:1fr auto auto; gap:8px; align-items:center;
     padding:9px 14px; cursor:pointer; border-bottom:1px solid rgba(19,28,48,.6);
     transition:background .12s; position:relative;
   }
-  .wl-row:hover{background:rgba(77,163,255,.05);}
-  .wl-row.active{background:rgba(56,225,196,.06); box-shadow:inset 3px 0 0 var(--cyan);}
+  .wl-row:hover{background:rgba(76,141,255,.05);}
+  .wl-row.active{background:rgba(76,141,255,.06); box-shadow:inset 3px 0 0 var(--cyan);}
   .wl-name{font-size:12px; font-weight:800; letter-spacing:.3px;}
   .wl-kind{display:block; font-size:9px; color:var(--dim); font-weight:600; letter-spacing:.5px;}
   .wl-price{font-family:var(--num); font-size:12.5px; font-weight:700; font-variant-numeric:tabular-nums;}
   .wl-chg{font-family:var(--num); font-size:10px; font-weight:800; padding:2px 7px; border-radius:6px; min-width:52px; text-align:center;}
-  .wl-chg.up{color:var(--green); background:rgba(34,201,138,.1);}
-  .wl-chg.down{color:var(--red); background:rgba(246,70,93,.1);}
+  .wl-chg.up{color:var(--green); background:rgba(22,199,132,.1);}
+  .wl-chg.down{color:var(--red); background:rgba(240,70,92,.1);}
   .wl-chg.flat{color:var(--muted); background:rgba(116,128,156,.1);}
 
   /* chart panel + legend bar (ย้าย legend ออกจาก canvas → ไม่บังแท่งเทียน) */
@@ -277,8 +264,8 @@
   .gauge .ghead{display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;}
   .gauge .gname{font-size:11px; font-weight:800; letter-spacing:.5px; color:var(--muted);}
   .gsig{font-size:10px; font-weight:900; padding:3px 9px; border-radius:99px; letter-spacing:.5px;}
-  .gsig.CALL{background:rgba(34,201,138,.14); color:var(--green); border:1px solid rgba(34,201,138,.3);}
-  .gsig.PUT{background:rgba(246,70,93,.14); color:var(--red); border:1px solid rgba(246,70,93,.3);}
+  .gsig.CALL{background:rgba(22,199,132,.14); color:var(--green); border:1px solid rgba(22,199,132,.3);}
+  .gsig.PUT{background:rgba(240,70,92,.14); color:var(--red); border:1px solid rgba(240,70,92,.3);}
   .gsig.NEUTRAL{background:rgba(116,128,156,.12); color:var(--muted); border:1px solid rgba(116,128,156,.25);}
   .gauge-svg{display:flex; justify-content:center; margin:6px 0 2px;}
   .gauge-svg svg{max-width:100%; height:auto;}
@@ -294,12 +281,12 @@
   }
   td{padding:8px 12px; border-bottom:1px solid var(--grid); white-space:nowrap;}
   tbody tr{transition:background .1s;}
-  tbody tr:hover{background:rgba(77,163,255,.045);}
+  tbody tr:hover{background:rgba(76,141,255,.045);}
   tbody tr:last-child td{border-bottom:none;}
   .pill{padding:2.5px 9px; border-radius:99px; font-size:10px; font-weight:800; letter-spacing:.3px;}
-  .pill.WIN{background:rgba(34,201,138,.14); color:var(--green);}
-  .pill.LOSE{background:rgba(246,70,93,.14); color:var(--red);}
-  .pill.PENDING{background:rgba(240,185,11,.14); color:var(--yellow);}
+  .pill.WIN{background:rgba(22,199,132,.14); color:var(--green);}
+  .pill.LOSE{background:rgba(240,70,92,.14); color:var(--red);}
+  .pill.PENDING{background:rgba(232,163,61,.14); color:var(--yellow);}
   .dir-call{color:var(--green); font-weight:800;}
   .dir-put{color:var(--red); font-weight:800;}
   .empty{color:var(--dim); text-align:center; padding:26px; font-size:12px;}
@@ -307,7 +294,7 @@
   /* ═══ SETUP GUIDE (คู่มือช่วยเทรด) ═══ */
   .guide-card{background:linear-gradient(180deg,var(--panel),var(--card)); border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:12px; position:relative; overflow:hidden;}
   .guide-card::before{content:''; position:absolute; inset:0 auto 0 0; width:3px;}
-  .guide-card.FIRE::before{background:var(--green); box-shadow:0 0 12px rgba(34,201,138,.6);}
+  .guide-card.FIRE::before{background:var(--green);}
   .guide-card.WATCH::before{background:var(--cyan);}
   .guide-card.NONE::before{background:var(--dim);}
   .guide-head{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px;}
@@ -316,7 +303,7 @@
   .guide-score{font-family:var(--num); font-size:22px; font-weight:800; line-height:1;}
   .guide-score.ok{color:var(--green);} .guide-score.wait{color:var(--yellow);} .guide-score.none{color:var(--dim);}
   .guide-action{margin:8px 0 10px; padding:8px 11px; border-radius:9px; font-size:12px; font-weight:800; letter-spacing:.2px; line-height:1.4;}
-  .guide-action.FIRE{background:rgba(34,201,138,.12); color:var(--green); border:1px solid rgba(34,201,138,.4);}
+  .guide-action.FIRE{background:rgba(22,199,132,.12); color:var(--green); border:1px solid rgba(22,199,132,.4);}
   .guide-action.WATCH{background:rgba(56,189,248,.1); color:var(--cyan); border:1px solid rgba(56,189,248,.35);}
   .guide-action.NONE{background:rgba(116,128,156,.08); color:var(--muted); border:1px solid var(--border);}
   .guide-steps{list-style:none; font-size:11.5px;}
@@ -325,9 +312,9 @@
   .gstep{display:flex; flex-direction:column; gap:3px; padding:8px 10px; border-radius:9px; background:rgba(12,18,32,.55); border:1px solid var(--border); font-size:11px; line-height:1.5;}
   .gstep b{font-size:11.5px;}
   .guide-ico{flex-shrink:0; width:19px; height:19px; border-radius:50%; display:grid; place-items:center; font-size:10.5px; font-weight:900; margin-top:1px; line-height:1;}
-  .guide-ico.pass{background:rgba(34,201,138,.16); color:var(--green);}
-  .guide-ico.part{background:rgba(240,185,11,.14); color:var(--yellow);}
-  .guide-ico.fail{background:rgba(246,70,93,.12); color:var(--red);}
+  .guide-ico.pass{background:rgba(22,199,132,.16); color:var(--green);}
+  .guide-ico.part{background:rgba(232,163,61,.14); color:var(--yellow);}
+  .guide-ico.fail{background:rgba(240,70,92,.12); color:var(--red);}
   .guide-steps .gname{font-weight:700; color:var(--text); flex-shrink:0; white-space:nowrap;}
   .guide-steps .gnote{color:var(--dim); font-size:10.5px; line-height:1.45;}
   .guide-prog{height:6px; border-radius:4px; background:var(--grid); overflow:hidden; margin:10px 0 12px;}
@@ -336,17 +323,17 @@
   .guide-prog.WATCH i{background:linear-gradient(90deg,var(--cyan),var(--blue));}
   .guide-prog.NONE i{background:linear-gradient(90deg,var(--dim),var(--border2));}
   .guide-note{margin-top:10px; padding:9px 11px; border-radius:9px; background:rgba(12,18,32,.6); border:1px dashed var(--border); font-size:11px; line-height:1.5;}
-  .guide-note.ready{color:var(--green); border-color:rgba(34,201,138,.35);}
+  .guide-note.ready{color:var(--green); border-color:rgba(22,199,132,.35);}
   .guide-note.wait{color:var(--dim);}
 
   /* compact setup rows (accordion) */
   .setup-row{border-bottom:1px solid var(--border); cursor:pointer; transition:background .12s;}
-  .setup-row:hover{background:rgba(77,163,255,.04);}
+  .setup-row:hover{background:rgba(76,141,255,.04);}
   .setup-row-head{display:grid; grid-template-columns:80px 50px 1fr 45px; align-items:center; gap:6px; padding:8px 10px; font-size:11.5px;}
   .setup-sym{font-weight:800; color:var(--text); letter-spacing:.3px;}
   .setup-tier{font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; padding:2px 6px; border-radius:5px; text-align:center;}
-  .setup-tier.ok{background:rgba(34,201,138,.15); color:var(--green);}
-  .setup-tier.wait{background:rgba(240,185,11,.12); color:var(--yellow);}
+  .setup-tier.ok{background:rgba(22,199,132,.15); color:var(--green);}
+  .setup-tier.wait{background:rgba(232,163,61,.12); color:var(--yellow);}
   .setup-tier.none{background:rgba(116,128,156,.08); color:var(--dim);}
   .setup-dir{font-size:10.5px; font-weight:700;}
   .setup-score{font-family:var(--num); font-weight:800; font-size:12px; text-align:right; color:var(--muted);}
@@ -354,7 +341,7 @@
   .setup-row.expanded .setup-row-detail{display:block;}
   .setup-row.expanded{background:rgba(12,18,32,.4);}
   .tier{display:inline-block; font-size:9.5px; font-weight:900; padding:3px 9px; border-radius:99px; letter-spacing:.4px;}
-  .tier.FIRE{background:rgba(34,201,138,.16); color:var(--green); border:1px solid rgba(34,201,138,.5);}
+  .tier.FIRE{background:rgba(22,199,132,.16); color:var(--green); border:1px solid rgba(22,199,132,.5);}
   .tier.WATCH{background:rgba(56,189,248,.13); color:var(--cyan); border:1px solid rgba(56,189,248,.45);}
   .tier.NONE{background:rgba(116,128,156,.1); color:var(--muted); border:1px solid var(--border);}
 
@@ -364,8 +351,8 @@
   }
   .feed-row:last-child{border-bottom:none;}
   .feed-row .fdir{width:52px; text-align:center; font-weight:900; font-size:11px; border-radius:6px; padding:2px 0;}
-  .feed-row .fdir.CALL{background:rgba(34,201,138,.14); color:var(--green);}
-  .feed-row .fdir.PUT{background:rgba(246,70,93,.14); color:var(--red);}
+  .feed-row .fdir.CALL{background:rgba(22,199,132,.14); color:var(--green);}
+  .feed-row .fdir.PUT{background:rgba(240,70,92,.14); color:var(--red);}
   .feed-row .ftime{color:var(--dim); font-family:var(--num); font-size:10.5px;}
   .feed-row .fprice{font-family:var(--num); font-weight:700; margin-left:auto;}
   .feed-row .fconf{font-family:var(--num); color:var(--muted); font-size:11px;}
@@ -387,9 +374,7 @@
     .pricebox .price{font-size:26px;}
     .pricebox .chg{font-size:11px;}
     .live-badge{margin-left:auto;}
-    .nav{overflow-x:auto; padding:8px 10px 0; -webkit-overflow-scrolling:touch;}
-    .nav-btn{flex:1 1 0; justify-content:center; padding:9px 6px; font-size:12px; gap:6px;}
-    .main{padding:12px 10px 30px;}
+     .content{padding:12px 10px 30px;}
     .kpi-row{grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:9px;}
     .kpi{padding:11px 13px;}
     .kpi .val{font-size:21px;}
@@ -414,7 +399,25 @@
     .chart-wrap{height:240px;}
     .guide-steps .gname{white-space:normal;}
     .guide-action{font-size:11.5px;}
-    .nav-btn{font-size:11px; padding:8px 4px;}
+  }
+
+  /* ═══ MOBILE: sidebar → bottom bar ═══ */
+  @media(max-width:768px){
+    .shell{grid-template-columns:1fr;}
+    .sidebar{
+      position:fixed; bottom:0; left:0; right:0; z-index:100;
+      border-right:none; border-top:1px solid var(--border);
+      padding:0; display:flex; background:var(--panel);
+    }
+    .nav-group{display:flex; margin-bottom:0; flex:1;}
+    .nav-group-label{display:none;}
+    .nav-item{
+      flex:1; justify-content:center; padding:10px 4px; font-size:11px;
+      border-left:none; border-top:2px solid transparent; text-align:center;
+    }
+    .nav-item.active{border-left-color:transparent; border-top-color:var(--accent);}
+    .nav-group+.nav-group{border-left:1px solid var(--border);}
+    .content{padding-bottom:60px;}
   }
 
   /* ═══════════ JOURNAL REDESIGN ═══════════ */
@@ -523,17 +526,26 @@
   <a class="logout" href="/logout">ออกจากระบบ</a>
 </div>
 
-<!-- ═══════════ NAV ═══════════ -->
-<div class="nav">
-  <button class="nav-btn active" data-tab="overview"><span class="ndot"></span>ภาพรวม</button>
-  <button class="nav-btn" data-tab="ml"><span class="ndot"></span>ML สัญญาณ</button>
-  <button class="nav-btn" data-tab="setup"><span class="ndot"></span>Rule-Based</button>
-  <button class="nav-btn" data-tab="journal"><span class="ndot"></span>Journal / P&amp;L</button>
-  <button class="nav-btn" data-tab="cfd"><span class="ndot"></span>CFD Backtest</button>
-</div>
+<!-- ═══════════ SHELL ═══════════ -->
+<div class="shell">
 
-<!-- ═══════════ MAIN ═══════════ -->
-<div class="main">
+<!-- ═══════════ SIDEBAR ═══════════ -->
+<aside class="sidebar">
+  <div class="nav-group">
+    <div class="nav-group-label">มอนิเตอร์สด</div>
+    <div class="nav-item active" data-tab="overview">ภาพรวม</div>
+    <div class="nav-item" data-tab="ml">ML สัญญาณ</div>
+    <div class="nav-item" data-tab="setup">Rule-Based</div>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-label">รายงานย้อนหลัง</div>
+    <div class="nav-item" data-tab="journal">Journal / P&amp;L</div>
+    <div class="nav-item" data-tab="cfd">CFD Backtest</div>
+  </div>
+</aside>
+
+<!-- ═══════════ CONTENT ═══════════ -->
+<div class="content">
 
   <!-- ─── OVERVIEW ─── -->
   <section id="tab-overview">
@@ -762,9 +774,9 @@
         </div>
       </div>
 
-      <!-- 🔬 TICK TOUCH RESEARCH MONITOR -->
+      <!-- TICK TOUCH RESEARCH MONITOR -->
       <div style="margin-top:20px;">
-        <h3><span class="ph purple"></span>🔬 Tick Touch Research
+        <h3><span class="ph purple"></span>Tick Touch Research
           <span style="font-size:11px;color:var(--muted);font-weight:400;margin-left:8px;">เก็บข้อมูล 3 เคสแตะ EMA200 + checklist vote (ไม่ส่งสัญญาณจริง)</span>
         </h3>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px;" id="ttCaseCards">
@@ -797,7 +809,7 @@
   <!-- ─── JOURNAL REDESIGNED ─── -->
   <section id="tab-journal" style="display:none;">
     <div class="j-header">
-      <div class="j-title"><span class="jicon">📊</span> Journal & P&amp;L</div>
+      <div class="j-title"><span class="jicon"></span>Journal & P&amp;L</div>
       <div class="j-actions">
         <button class="btn" id="btnExportJ" title="Export Excel">⬇ Export</button>
       </div>
@@ -805,7 +817,7 @@
 
     <div class="j-settings" id="jSettings">
       <div class="j-settings-head" onclick="this.parentElement.classList.toggle('open')">
-        <span class="jsl">⚙ ตั้งค่าการเทรด + Export</span>
+        <span class="jsl">ตั้งค่าการเทรด + Export</span>
         <span class="jsa">▾</span>
       </div>
       <div class="j-settings-body">
@@ -837,7 +849,7 @@
         <div class="jh-sub" id="mBalanceSub">–</div>
       </div>
       <div class="j-hero-card bal" style="border-left:2px solid var(--cyan);">
-        <div class="jh-lbl">📈 CFD Balance</div>
+        <div class="jh-lbl">CFD Balance</div>
         <div class="jh-val" id="mCfdBalance">–</div>
         <div class="jh-sub" id="mCfdBalanceSub">–</div>
       </div>
@@ -867,13 +879,13 @@
     </div>
 
     <div class="j-equity">
-      <h3>📈 Equity Curve</h3>
+      <h3>Equity Curve</h3>
       <div style="height:260px;"><canvas id="equityFullChart" class="chart"></canvas></div>
     </div>
 
     <div class="j-section open" id="jSecDaily">
       <div class="j-section-head" onclick="this.parentElement.classList.toggle('open')">
-        <h3>📅 ผลรายวัน</h3><span class="j-arrow">▾</span>
+        <h3>ผลรายวัน</h3><span class="j-arrow">▾</span>
       </div>
       <div class="j-section-body">
         <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
@@ -887,7 +899,7 @@
 
     <div class="j-section" id="jSecPeriod">
       <div class="j-section-head" onclick="this.parentElement.classList.toggle('open')">
-        <h3>📊 สรุป ML vs Rule-Based</h3><span class="j-arrow">▾</span>
+        <h3>สรุป ML vs Rule-Based</h3><span class="j-arrow">▾</span>
       </div>
       <div class="j-section-body">
         <div class="j-period-tabs" id="jPeriodTabs">
@@ -915,7 +927,7 @@
 
     <div class="j-section" id="jSecModel">
       <div class="j-section-head" onclick="this.parentElement.classList.toggle('open')">
-        <h3>🤖 Model Registry</h3><span class="j-arrow">▾</span>
+        <h3>Model Registry</h3><span class="j-arrow">▾</span>
       </div>
       <div class="j-section-body">
         <div class="tbl-wrap">
@@ -934,7 +946,7 @@
       <!-- params bar -->
       <div class="j-section open">
         <div class="j-section-head" onclick="this.parentElement.classList.toggle('open')">
-          <h3>⚙️ CFD Parameters</h3><span class="j-arrow">▾</span>
+          <h3>CFD Parameters</h3><span class="j-arrow">▾</span>
         </div>
         <div class="j-section-body" style="padding:12px;">
           <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center; font-size:11px;">
@@ -960,7 +972,7 @@
       <!-- ═══ CFD PAPER TRADING ═══ -->
       <div class="j-section open" style="margin-top:14px;">
         <div class="j-section-head" onclick="this.parentElement.classList.toggle('open')">
-          <h3>📊 CFD Paper Trading (Real-time)</h3><span class="j-arrow">▾</span>
+          <h3>CFD Paper Trading (Real-time)</h3><span class="j-arrow">▾</span>
         </div>
         <div class="j-section-body" style="padding:12px;">
           <div id="cfdPaperSummary" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px;"></div>
@@ -982,7 +994,7 @@
       <!-- TP1 vs TP2 comparison -->
       <div class="j-section" style="margin-top:14px;">
         <div class="j-section-head" onclick="this.parentElement.classList.toggle('open')">
-          <h3>📊 TP1 vs TP2 Comparison</h3><span class="j-arrow">▾</span>
+          <h3>TP1 vs TP2 Comparison</h3><span class="j-arrow">▾</span>
         </div>
         <div class="j-section-body">
           <div class="tbl-wrap">
@@ -1023,7 +1035,8 @@
     </div>
   </section>
 
-</div>
+</div><!-- /content -->
+</div><!-- /shell -->
 
 <!-- ═══════════ STATUS BAR ═══════════ -->
 <div class="statusbar">
@@ -1335,8 +1348,8 @@ function drawCandles(canvas, data){
   // ── EMA 50/100/200 (แทน EMA20 เดิม → EMA100) ──
   if(chartInd.ema){
     drawLine(ema(closes,200),'rgba(243,168,70,.95)',1.6);
-    drawLine(ema(closes,100),'rgba(167,139,250,.9)',1.2);
-    drawLine(ema(closes,50),'rgba(56,225,196,.9)',1.2);
+    drawLine(ema(closes,100),'rgba(76,141,255,.9)',1.2);
+    drawLine(ema(closes,50),'rgba(76,141,255,.9)',1.2);
   }
 
   // ── SMA5 ──
@@ -1523,7 +1536,7 @@ function drawCandles(canvas, data){
     ctx.fillText('VOL',padL+2,volTop+10);
     view.forEach((d,i)=>{
       const x=pxForData(i+start), hh=d.v/vmax*(vh-6);
-      ctx.fillStyle=(d.c>=d.o)?'rgba(34,201,138,.25)':'rgba(246,70,93,.25)';
+      ctx.fillStyle=(d.c>=d.o)?'rgba(22,199,132,.25)':'rgba(240,70,92,.25)';
       ctx.fillRect(x-bw/2,volTop+vh-2-hh,bw,hh);
     });
     volTop+=volH;
@@ -1537,8 +1550,8 @@ function drawCandles(canvas, data){
       oy,
       min:0, max:100,                       // สเกล RSI คงที่ 0–100
       guides:[{v:0},{v:30},{v:50,major:true},{v:70},{v:100}],
-      zones:[{v0:70,v1:100,color:'rgba(246,70,93,.08)'},
-             {v0:0,v1:30,color:'rgba(34,201,138,.08)'}],
+      zones:[{v0:70,v1:100,color:'rgba(240,70,92,.08)'},
+             {v0:0,v1:30,color:'rgba(22,199,132,.08)'}],
       fill:{arr:rv, color:'rgba(247,184,71,.30)'},
       lines:[{arr:rv, color:'#f7b847', width:1.2}],
       pill:{arr:rv, color:'#f7b847'}
@@ -1555,10 +1568,10 @@ function drawCandles(canvas, data){
       oy,
       min:0, max:aMax,
       guides:[{v:0},{v:20},{v:40,major:true},{v:60},{v:80}],
-      zones:[{v0:0,v1:20,color:'rgba(34,201,138,.07)'}],
+      zones:[{v0:0,v1:20,color:'rgba(22,199,132,.07)'}],
       fill:{arr:aa.adx, color:'rgba(247,184,71,.22)'},
-      lines:[{arr:aa.pdi, color:'rgba(34,201,138,.75)', width:1.2},
-             {arr:aa.ndi, color:'rgba(246,70,93,.75)', width:1.2},
+      lines:[{arr:aa.pdi, color:'rgba(22,199,132,.75)', width:1.2},
+             {arr:aa.ndi, color:'rgba(240,70,92,.75)', width:1.2},
              {arr:aa.adx, color:'#f7b847', width:1.2}],
       pill:{arr:aa.adx, color:'#f7b847'}
     });
@@ -1588,7 +1601,7 @@ function drawCandles(canvas, data){
       if(d){
         const bx=pxForData(bi), by=py(d.c);
         // ไฮไลต์แท่งที่ hover
-        ctx.fillStyle='rgba(77,163,255,.10)';
+        ctx.fillStyle='rgba(76,141,255,.10)';
         ctx.fillRect(bx-bw/2,padT,bw,plotH);
         // เส้นกากบาท
         ctx.strokeStyle='rgba(232,238,251,.35)'; ctx.lineWidth=1;
@@ -1771,10 +1784,10 @@ function gaugeSVG(g){
 }
 
 /* ═══════ TABS ═══════ */
-document.querySelectorAll('.nav-btn').forEach(btn=>{
+document.querySelectorAll('.nav-item').forEach(btn=>{
   btn.addEventListener('click',()=>{
-    document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-    document.querySelectorAll('.main section').forEach(s=>s.style.display='none');
+    document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.content section').forEach(s=>s.style.display='none');
     btn.classList.add('active');
     document.getElementById('tab-'+btn.dataset.tab).style.display='block';
     window.dispatchEvent(new Event('resize'));
@@ -1822,7 +1835,7 @@ function drawEquity(points){
   const up=values.length>0&&values[values.length-1]>=0;
   const cfg={type:'line',
     data:{labels,datasets:[{data:values,borderColor:up?'#22c98a':'#f6465d',
-      backgroundColor:up?'rgba(34,201,138,.15)':'rgba(246,70,93,.15)',fill:true,pointRadius:0,borderWidth:2,tension:.25}]},
+      backgroundColor:up?'rgba(22,199,132,.15)':'rgba(240,70,92,.15)',fill:true,pointRadius:0,borderWidth:2,tension:.25}]},
     options:{responsive:true,maintainAspectRatio:false,animation:false,
       scales:{x:{display:false},y:{grid:{color:'#131c30'},ticks:{color:'#4a5775',font:{size:10}}}},
       plugins:{legend:{display:false}} }};
@@ -2463,7 +2476,7 @@ function drawEquityFull(points){
   const last=values[values.length-1]||0;
   const cfg={type:'line',
     data:{labels,datasets:[{data:values,borderColor:last>=0?'#22c98a':'#f6465d',
-      backgroundColor:last>=0?'rgba(34,201,138,.15)':'rgba(246,70,93,.15)',fill:true,pointRadius:0,borderWidth:2,tension:.2}]},
+      backgroundColor:last>=0?'rgba(22,199,132,.15)':'rgba(240,70,92,.15)',fill:true,pointRadius:0,borderWidth:2,tension:.2}]},
     options:{responsive:true,maintainAspectRatio:false,animation:false,
       scales:{x:{ticks:{color:'#4a5775',font:{size:10},maxTicksLimit:6},grid:{color:'#131c30'}},
               y:{grid:{color:'#131c30'},ticks:{color:'#4a5775',font:{size:10}}}},
@@ -2640,7 +2653,7 @@ function renderCFDPaperTrades(d){
   if(!openDiv) return;
   const open=d.open_trades||[];
   if(!open.length){openDiv.innerHTML='';return;}
-  openDiv.innerHTML='<h4 style="color:var(--cyan);font-size:12px;margin-bottom:8px;">🟢 OPEN TRADES ('+open.length+')</h4>'+
+  openDiv.innerHTML='<h4 style="color:var(--cyan);font-size:12px;margin-bottom:8px;">OPEN TRADES ('+open.length+')</h4>'+
     open.map(t=>{
       const lp=t.live_price||t.entry_price;
       const pnlCol=(t.unrealized_pnl||0)>=0?'var(--green)':'var(--red)';
