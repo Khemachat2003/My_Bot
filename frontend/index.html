@@ -761,6 +761,36 @@
           <div id="setEmpty" class="empty" style="display:none;">ยังไม่มีสัญญาณ — รอ setup_feed.py ทำงาน</div>
         </div>
       </div>
+
+      <!-- 🔬 TICK TOUCH RESEARCH MONITOR -->
+      <div style="margin-top:20px;">
+        <h3><span class="ph purple"></span>🔬 Tick Touch Research
+          <span style="font-size:11px;color:var(--muted);font-weight:400;margin-left:8px;">เก็บข้อมูล 3 เคสแตะ EMA200 + checklist vote (ไม่ส่งสัญญาณจริง)</span>
+        </h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px;" id="ttCaseCards">
+          <div class="empty" style="grid-column:1/-1;">ยังไม่มีข้อมูล research</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div>
+            <h4 style="color:var(--cyan);font-size:12px;margin-bottom:6px;">🗳 Checklist Vote Weight (WR เมื่อ cond = true)</h4>
+            <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
+              <table id="ttCondTable" style="font-size:11px;">
+                <thead><tr><th>Condition</th><th>True</th><th>Win</th><th>WR</th><th>False WR</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <h4 style="color:var(--cyan);font-size:12px;margin-bottom:6px;">📋 Recent Touches</h4>
+            <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
+              <table id="ttRecentTable" style="font-size:11px;">
+                <thead><tr><th>เวลา</th><th>คู่</th><th>Case</th><th>Dir</th><th>Entry</th><th>Exit</th><th>✓</th><th>ผล</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -2074,6 +2104,62 @@ async function refreshSetupTab(){
       <td class="mono">${r.details?Object.values(r.details).filter(d=>d.frac!=null?d.frac>=0.999:d.ok).length+'/10':'–'}</td>
       <td><span class="pill ${r.result}">${r.result}</span></td>
     </tr>`).join('');
+  }catch(e){}
+  await refreshTickTouchResearch();
+}
+
+const TT_CASE_COLORS={'TICK_TOUCH':'var(--cyan)','WICK_BOUNCE':'var(--yellow)','BREAKOUT':'var(--green)'};
+const TT_COND_NAMES={
+  'c1_fractal_sr':'1. Fractal 15 S/R','c2_bb_break':'2. BB Break','c3_rsi_ob_os':'3. RSI OVB/OVS',
+  'c4_rsi_div':'4. RSI Divergence','c5_adx':'5. ADX > 20','c6_pa':'6. PA Confirmation',
+  'c7_fractal_trend':'7. Fractal Trend','c8_grip':'8. Grip','c9_bb_width':'9. BB Width','c10_mtf':'10. MTF Trend',
+};
+
+async function refreshTickTouchResearch(){
+  try{
+    const s=await fetchJSON('/api/ticktouch/stats');
+    // Case cards
+    const cards=document.getElementById('ttCaseCards');
+    if(cards){
+      const cases=Object.entries(s.by_case||{});
+      cards.innerHTML=cases.length?cases.map(([k,v])=>`
+        <div style="background:var(--bg);border:1px solid ${TT_CASE_COLORS[k]||'var(--border)'};border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:11px;color:var(--muted);">${TT_CASE_COLORS[k]?k:'–'}</div>
+          <div style="font-size:20px;font-weight:800;color:${v.wr>=60?'var(--green)':(v.wr>=50?'var(--yellow)':'var(--red)')};">${v.wr}%</div>
+          <div style="font-size:11px;color:var(--muted);">${v.wins}W / ${v.losses}L (${v.n})</div>
+        </div>`).join('')+'<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;"><div style="font-size:11px;color:var(--muted);">TOTAL</div><div style="font-size:20px;font-weight:800;">'+(s.wr||0)+'%</div><div style="font-size:11px;color:var(--muted);">'+s.wins+'W ('+s.resolved+') · ⏳'+s.pending+'</div></div>'
+        :'<div class="empty" style="grid-column:1/-1;">ยังไม่มีข้อมูล research — รอราคาแตะ EMA200</div>';
+    }
+    // Condition vote table
+    const condBody=document.querySelector('#ttCondTable tbody');
+    if(condBody){
+      const conds=Object.entries(s.by_condition||{})
+        .sort((a,b)=>(b[1].wr_when_true||0)-(a[1].wr_when_true||0));
+      condBody.innerHTML=conds.length?conds.map(([k,v])=>`
+        <tr>
+          <td>${TT_COND_NAMES[k]||k}</td>
+          <td>${v.true_n}</td>
+          <td>${v.true_wins}</td>
+          <td><b style="color:${v.wr_when_true>=60?'var(--green)':(v.wr_when_true>=50?'var(--yellow)':'var(--red)')}">${v.wr_when_true}%</b></td>
+          <td style="color:var(--muted);">${v.false_n?v.wr_when_false+'%':'–'}</td>
+        </tr>`).join(''):'<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:14px;">รอข้อมูล resolved</td></tr>';
+    }
+    // Recent touches
+    const recBody=document.querySelector('#ttRecentTable tbody');
+    if(recBody){
+      const rec=s.recent||[];
+      recBody.innerHTML=rec.length?rec.map(r=>`
+        <tr>
+          <td>${fmtTime(r.signal_time)}</td>
+          <td>${(r.symbol||'').replace('frx','')}</td>
+          <td style="color:${TT_CASE_COLORS[r.touch_case]||'inherit'};">${(r.touch_case||'').replace('_TOUCH','').replace('_',' ')}</td>
+          <td class="${dirClass(r.direction)}">${r.direction}</td>
+          <td class="mono">${r.entry_price?.toFixed(2)}</td>
+          <td class="mono">${r.exit_price!=null?r.exit_price.toFixed(2):'–'}</td>
+          <td class="mono">${r.passed_count}/10</td>
+          <td><span class="pill ${r.result}">${r.result}</span></td>
+        </tr>`).join(''):'<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px;">ยังไม่มีเหตุการณ์แตะ</td></tr>';
+    }
   }catch(e){}
 }
 

@@ -229,9 +229,9 @@ class SetupFeedEngine:
             if not touched:
                 return
 
-            recent = db.fetch_recent_setup_signals(limit=1, symbol=self.symbol)
-            if recent and recent[0].get("importance") == 1:
-                sig_time = pd.to_datetime(recent[0]["signal_time"])
+            last = db.fetch_last_tick_touch(self.symbol)
+            if last:
+                sig_time = pd.to_datetime(last["signal_time"])
                 if (now - sig_time).total_seconds() < 1800:
                     return
 
@@ -240,40 +240,23 @@ class SetupFeedEngine:
             target_time = (now + pd.Timedelta(minutes=hold_min)).isoformat()
             from backend.setup_scorer import score_setup
             result = score_setup(self.buffer, timeframe="TICK", target_hold_minutes=hold_min)
-            dist_pct = round(abs(self.last_price - e200) / e200 * 100.0, 4)
-            new_sig_id = db.insert_setup_signal(
+            # RESEARCH MODE: เก็บข้อมูลลง tick_touch_log — ไม่ส่งสัญญาณจริง
+            # ไม่ลง setup_signals/trade_journal ไม่เข้า CFD
+            db.insert_tick_touch_log(
                 signal_time=now.isoformat(),
-                entry_price=self.last_price,
+                symbol=self.symbol,
+                touch_case=touch_case,
                 direction=direction,
-                confidence=1.0,
+                entry_price=self.last_price,
+                ema200_price=e200,
                 horizon_min=hold_min,
                 target_time=target_time,
-                timeframe="TICK",
-                score=0,
-                total=0,
-                tier="FIRE",
-                symbol=self.symbol,
-                ema200_price=e200,
-                dist200_pct=dist_pct,
-                near_ema200=True,
-                crossed_ema100=False,
-                importance=1,
-                conditions_passed=result.conditions_passed,
-                conditions_log_json=json.dumps(
-                    {**result.conditions_log, "_touch_case": touch_case},
-                    ensure_ascii=False, default=str),
+                conditions_json=json.dumps(result.conditions_log, ensure_ascii=False, default=str),
+                passed_count=result.conditions_passed,
             )
-            # TICK_TOUCH ไม่สร้าง CFD — CFD ต้องมาจาก rulebase/ML เท่านั้น
-            sym_text = symbol_label(self.symbol)
-            msg = (
-                f"⚡ [EMA200 TOUCH] Importance 1 [{touch_case}]\n"
-                f"Symbol: {sym_text} | {touch_note}\n"
-                f"Direction: {direction} | Hold: {hold_min}m\n"
-                f"⚠️ สัญญาณเตือน — รอ rulebase/ML ยืนยันก่อนเข้า CFD"
-            )
-            send_telegram(msg)
-            print(f"[SetupFeed:{self.symbol}] 🚨 EMA200_TOUCH [{touch_case}] {direction} → "
-                  f"EMA200 = {e200:.5f}, price = {self.last_price:.5f}")
+            print(f"[SetupFeed:{self.symbol}] 🔬 RESEARCH [{touch_case}] {direction} → "
+                  f"EMA200 = {e200:.5f}, price = {self.last_price:.5f}, "
+                  f"checklist {result.conditions_passed}/10")
         except Exception:
             pass
 
@@ -346,6 +329,28 @@ class SetupFeedEngine:
                 )
                 send_telegram(msg)
                 print(f"[SetupFeed:{self.symbol}] CFD #{cr['id']} → {cr['result']} P&L=${cr.get('pnl',0):+.2f}")
+        except Exception:
+            pass
+
+        # 🔬 Research: สรุปผล tick_touch_log (เงียบๆ ไม่ส่ง Telegram)
+        try:
+            pending_research = db.fetch_pending_tick_touch(self.symbol)
+            for row in pending_research:
+                sig_time = pd.to_datetime(row["signal_time"])
+                elapsed_min = (now - sig_time).total_seconds() / 60.0
+                if elapsed_min < row["horizon_min"]:
+                    continue
+                exit_price = self.last_price
+                entry_price = row["entry_price"]
+                if row["direction"] == "CALL":
+                    res = "WIN" if exit_price > entry_price else (
+                        "LOSE" if exit_price < entry_price else "DRAW")
+                else:
+                    res = "WIN" if exit_price < entry_price else (
+                        "LOSE" if exit_price > entry_price else "DRAW")
+                db.update_tick_touch_result(row["id"], exit_price, res, now.isoformat())
+                print(f"[SetupFeed:{self.symbol}] 🔬 Research #{row['id']} "
+                      f"[{row['touch_case']}] → {res}")
         except Exception:
             pass
 

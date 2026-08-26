@@ -337,6 +337,12 @@ def get_signals(limit: int = Query(100, ge=1, le=1000),
     return db.fetch_recent_setup_signals(limit=limit, symbol=symbol, exclude_tick=True)
 
 
+@app.get("/api/ticktouch/stats")
+def get_tick_touch_stats(_auth=Depends(require_auth)):
+    """สถิติ research แตะ EMA200 3 เคส + น้ำหนักโหวต checklist"""
+    return db.fetch_tick_touch_stats()
+
+
 @app.get("/api/signals/markers")
 def get_signal_markers(symbol: str = Query("frxXAUUSD"),
                        limit: int = Query(50, ge=1, le=200),
