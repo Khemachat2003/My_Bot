@@ -426,47 +426,6 @@ class SetupFeedEngine:
                         self._last_entry_trigger[tf_label] = result.entry_trigger
                         continue
 
-                # 🚦 loss-streak cooldown: ข้ามถ้าสัญญาณล่าสุด 2 ไม้บน symbol นี้แพ้ทั้งคู่
-                # → หยุด 1 ชม. (กันระบบยิงซ้ำ direction เดิมบน symbol ที่กำลังขาดทุน)
-                recent = db.fetch_recent_setup_signals(limit=2, symbol=self.symbol)
-                recent_resolved = [s for s in recent
-                                   if s.get("result") in ("WIN", "LOSE") and not s.get("phantom")]
-                if (len(recent_resolved) >= 2
-                        and all(s["result"] == "LOSE" for s in recent_resolved)):
-                    last_loss_time = pd.to_datetime(recent_resolved[0]["signal_time"])
-                    loss_age_h = (now - last_loss_time).total_seconds() / 3600.0
-                    if loss_age_h < 1.0:
-                        print(f"[SetupFeed:{self.symbol}] ข้ามสัญญาณ [{tf_label}] — "
-                              f"แพ้ 2 ไม้ติด หยุด 1 ชม. (เหลือ {60 - loss_age_h*60:.0f} นาที)")
-                        self._last_entry_trigger[tf_label] = result.entry_trigger
-                        continue
-
-                # 🚦 session throttle: Asia session (00-07 UTC) max 3/symbol (แทน daily cap 6)
-                hour_utc = now.hour
-                if 0 <= hour_utc < 7:
-                    start_of_day = pd.Timestamp(
-                        now.tz_localize(None) if now.tz is not None else now
-                    ).normalize().isoformat()
-                    asia_count = db.count_setup_signals_since(start_iso=start_of_day,
-                                                             symbol=self.symbol)
-                    if asia_count >= 3:
-                        print(f"[SetupFeed:{self.symbol}] ข้ามสัญญาณ [{tf_label}] — "
-                              f"Asia session cap (3/symbol) แล้ว ({asia_count} ไม้)")
-                        self._last_entry_trigger[tf_label] = result.entry_trigger
-                        continue
-
-                # 🚦 daily cap: ข้ามถ้าวันนี้ยิงเกิน cap แล้ว (นับตั้งแต่ 00:00 UTC)
-                if DAILY_CAP > 0:
-                    start_of_day = pd.Timestamp(
-                        now.tz_localize(None) if now.tz is not None else now
-                    ).normalize().isoformat()
-                    day_count = db.count_setup_signals_since(start_iso=start_of_day,
-                                                             symbol=self.symbol)
-                    if day_count >= DAILY_CAP:
-                        print(f"[SetupFeed:{self.symbol}] ข้ามสัญญาณ [{tf_label}] — ถึง daily cap {DAILY_CAP} แล้ว")
-                        self._last_entry_trigger[tf_label] = result.entry_trigger
-                        continue
-
                 # 🚦 session block: Night (18-24 UTC) = ตลาด volume ต่ำสุด — บล็อกทั้ง CALL/PUT
                 # CALL Night: 34.1% WR (41 trades), PUT Night: 45.9% WR (37 trades)
                 # ทั้งสองต่ำกว่า break-even 54.95% → ไม่เทรดช่วงนี้เลยดีกว่า

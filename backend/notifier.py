@@ -48,7 +48,7 @@ import pandas as pd
 
 from backend import db
 from backend.telegram import send_telegram
-from backend.market_hours import is_forex_like, market_open_now, symbol_label
+from backend.market_hours import is_forex_like, market_open_now, symbol_label, get_session
 from backend.ml_forecaster.features_v2 import get_latest_features
 from backend.ml_forecaster.setup_features import (
     SETUP_FEATURE_COLUMNS, flatten_setup_result,
@@ -69,6 +69,10 @@ ML_TIMEFRAMES = [
     {"label": "M5", "hold_min": 30, "resample_min": 5,
      "model_file": "model_m5.joblib", "train_horizon": 6, "min_bars": 60},
 ]
+
+# ── Guards (เหมือนฝั่ง rulebase) ──
+ML_DAILY_CAP = int(os.getenv("ML_DAILY_CAP", "20"))     # ไม่เกิน 20 ไม้/วัน
+ML_COOLDOWN_MIN = float(os.getenv("ML_COOLDOWN_MIN", "60"))  # 60 นาที/direction
 
 
 def _load_model_bundle(cfg: dict) -> dict:
@@ -398,6 +402,30 @@ class MLFeedEngine:
 
             prev_state = self._last_signal_state.get(cfg["label"], "NEUTRAL")
             if res["signal"] in ("CALL", "PUT") and res["signal"] != prev_state:
+                # 🚦 Night block: 18-24 UTC volume ต่ำ (rulebase พิสูจน์แล้ว WR 34-46%)
+                if get_session(now) == "Night":
+                    print(f"[MLFeed] ข้ามสัญญาณ [{cfg['label']}] — Night session "
+                          f"(volume ต่ำ, WR ต่ำกว่า breakeven)")
+                    continue
+                # 🚦 daily cap: ไม่เกิน 20 ไม้/วัน
+                start_of_day = pd.Timestamp(
+                    now.tz_localize(None) if now.tz is not None else now
+                ).normalize().isoformat()
+                day_count = db.count_ml_signals_since(start_iso=start_of_day)
+                if day_count >= ML_DAILY_CAP:
+                    print(f"[MLFeed] ข้ามสัญญาณ [{cfg['label']}] — ถึง daily cap "
+                          f"{ML_DAILY_CAP} แล้ว ({day_count} ไม้)")
+                    continue
+                # 🚦 cooldown: 60 นาที/direction (กันยิงซ้ำทิศเดิมถี่ๆ)
+                recent_same_dir = [s for s in db.fetch_recent_ml_signals(limit=10)
+                                   if s.get("direction") == res["signal"]]
+                if recent_same_dir:
+                    age_min = (now - pd.to_datetime(
+                        recent_same_dir[0]["signal_time"])).total_seconds() / 60.0
+                    if age_min < ML_COOLDOWN_MIN:
+                        print(f"[MLFeed] ข้ามสัญญาณ [{cfg['label']}] — cooldown "
+                              f"{res['signal']} {age_min:.0f}/{ML_COOLDOWN_MIN} นาที")
+                        continue
                 # 🚦 loss-streak cooldown: แพ้ 2 ไม้ติด → พัก 1 ชม.
                 recent_ml = [s for s in db.fetch_recent_ml_signals(limit=4)
                              if s.get("result") in ("WIN", "LOSE")]

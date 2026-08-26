@@ -686,6 +686,17 @@ def fetch_recent_ml_signals(limit: int = 100) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def count_ml_signals_since(start_iso: str) -> int:
+    """จำนวน ML signals ที่ยิงตั้งแต่ start_iso (ใช้ daily cap 20 ไม้)"""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT COUNT(*) AS c FROM ml_signals WHERE signal_time >= ?",
+        (start_iso,),
+    ).fetchone()
+    conn.close()
+    return int(row["c"]) if row else 0
+
+
 def compute_ml_stats(payout: float = 0.82) -> dict:
     return _compute_stats("ml_signals", payout)
 
