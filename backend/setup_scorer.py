@@ -363,11 +363,52 @@ def _cond10_mtf_trend(df: pd.DataFrame, direction: str) -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 # EMA200 TOUCH Detection
 # ══════════════════════════════════════════════════════════════════════════════
+def classify_ema200_touch(c_open: float, c_high: float, c_low: float,
+                          c_close: float, e200: float) -> tuple[bool, str, str, str]:
+    """Classifier กลาง 3 เคสการแตะ EMA200 — ใช้ร่วมกันทั้ง real-time checker
+    (setup_feed._check_tick_touch) และ rulebase checklist (_ema200_touch检测)
+    เพื่อให้ทั้ง 2 ระบบส่งสัญญาณด้วยหลักการเดียวกัน
+
+    "แตะ" = เส้น EMA200 อยู่ใน range ของแท่ง (low ≤ EMA200 ≤ high) — ไม่ใช้รัศมี
+
+    Returns: (touched, touch_case, note, direction)
+      touch_case: BREAKOUT / WICK_BOUNCE / TICK_TOUCH / ""
+      direction: CALL / PUT (ฝั่งของ close เทียบเส้น)
+    """
+    if e200 <= 0:
+        return False, "", "EMA200 ไม่ถูกต้อง", ""
+
+    # แตะจริง = เส้นอยู่ใน range แท่งเทียน
+    if not (c_low <= e200 <= c_high):
+        return False, "", f"แท่งไม่ได้แตะ EMA200 ({e200:.5f})", ""
+
+    direction = "CALL" if c_close >= e200 else "PUT"
+    body = abs(c_close - c_open)
+    # ทะลุจริง = เปิด-ปิดอยู่คนละฝั่งของเส้น
+    crossed = (c_open - e200) * (c_close - e200) < 0
+
+    # เคส 3: BREAKOUT — เปิด-ปิดคนละฝั่งเส้น + dist(เส้น→close) ≥ ½ body
+    if crossed and body > 0 and abs(c_close - e200) >= 0.5 * body:
+        return True, "BREAKOUT", (
+            f"ปิดทะลุ EMA200 ({e200:.5f}) dist(เส้น→close)={abs(c_close-e200):.5f} "
+            f"≥ ½body({0.5*body:.5f})"), direction
+
+    # เคส 2: WICK_BOUNCE — wick แตะเส้น ปิดกลับ dist(wick→close) ≥ ½ body
+    wick_to_close = (c_close - c_low) if c_close >= e200 else (c_high - c_close)
+    if body > 0 and wick_to_close >= 0.5 * body:
+        return True, "WICK_BOUNCE", (
+            f"wick แตะ EMA200 ({e200:.5f}) เด้ง dist(wick→close)={wick_to_close:.5f} "
+            f"≥ ½body({0.5*body:.5f})"), direction
+
+    # เคส 1: TICK_TOUCH — แตะแล้วส่งเลย
+    return True, "TICK_TOUCH", f"ราคาแตะ EMA200 ({e200:.5f}) real-time", direction
+
+
 def _ema200_touch检测(df: pd.DataFrame, ema200: pd.Series,
                        lookback: int = 20) -> tuple[bool, str, str]:
-    """ตรวจว่าแท่งล่าสุด (k=0) มี wick แตะ EMA200 หรือไม่
+    """ตรวจว่าแท่งล่าสุด (k=0) แตะ EMA200 หรือไม่ — ใช้ classify_ema200_touch กลาง
     Returns: (touched, note, touch_case)
-    touch_case: WICK_TOUCH / CLOSE_TOUCH / ""
+    touch_case: BREAKOUT / WICK_BOUNCE / TICK_TOUCH / ""
     """
     n = len(df)
     idx = n - 1
@@ -375,19 +416,12 @@ def _ema200_touch检测(df: pd.DataFrame, ema200: pd.Series,
         return False, "ไม่มีข้อมูล", ""
 
     row = df.iloc[idx]
-    candle_high = float(row["high"])
-    candle_low = float(row["low"])
-    candle_close = float(row["close"])
     e_at_bar = float(ema200.iloc[idx]) if idx < len(ema200) else float(ema200.iloc[-1])
-    e200 = float(ema200.iloc[-1])
-    dist_now = abs(candle_close - e200) / e200 * 100.0
-
-    if candle_low <= e_at_bar <= candle_high:
-        if abs(candle_close - e200) / e200 * 100.0 <= 0.02:
-            return True, f"ปิดตรง EMA200 ({e200:.2f})", "CLOSE_TOUCH"
-        return True, f"wick แตะ EMA200 ({e200:.2f}, ห่าง {dist_now:.2f}%)", "WICK_TOUCH"
-
-    return False, f"แท่งล่าสุดไม่ได้แตะ EMA200 ({e200:.2f})", ""
+    touched, case, note, _dir = classify_ema200_touch(
+        float(row["open"]), float(row["high"]),
+        float(row["low"]), float(row["close"]), e_at_bar,
+    )
+    return touched, note, case
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -503,7 +537,9 @@ def score_setup(
         entry_trigger = True
         passed_names = [k for k, v in cond.items() if v["pass"]]
         touch_labels = {
-            "TICK_TOUCH": "⏱ ราคากดแตะ EMA200 ณ ขณะนี้",
+            "TICK_TOUCH": "⏱ ราคาแตะ EMA200 real-time",
+            "WICK_BOUNCE": "📉 Wick แตะเส้นแล้วเด้ง (≥½ body)",
+            "BREAKOUT": "💥 ปิดทะลุ EMA200 (≥½ body)",
             "WICK_TOUCH": "📉 Wick แตะ EMA200 (แท่งปิดห่าง)",
             "CLOSE_TOUCH": "📍 ปิดตรง EMA200",
         }

@@ -208,9 +208,10 @@ class SetupFeedEngine:
             self._resolve_pending_signals(now)
 
     def _check_tick_touch(self, now: pd.Timestamp):
-        """ตรวจ real-time ว่าราคาปัจจุบันแตะ EMA200 หรือไม่
-        ถ้าแตะ → FIRE Importance 1 ทันที (TICK_TOUCH)
-        ป้องกันซ้ำ: ไม่ FIRE ถ้ามี signal importance=1 จาก symbol เดียวกันภายใน 30 นาที
+        """Real-time: แท่งปัจจุบันแตะ EMA200 (low ≤ EMA200 ≤ high) → FIRE Importance 1
+        จำแนก 3 เคสพฤติกรรม: TICK_TOUCH / WICK_BOUNCE / BREAKOUT
+        — หลักการเดียวกับ rulebase checklist (classify_ema200_touch)
+        Cooldown: ไม่ FIRE ซ้ำภายใน 30 นาที per symbol
         """
         if len(self.buffer) < 210:
             return
@@ -218,17 +219,14 @@ class SetupFeedEngine:
             close = self.buffer["close"]
             ema200 = close.ewm(span=200, adjust=False).mean()
             e200 = float(ema200.iloc[-1])
-            if e200 <= 0:
-                return
 
-            # ใช้ absolute pip distance — XAUUSD ต้องแตะภายใน 1 point, forex 0.2 pip
-            ps = db.get_pip_size(self.symbol)
-            pip_dist = abs(self.last_price - e200) / ps
-            if ps >= 1.0:
-                max_pip = 1.0
-            else:
-                max_pip = 0.2
-            if pip_dist > max_pip:
+            bar = self.buffer.iloc[-1]
+            from backend.setup_scorer import classify_ema200_touch
+            touched, touch_case, touch_note, direction = classify_ema200_touch(
+                float(bar["open"]), float(bar["high"]),
+                float(bar["low"]), float(bar["close"]), e200,
+            )
+            if not touched:
                 return
 
             recent = db.fetch_recent_setup_signals(limit=1, symbol=self.symbol)
@@ -237,11 +235,7 @@ class SetupFeedEngine:
                 if (now - sig_time).total_seconds() < 1800:
                     return
 
-            if self.last_price >= e200:
-                direction, bias = "CALL", "EMA200_TICK_BOUNCE"
-            else:
-                direction, bias = "PUT", "EMA200_TICK_BOUNCE"
-
+            bias = "EMA200_" + touch_case
             hold_min = 30
             target_time = (now + pd.Timedelta(minutes=hold_min)).isoformat()
             from backend.setup_scorer import score_setup
@@ -265,19 +259,21 @@ class SetupFeedEngine:
                 crossed_ema100=False,
                 importance=1,
                 conditions_passed=result.conditions_passed,
-                conditions_log_json=json.dumps(result.conditions_log, ensure_ascii=False, default=str),
+                conditions_log_json=json.dumps(
+                    {**result.conditions_log, "_touch_case": touch_case},
+                    ensure_ascii=False, default=str),
             )
             # TICK_TOUCH ไม่สร้าง CFD — CFD ต้องมาจาก rulebase/ML เท่านั้น
             sym_text = symbol_label(self.symbol)
             msg = (
-                f"⚡ [TICK TOUCH] Importance 1\n"
-                f"Symbol: {sym_text} | ราคา {self.last_price:.5f} แตะ EMA200 ({e200:.5f})\n"
+                f"⚡ [EMA200 TOUCH] Importance 1 [{touch_case}]\n"
+                f"Symbol: {sym_text} | {touch_note}\n"
                 f"Direction: {direction} | Hold: {hold_min}m\n"
                 f"⚠️ สัญญาณเตือน — รอ rulebase/ML ยืนยันก่อนเข้า CFD"
             )
             send_telegram(msg)
-            print(f"[SetupFeed:{self.symbol}] 🚨 TICK_TOUCH → EMA200 = {e200:.5f}, "
-                  f"price = {self.last_price:.5f}, pip_dist = {pip_dist:.2f}")
+            print(f"[SetupFeed:{self.symbol}] 🚨 EMA200_TOUCH [{touch_case}] {direction} → "
+                  f"EMA200 = {e200:.5f}, price = {self.last_price:.5f}")
         except Exception:
             pass
 
