@@ -15,7 +15,7 @@
     --text:#EDEFF3; --muted:#838B9C; --dim:#4C5566;
     --green:#16C784; --red:#F0465C; --yellow:#E8A33D;
     --blue:#4C8DFF; --cyan:#4C8DFF; --purple:#4C8DFF;
-    --grid:#131c30;
+    --grid:#1C2029; --bg2:#171B24;
     --accent:var(--cyan);
     --font-display:'Archivo',sans-serif;
     --font-body:'IBM Plex Sans',sans-serif;
@@ -46,7 +46,7 @@
   .brand{display:flex; align-items:center; gap:9px; white-space:nowrap;}
   .brand .logo{
     width:30px; height:30px; border-radius:8px; display:grid; place-items:center;
-    background:linear-gradient(135deg,#22c98a,#4da3ff); font-weight:900; color:#04121a; font-size:14px;
+    background:linear-gradient(135deg,#16C784,#4C8DFF); font-weight:900; color:#04121a; font-size:14px;
     box-shadow:0 1px 2px rgba(0,0,0,.3);
   }
   .brand .name{font-size:14px; font-weight:800; letter-spacing:.6px;}
@@ -357,14 +357,22 @@
   .feed-row .fprice{font-family:var(--num); font-weight:700; margin-left:auto;}
   .feed-row .fconf{font-family:var(--num); color:var(--muted); font-size:11px;}
   .hi-badge{
-    display:inline-block; background:linear-gradient(135deg,#f7b847,#ff8a3d); color:#1a1305;
+    display:inline-block; background:linear-gradient(135deg,#E8A33D,#ff8a3d); color:#1a1305;
     font-size:9px; font-weight:900; border-radius:10px; padding:1px 6px; margin-left:4px; vertical-align:1px;
     font-family:var(--num); letter-spacing:.3px;
   }
 
+  .open-trade-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;font-size:12px;}
+
   /* ═══ MOBILE RESPONSIVE ═══ */
   @media(max-width:1100px){
     .topstat{display:none;}
+  }
+  @media(max-width:600px){
+    .open-trade-grid{grid-template-columns:repeat(3,1fr);gap:8px 6px;font-size:11px;}
+  }
+  @media(max-width:380px){
+    .open-trade-grid{grid-template-columns:repeat(2,1fr);}
   }
   @media(max-width:820px){
     body{font-size:13px; overflow:auto;}
@@ -793,7 +801,7 @@
             </div>
           </div>
           <div>
-            <h4 style="color:var(--cyan);font-size:12px;margin-bottom:6px;">📋 Recent Touches</h4>
+            <h4 style="color:var(--cyan);font-size:12px;margin-bottom:6px;">Recent Touches</h4>
             <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
               <table id="ttRecentTable" style="font-size:11px;">
                 <thead><tr><th>เวลา</th><th>คู่</th><th>Case</th><th>Dir</th><th>Entry</th><th>Exit</th><th>✓</th><th>ผล</th></tr></thead>
@@ -1018,7 +1026,7 @@
       <!-- trade list -->
       <div class="j-section" style="margin-top:14px;">
         <div class="j-section-head" onclick="this.parentElement.classList.toggle('open')">
-          <h3>📋 Trade List</h3><span class="j-arrow">▾</span>
+          <h3>Trade List</h3><span class="j-arrow">▾</span>
         </div>
         <div class="j-section-body">
           <div class="tbl-wrap">
@@ -1075,7 +1083,7 @@ function showToast(msg, type){
     document.body.appendChild(c);
   }
   const d = document.createElement('div');
-  const bg = type === 'CALL' ? '#22c98a' : type === 'PUT' ? '#f6465d' : '#38e1c4';
+  const bg = type === 'CALL' ? '#16C784' : type === 'PUT' ? '#F0465C' : '#4C8DFF';
   d.style.cssText = `background:${bg};color:#fff;padding:10px 14px;border-radius:8px;margin-bottom:8px;font-size:12px;font-family:monospace;box-shadow:0 2px 8px rgba(0,0,0,.3);opacity:0;transition:opacity .3s;`;
   d.textContent = msg;
   c.appendChild(d);
@@ -1224,7 +1232,7 @@ function drawCandles(canvas, data){
   const W=rect.width, H=rect.height;
   ctx.clearRect(0,0,W,H);
   if(!data||data.length<2){
-    ctx.fillStyle='#4a5775'; ctx.font='13px Segoe UI'; ctx.fillText('รอข้อมูลราคา...',20,H/2); return;
+    ctx.fillStyle='#4C5566'; ctx.font='13px Segoe UI'; ctx.fillText('รอข้อมูลราคา...',20,H/2); return;
   }
   lastCandles=data;
   // normalise: รองรับทั้ง /api/prices (open/high/low/close/ts) และ /api/candles (o/h/l/c/t)
@@ -1257,7 +1265,7 @@ function drawCandles(canvas, data){
   lastEma200=null;
   for(let i=nAll-1;i>=0;i--){ if(emaArr[i]!=null){lastEma200=emaArr[i];break;} }
   srSnapDist=Math.pow(10,-dec)*SR_SNAP_PIPS;
-  ctx.font='9.5px Cascadia Mono,monospace';
+  ctx.font='9.5px IBM Plex Mono,monospace';
   const labelW=(max.toFixed(dec)).length*6.2+2;
   const padR=Math.max(50,labelW+14);
   const plotW=W-padL-padR;
@@ -1280,7 +1288,7 @@ function drawCandles(canvas, data){
     const pTop=o.oy+PANE_MARGIN, pBot=o.oy+PANE_H-PANE_MARGIN, plot=pBot-pTop;
     const yMap=v=>pBot-(v-o.min)/(o.max-o.min)*plot;   // mapper ที่มี padding ทั้ง 2 ด้าน
     // พื้นหลัง + กรอบ
-    ctx.fillStyle='#0e1526'; ctx.fillRect(padL,o.oy,plotW,PANE_H);
+    ctx.fillStyle='#10131A'; ctx.fillRect(padL,o.oy,plotW,PANE_H);
     ctx.strokeStyle='rgba(255,255,255,.06)'; ctx.strokeRect(padL,o.oy,plotW,PANE_H);
     // โซน (overbought/oversold) วาดก่อน gridline
     (o.zones||[]).forEach(z=>{
@@ -1288,12 +1296,12 @@ function drawCandles(canvas, data){
       ctx.fillStyle=z.color; ctx.fillRect(padL,yA,plotW,yB-yA);
     });
     // gridline + สเกลขวา (ไม่มี text overlay รกหน้าจออีกต่อไป)
-    ctx.font='9.5px Cascadia Mono,monospace';
+    ctx.font='9.5px IBM Plex Mono,monospace';
     o.guides.forEach(g=>{
       const y=yMap(g.v);
       ctx.strokeStyle=g.major?GRID_MAJ:GRID_SOFT;
       ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle='#4a5775'; ctx.textAlign='right'; ctx.fillText(g.v,W-6,y+3); ctx.textAlign='left';
+      ctx.fillStyle='#4C5566'; ctx.textAlign='right'; ctx.fillText(g.v,W-6,y+3); ctx.textAlign='left';
     });
     // clip พื้นที่วาดจริง (กัน gradient/pill ล้นกรอบ)
     ctx.save(); ctx.beginPath(); ctx.rect(padL,pTop,plotW,plot); ctx.clip();
@@ -1316,10 +1324,10 @@ function drawCandles(canvas, data){
     const pa=o.pill.arr, pv=pa[pa.length-1];
     if(pv!=null){
       const t=pv.toFixed(1), y=yMap(pv);
-      ctx.font='bold 10px Cascadia Mono,monospace';
+      ctx.font='bold 10px IBM Plex Mono,monospace';
       const tw=Math.min(ctx.measureText(t).width+12,padR-4);
       ctx.fillStyle=o.pill.color; ctx.beginPath(); ctx.roundRect(W-tw-2,y-8,tw,16,3); ctx.fill();
-      ctx.fillStyle='#0a0f1c'; ctx.textAlign='left'; ctx.fillText(t,W-tw+4,y+4); ctx.textAlign='left';
+      ctx.fillStyle='#0A0C10'; ctx.textAlign='left'; ctx.fillText(t,W-tw+4,y+4); ctx.textAlign='left';
     }
   }
 
@@ -1364,10 +1372,10 @@ function drawCandles(canvas, data){
     fr.forEach(p=>{
       const x=pxForData(p.i), y=py(p.v);
       if(p.t==='H'){
-        ctx.fillStyle='#f6465d';
+        ctx.fillStyle='#F0465C';
         ctx.beginPath(); ctx.moveTo(x,y-7); ctx.lineTo(x-4,y); ctx.lineTo(x+4,y); ctx.closePath(); ctx.fill();
       } else {
-        ctx.fillStyle='#22c98a';
+        ctx.fillStyle='#16C784';
         ctx.beginPath(); ctx.moveTo(x,y+7); ctx.lineTo(x-4,y); ctx.lineTo(x+4,y); ctx.closePath(); ctx.fill();
       }
     });
@@ -1383,13 +1391,13 @@ function drawCandles(canvas, data){
     srRects.push([y-8,y+8]); return y;
   };
   if(srLevels.length){
-    ctx.font='bold 9px Cascadia Mono,monospace';
+    ctx.font='bold 9px IBM Plex Mono,monospace';
     srLevels.forEach(lv=>{
       const y=py(lv.price);
       if(y<padT-10||y>padT+plotH+10) return;
       const nearEma=lastEma200!=null&&Math.abs(lv.price-lastEma200)<=srSnapDist;
       const dragging=srDrag&&srDrag.id===lv.id;
-      const col=nearEma?'#f7b847':(lv.type==='R'?'#f6465d':'#22c98a');
+      const col=nearEma?'#E8A33D':(lv.type==='R'?'#F0465C':'#16C784');
       const alpha=(nearEma||lv.manual||dragging)?'':'bb';
       ctx.strokeStyle=col+alpha; ctx.lineWidth=dragging?1.6:1.1;
       ctx.setLineDash(lv.manual||dragging?[6,4]:[2,4]);
@@ -1402,23 +1410,23 @@ function drawCandles(canvas, data){
       const txt=(lv.type==='R'?'R ':'S ')+lv.price.toFixed(dec);
       const tw=Math.min(ctx.measureText(txt).width+8,padR-4);
       ctx.fillStyle=col+(alpha||''); ctx.beginPath(); ctx.roundRect(W-padR-tw-2,ty-7,tw,14,3); ctx.fill();
-      ctx.fillStyle='#0a0f1c'; ctx.textAlign='left'; ctx.fillText(txt,W-padR-tw+2,ty+4); ctx.textAlign='left';
+      ctx.fillStyle='#0A0C10'; ctx.textAlign='left'; ctx.fillText(txt,W-padR-tw+2,ty+4); ctx.textAlign='left';
       // เตือน: อยู่ในโซน EMA200 (ห่างไม่เกิน 5 pips)
       if(nearEma){
         ctx.strokeStyle='rgba(247,184,71,.5)'; ctx.lineWidth=1;
         ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
-        ctx.fillStyle='#f7b847'; ctx.font='bold 8.5px Cascadia Mono,monospace';
+        ctx.fillStyle='#E8A33D'; ctx.font='bold 8.5px IBM Plex Mono,monospace';
         const btxt='EMA200';
         const btw=ctx.measureText(btxt).width+8;
         ctx.beginPath(); ctx.roundRect(padL+2,Math.max(y-13,padT+2),btw,12,3); ctx.fill();
-        ctx.fillStyle='#0a0f1c'; ctx.textAlign='left'; ctx.fillText(btxt,padL+6,Math.max(y-13,padT+2)+9); ctx.textAlign='left';
-        ctx.font='bold 9px Cascadia Mono,monospace';
+        ctx.fillStyle='#0A0C10'; ctx.textAlign='left'; ctx.fillText(btxt,padL+6,Math.max(y-13,padT+2)+9); ctx.textAlign='left';
+        ctx.font='bold 9px IBM Plex Mono,monospace';
       }
     });
   }
 
   // ── grid + price labels (right axis) — ข้าม label ที่ชนกับ label S/R ──
-  ctx.strokeStyle='#131c30'; ctx.fillStyle='#4a5775'; ctx.font='9.5px Cascadia Mono,monospace';
+  ctx.strokeStyle='#1C2029'; ctx.fillStyle='#4C5566'; ctx.font='9.5px IBM Plex Mono,monospace';
   const GRID=5;
   for(let i=0;i<=GRID;i++){
     const y=padT+plotH*i/GRID;
@@ -1431,7 +1439,7 @@ function drawCandles(canvas, data){
   // ── candles ──
   view.forEach((d,i)=>{
     const x=pxForData(i+start), up=d.c>=d.o;
-    ctx.strokeStyle=up?'#22c98a':'#f6465d'; ctx.fillStyle=up?'#22c98a':'#f6465d';
+    ctx.strokeStyle=up?'#16C784':'#F0465C'; ctx.fillStyle=up?'#16C784':'#F0465C';
     ctx.beginPath(); ctx.moveTo(x,py(d.h)); ctx.lineTo(x,py(d.l)); ctx.stroke();
     const yO=py(d.o),yC=py(d.c),top=Math.min(yO,yC),hgt=Math.max(Math.abs(yO-yC),1);
     ctx.fillRect(x-bw/2,top,bw,hgt);
@@ -1452,7 +1460,7 @@ function drawCandles(canvas, data){
       const isWin=m.result==='WIN'||m.result==='TP1'||m.result==='TP2';
       const isLose=m.result==='LOSE'||m.result==='SL';
       const isOpen=m.result==='PENDING';
-      const color=m.type==='ML'?(isWin?'#22c98a':isLose?'#f6465d':'#38e1c4'):(isWin?'#22c98a':isLose?'#f6465d':'#f7b847');
+      const color=m.type==='ML'?(isWin?'#16C784':isLose?'#F0465C':'#8B7FFF'):(isWin?'#16C784':isLose?'#F0465C':'#E8A33D');
 
       // Entry triangle
       if(m.direction==='CALL'){
@@ -1462,21 +1470,15 @@ function drawCandles(canvas, data){
         ctx.fillStyle=color;
         ctx.beginPath(); ctx.moveTo(x,y-4); ctx.lineTo(x-5,y-12); ctx.lineTo(x+5,y-12); ctx.closePath(); ctx.fill();
       }
-      // Label — CALL อยู่ในแท่ง, PUT อยู่ด้านล่างแท่ง
+      // Label — วางนอกแท่งเสมอทั้ง CALL/PUT (ไม่บังราคา) มีพื้นหลังทึบให้อ่านง่ายเหมือนกันทั้งสองทิศทาง
       const label=m.type==='ML'?'ML':m.importance===1?'IMP1':m.importance===2?'IMP2':'RBF';
-      ctx.font='bold 7px Cascadia Mono,monospace'; ctx.textAlign='center';
-      if(m.direction==='CALL'){
-        // อยู่ในแท่ง: วาดพื้นหลังโปร่งแสงทับบน body
-        const lw=ctx.measureText(label).width+4;
-        ctx.fillStyle='rgba(10,15,28,0.6)';
-        ctx.beginPath(); ctx.roundRect(x-lw/2,y-4,lw,9,2); ctx.fill();
-        ctx.fillStyle=color;
-        ctx.fillText(label,x,y+3);
-      } else {
-        // PUT: อยู่ด้านล่างแท่ง
-        ctx.fillStyle=color;
-        ctx.fillText(label,x,y+20);
-      }
+      ctx.font='bold 7px IBM Plex Mono,monospace'; ctx.textAlign='center';
+      const lw=ctx.measureText(label).width+6;
+      const ly=m.direction==='CALL'?y+22:y-22; // ใต้สามเหลี่ยม (CALL) หรือเหนือสามเหลี่ยม (PUT) ห่างจาก body เสมอ
+      ctx.fillStyle=color;
+      ctx.beginPath(); ctx.roundRect(x-lw/2,ly-6,lw,11,3); ctx.fill();
+      ctx.fillStyle='#0A0C10';
+      ctx.fillText(label,x,ly+2);
       ctx.textAlign='left';
 
       // CFD levels: SL / TP1 / TP2 lines (เฉพาะที่มี cfd data)
@@ -1487,28 +1489,28 @@ function drawCandles(canvas, data){
         // SL line (red)
         if(m.cfd.sl){
           const ySL=py(m.cfd.sl);
-          ctx.strokeStyle='#f6465d'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+          ctx.strokeStyle='#F0465C'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
           ctx.beginPath(); ctx.moveTo(x,ySL); ctx.lineTo(xEnd,ySL); ctx.stroke();
           ctx.setLineDash([]);
-          ctx.fillStyle='#f6465d'; ctx.font='6px Cascadia Mono,monospace';
+          ctx.fillStyle='#F0465C'; ctx.font='6px IBM Plex Mono,monospace';
           ctx.fillText('SL '+m.cfd.sl.toFixed(2),xEnd+3,ySL+3);
         }
         // TP1 line (yellow)
         if(m.cfd.tp1){
           const yTP1=py(m.cfd.tp1);
-          ctx.strokeStyle='#f7b847'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+          ctx.strokeStyle='#E8A33D'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
           ctx.beginPath(); ctx.moveTo(x,yTP1); ctx.lineTo(xEnd,yTP1); ctx.stroke();
           ctx.setLineDash([]);
-          ctx.fillStyle='#f7b847'; ctx.font='6px Cascadia Mono,monospace';
+          ctx.fillStyle='#E8A33D'; ctx.font='6px IBM Plex Mono,monospace';
           ctx.fillText('TP1 '+m.cfd.tp1.toFixed(2),xEnd+3,yTP1+3);
         }
         // TP2 line (green)
         if(m.cfd.tp2){
           const yTP2=py(m.cfd.tp2);
-          ctx.strokeStyle='#22c98a'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+          ctx.strokeStyle='#16C784'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
           ctx.beginPath(); ctx.moveTo(x,yTP2); ctx.lineTo(xEnd,yTP2); ctx.stroke();
           ctx.setLineDash([]);
-          ctx.fillStyle='#22c98a'; ctx.font='6px Cascadia Mono,monospace';
+          ctx.fillStyle='#16C784'; ctx.font='6px IBM Plex Mono,monospace';
           ctx.fillText('TP2 '+m.cfd.tp2.toFixed(2),xEnd+3,yTP2+3);
         }
       }
@@ -1516,23 +1518,23 @@ function drawCandles(canvas, data){
   }
 
   // ── last price: เส้น + tag pill ──
-  const lp=view[view.length-1].c, lc=lp>=view[view.length-1].o?'#22c98a':'#f6465d';
+  const lp=view[view.length-1].c, lc=lp>=view[view.length-1].o?'#16C784':'#F0465C';
   ctx.strokeStyle=lc; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(padL,py(lp)); ctx.lineTo(W-padR,py(lp)); ctx.stroke(); ctx.setLineDash([]);
   const tag=lp.toFixed(dec);
-  ctx.font='bold 10px Cascadia Mono,monospace';
+  ctx.font='bold 10px IBM Plex Mono,monospace';
   const tw=Math.min(ctx.measureText(tag).width+12,padR-4);
   let ty=Math.min(Math.max(py(lp)-8,6),H-24);
   // กันชนกับ label S/R ฝั่งขวา → ขยับขึ้นไม่ให้ซ้อน
   if(srRects.length&&srRects.some(r=>ty-8<r[1]&&ty+16>r[0])) ty=Math.min(Math.max(py(lp)-22,6),H-24);
   ctx.fillStyle=lc; ctx.beginPath(); ctx.roundRect(W-tw-2,ty,tw,16,3); ctx.fill();
-  ctx.fillStyle='#0a0f1c'; ctx.textAlign='left'; ctx.fillText(tag,W-tw+4,ty+12); ctx.textAlign='left';
+  ctx.fillStyle='#0A0C10'; ctx.textAlign='left'; ctx.fillText(tag,W-tw+4,ty+12); ctx.textAlign='left';
 
   // ── volume strip ──
   let volTop=priceH;
   if(chartInd.vol){
     const vh=volH-4, vmax=Math.max(...view.map(d=>d.v),1);
-    ctx.fillStyle='#0e1526'; ctx.fillRect(0,volTop,W,volH);
-    ctx.fillStyle='#4a5775'; ctx.font='9.5px Cascadia Mono,monospace'; ctx.textAlign='left';
+    ctx.fillStyle='#10131A'; ctx.fillRect(0,volTop,W,volH);
+    ctx.fillStyle='#4C5566'; ctx.font='9.5px IBM Plex Mono,monospace'; ctx.textAlign='left';
     ctx.fillText('VOL',padL+2,volTop+10);
     view.forEach((d,i)=>{
       const x=pxForData(i+start), hh=d.v/vmax*(vh-6);
@@ -1553,8 +1555,8 @@ function drawCandles(canvas, data){
       zones:[{v0:70,v1:100,color:'rgba(240,70,92,.08)'},
              {v0:0,v1:30,color:'rgba(22,199,132,.08)'}],
       fill:{arr:rv, color:'rgba(247,184,71,.30)'},
-      lines:[{arr:rv, color:'#f7b847', width:1.2}],
-      pill:{arr:rv, color:'#f7b847'}
+      lines:[{arr:rv, color:'#E8A33D', width:1.2}],
+      pill:{arr:rv, color:'#E8A33D'}
     });
     oy+=PANE_H;
   }
@@ -1572,15 +1574,15 @@ function drawCandles(canvas, data){
       fill:{arr:aa.adx, color:'rgba(247,184,71,.22)'},
       lines:[{arr:aa.pdi, color:'rgba(22,199,132,.75)', width:1.2},
              {arr:aa.ndi, color:'rgba(240,70,92,.75)', width:1.2},
-             {arr:aa.adx, color:'#f7b847', width:1.2}],
-      pill:{arr:aa.adx, color:'#f7b847'}
+             {arr:aa.adx, color:'#E8A33D', width:1.2}],
+      pill:{arr:aa.adx, color:'#E8A33D'}
     });
   }
 
   // ── time strip: แยกจากกรอบล่างสุดด้วยเส้นคั่น ไม่เบียดขอบ ADX ──
   ctx.strokeStyle='rgba(255,255,255,.06)';
   ctx.beginPath(); ctx.moveTo(padL,H-timeStrip); ctx.lineTo(W-padR,H-timeStrip); ctx.stroke();
-  ctx.fillStyle='#4a5775'; ctx.font='9.5px Cascadia Mono,monospace';
+  ctx.fillStyle='#4C5566'; ctx.font='9.5px IBM Plex Mono,monospace';
   ctx.textAlign='left';
   ctx.fillText(view[0].t?fmtHM(view[0].t):'',padL,H-6);
   ctx.fillText(view[view.length-1].t?fmtHM(view[view.length-1].t):'',Math.min(pxForData(end),W-padR-70),H-6);
@@ -1611,33 +1613,33 @@ function drawCandles(canvas, data){
         ctx.setLineDash([]);
         // ราคาที่ hover: pill ฝั่งขวา
         const hp=max-(cy-padT)/plotH*(max-min);
-        ctx.font='bold 10px Cascadia Mono,monospace';
+        ctx.font='bold 10px IBM Plex Mono,monospace';
         const ht=hp.toFixed(dec);
         const htw=Math.min(ctx.measureText(ht).width+12,padR-4);
         ctx.fillStyle='rgba(26,36,64,.9)'; ctx.beginPath(); ctx.roundRect(W-htw-2,cy-8,htw,16,3); ctx.fill();
-        ctx.fillStyle='#e8eefb'; ctx.textAlign='left'; ctx.fillText(ht,W-htw+4,cy+4); ctx.textAlign='left';
+        ctx.fillStyle='#EDEFF3'; ctx.textAlign='left'; ctx.fillText(ht,W-htw+4,cy+4); ctx.textAlign='left';
         // เวลาที่ hover: pill ฝั่งล่าง
         const tt=d.t?fmtHM(d.t):'';
         if(tt){
-          ctx.font='bold 9px Cascadia Mono,monospace';
+          ctx.font='bold 9px IBM Plex Mono,monospace';
           const ttw=ctx.measureText(tt).width+12;
           const tx=Math.min(Math.max(bx-ttw/2,padL),W-padR-ttw);
           ctx.fillStyle='rgba(26,36,64,.9)'; ctx.beginPath(); ctx.roundRect(tx,H-18,ttw,14,3); ctx.fill();
-          ctx.fillStyle='#e8eefb'; ctx.textAlign='left'; ctx.fillText(tt,tx+6,H-8); ctx.textAlign='left';
+          ctx.fillStyle='#EDEFF3'; ctx.textAlign='left'; ctx.fillText(tt,tx+6,H-8); ctx.textAlign='left';
         }
         // OHLC box (มุมซ้ายบน เหมือน TradingView)
         const bx2=padL+8, by2=padT+8;
         ctx.fillStyle='rgba(10,15,26,.82)';
         ctx.beginPath(); ctx.roundRect(bx2,by2,88,74,6); ctx.fill();
         ctx.strokeStyle='rgba(38,50,89,.8)'; ctx.strokeRect(bx2+.5,by2+.5,87,73);
-        ctx.font='bold 9px Cascadia Mono,monospace';
-        ctx.fillStyle='#74809c'; ctx.textAlign='left';
+        ctx.font='bold 9px IBM Plex Mono,monospace';
+        ctx.fillStyle='#838B9C'; ctx.textAlign='left';
         ctx.fillText(d.t?fmtTime(d.t):'',bx2+7,by2+12);
         const up=d.c>=d.o;
         [['O',d.o,up],['H',d.h,up],['L',d.l,up],['C',d.c,up]].forEach((r,i)=>{
           const yy=by2+28+i*11;
-          ctx.fillStyle='#74809c'; ctx.fillText(r[0],bx2+7,yy);
-          ctx.fillStyle=r[2]?'#22c98a':'#f6465d';
+          ctx.fillStyle='#838B9C'; ctx.fillText(r[0],bx2+7,yy);
+          ctx.fillStyle=r[2]?'#16C784':'#F0465C';
           ctx.fillText(r[1].toFixed(dec),bx2+26,yy);
         });
       }
@@ -1679,10 +1681,10 @@ function updateLegendOverlay(nd, idx){
     chip('ema','EMA100','#a78bfa',e100);
     chip('ema','EMA200','#f3a846',e200);
   }
-  if(chartInd.sma5){ const s5=sma(closes,5)[at]; chip('sma5','SMA5','#e8eefb',s5); }
+  if(chartInd.sma5){ const s5=sma(closes,5)[at]; chip('sma5','SMA5','#EDEFF3',s5); }
   if(chartInd.bb){ const b=bollinger(closes,20,2); chip('bb','BB', '#8ca0c8', b.up[at], ' / '+f(b.low[at])); }
-  if(chartInd.rsi){ const rv=rsi(closes,14)[at]; chip('rsi','RSI14','#f7b847',rv); }
-  if(chartInd.adx){ const a=adx(nd.map(d=>d.h),nd.map(d=>d.l),closes,14); chip('adx','ADX','#f7b847',a.adx[at], ' +'+f(a.pdi[at])+' −'+f(a.ndi[at])); }
+  if(chartInd.rsi){ const rv=rsi(closes,14)[at]; chip('rsi','RSI14','#E8A33D',rv); }
+  if(chartInd.adx){ const a=adx(nd.map(d=>d.h),nd.map(d=>d.l),closes,14); chip('adx','ADX','#E8A33D',a.adx[at], ' +'+f(a.pdi[at])+' −'+f(a.ndi[at])); }
   document.getElementById('lbValues').innerHTML=chips.join('');
 }
 function zoomChartAt(factor, frac){
@@ -1769,10 +1771,10 @@ function gaugeSVG(g){
     <div class="ghead"><span class="gname">XAUUSD · TF ${g.timeframe||'–'} — WIN PROBABILITY</span><span class="gsig ${sigClass}">${g.signal||'–'}</span></div>
     <div class="gauge-svg">
       <svg width="220" height="96" viewBox="0 0 220 96">
-        <path d="${arcPath(cx,cy,r,a0,aEnd)}" stroke="#131c30" stroke-width="${w}" fill="none" stroke-linecap="round"/>
-        <path d="${arcPath(cx,cy,r,a0,upEnd)}" stroke="#22c98a" stroke-width="${w}" fill="none" stroke-linecap="round"/>
-        <path d="${arcPath(cx,cy,r,upEnd,aEnd)}" stroke="#f6465d" stroke-width="${w}" fill="none" stroke-linecap="round"/>
-        <text x="110" y="84" text-anchor="middle" font-size="20" font-weight="800" font-family="Cascadia Mono,monospace" fill="#e8eefb">${g.signal==='NEUTRAL'?'NEUTRAL':(g.confidence*100).toFixed(0)+'%'}</text>
+        <path d="${arcPath(cx,cy,r,a0,aEnd)}" stroke="#1C2029" stroke-width="${w}" fill="none" stroke-linecap="round"/>
+        <path d="${arcPath(cx,cy,r,a0,upEnd)}" stroke="#16C784" stroke-width="${w}" fill="none" stroke-linecap="round"/>
+        <path d="${arcPath(cx,cy,r,upEnd,aEnd)}" stroke="#F0465C" stroke-width="${w}" fill="none" stroke-linecap="round"/>
+        <text x="110" y="84" text-anchor="middle" font-size="20" font-weight="800" font-family="IBM Plex Mono,monospace" fill="#EDEFF3">${g.signal==='NEUTRAL'?'NEUTRAL':(g.confidence*100).toFixed(0)+'%'}</text>
       </svg>
     </div>
     <div class="gmeta">
@@ -1834,10 +1836,10 @@ function drawEquity(points){
   const labels=points.map(p=>p.t), values=points.map(p=>p.equity);
   const up=values.length>0&&values[values.length-1]>=0;
   const cfg={type:'line',
-    data:{labels,datasets:[{data:values,borderColor:up?'#22c98a':'#f6465d',
+    data:{labels,datasets:[{data:values,borderColor:up?'#16C784':'#F0465C',
       backgroundColor:up?'rgba(22,199,132,.15)':'rgba(240,70,92,.15)',fill:true,pointRadius:0,borderWidth:2,tension:.25}]},
     options:{responsive:true,maintainAspectRatio:false,animation:false,
-      scales:{x:{display:false},y:{grid:{color:'#131c30'},ticks:{color:'#4a5775',font:{size:10}}}},
+      scales:{x:{display:false},y:{grid:{color:'#1C2029'},ticks:{color:'#4C5566',font:{size:10}}}},
       plugins:{legend:{display:false}} }};
   if(equityChart){equityChart.data=cfg.data; equityChart.update('none');} else equityChart=new Chart(el,cfg);
 }
@@ -2475,11 +2477,11 @@ function drawEquityFull(points){
   const labels=points.map(p=>p.t), values=points.map(p=>p.equity);
   const last=values[values.length-1]||0;
   const cfg={type:'line',
-    data:{labels,datasets:[{data:values,borderColor:last>=0?'#22c98a':'#f6465d',
+    data:{labels,datasets:[{data:values,borderColor:last>=0?'#16C784':'#F0465C',
       backgroundColor:last>=0?'rgba(22,199,132,.15)':'rgba(240,70,92,.15)',fill:true,pointRadius:0,borderWidth:2,tension:.2}]},
     options:{responsive:true,maintainAspectRatio:false,animation:false,
-      scales:{x:{ticks:{color:'#4a5775',font:{size:10},maxTicksLimit:6},grid:{color:'#131c30'}},
-              y:{grid:{color:'#131c30'},ticks:{color:'#4a5775',font:{size:10}}}},
+      scales:{x:{ticks:{color:'#4C5566',font:{size:10},maxTicksLimit:6},grid:{color:'#1C2029'}},
+              y:{grid:{color:'#1C2029'},ticks:{color:'#4C5566',font:{size:10}}}},
       plugins:{legend:{display:false}} }};
   if(equityFullChart){equityFullChart.data=cfg.data;equityFullChart.update('none');} else equityFullChart=new Chart(el,cfg);
 }
@@ -2666,7 +2668,7 @@ function renderCFDPaperTrades(d){
           <span style="color:${dirCol};font-weight:700;">${t.direction} ${t.signal_type} #${t.signal_id} ${t.tp1_hit?'<span style="color:var(--yellow);font-size:10px;">TP1 HIT →</span>':''}</span>
           <span style="color:var(--muted);font-size:11px;">${fmtHM(t.entry_time)}</span>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;font-size:12px;">
+        <div class="open-trade-grid">
           <div><span style="color:var(--muted);">Entry</span><br><b>${t.effective_entry?.toFixed(2)||'?'}</b></div>
           <div><span style="color:var(--cyan);">Live</span><br><b>${lp?.toFixed(2)||'?'}</b></div>
           <div><span style="color:var(--red);">SL (${t.dist_to_sl??'?'})</span><br><b style="color:var(--red)">${t.sl_price?.toFixed(2)}</b></div>
@@ -2679,7 +2681,7 @@ function renderCFDPaperTrades(d){
             <span style="font-weight:700;color:${pnlCol}">${t.unrealized_pnl!=null?'$'+t.unrealized_pnl.toFixed(2):'–'}</span>
             <span style="font-size:11px;color:var(--muted);margin-left:8px;">(${t.unrealized_pips??'–'} pips)</span>
           </div>
-          <div style="width:120px;height:6px;background:var(--bg2);border-radius:3px;overflow:hidden;">
+          <div style="flex:0 1 120px;min-width:60px;height:6px;background:var(--bg2);border-radius:3px;overflow:hidden;">
             <div style="height:100%;width:${Math.min(Math.max(progress||0,0),100)}%;background:${dirCol};border-radius:3px;transition:width 1s;"></div>
           </div>
         </div>
