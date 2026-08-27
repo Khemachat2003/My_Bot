@@ -7,16 +7,18 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.16.0/tabler-icons.min.css">
 <style>
   /* ═══ DESIGN TOKENS ═══ */
   :root{
-    --bg:#0A0C10; --panel:#12151C; --panel2:#171B24; --card:#12151C;
-    --border:#232732; --border2:#232732;
-    --text:#EDEFF3; --muted:#838B9C; --dim:#4C5566;
-    --green:#16C784; --red:#F0465C; --yellow:#E8A33D;
-    --blue:#4C8DFF; --cyan:#4C8DFF; --purple:#4C8DFF;
-    --grid:#1C2029; --bg2:#171B24;
-    --accent:var(--cyan);
+    --bg:#131722; --panel:#1A1E29; --panel2:#1E222D; --card:#1A1E29;
+    --border:#2A2E39; --border2:#363A45;
+    --text:#D1D4DC; --muted:#787B86; --dim:#565B66;
+    --green:#26A69A; --red:#EF5350; --yellow:#FF9800;
+    --blue:#2962FF; --cyan:#2962FF; --purple:#9C6FE0; --ml:#9C6FE0;
+    --grid:#1E222D; --bg2:#1E222D;
+    --accent:var(--blue);
     --font-display:'Archivo',sans-serif;
     --font-body:'IBM Plex Sans',sans-serif;
     --font-mono:'IBM Plex Mono',ui-monospace,monospace;
@@ -46,7 +48,7 @@
   .brand{display:flex; align-items:center; gap:9px; white-space:nowrap;}
   .brand .logo{
     width:30px; height:30px; border-radius:8px; display:grid; place-items:center;
-    background:linear-gradient(135deg,#16C784,#4C8DFF); font-weight:900; color:#04121a; font-size:14px;
+    background:linear-gradient(135deg,#26A69A,#2962FF); font-weight:900; color:#04121a; font-size:14px;
     box-shadow:0 1px 2px rgba(0,0,0,.3);
   }
   .brand .name{font-size:14px; font-weight:800; letter-spacing:.6px;}
@@ -61,11 +63,11 @@
   .pricebox .price{font-family:var(--num); font-size:30px; font-weight:800; line-height:1; letter-spacing:.5px;}
   .pricebox .price.up{color:var(--green);} .pricebox .price.down{color:var(--red);}
   .pricebox .chg{font-family:var(--num); font-size:12.5px; font-weight:700; padding:2px 7px; border-radius:6px;}
-  .chg.up{color:var(--green); background:rgba(22,199,132,.1);}
-  .chg.down{color:var(--red); background:rgba(240,70,92,.1);}
+  .chg.up{color:var(--green); background:rgba(38,166,154,.1);}
+  .chg.down{color:var(--red); background:rgba(239,83,80,.1);}
   .live-badge{
     font-size:10px; font-weight:800; letter-spacing:1px; color:var(--green);
-    border:1px solid rgba(22,199,132,.4); border-radius:99px; padding:3px 9px;
+    border:1px solid rgba(38,166,154,.4); border-radius:99px; padding:3px 9px;
     display:inline-flex; align-items:center; gap:5px;
   }
   .live-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.6s infinite;}
@@ -196,19 +198,33 @@
     padding:9px 14px; cursor:pointer; border-bottom:1px solid rgba(19,28,48,.6);
     transition:background .12s; position:relative;
   }
-  .wl-row:hover{background:rgba(76,141,255,.05);}
-  .wl-row.active{background:rgba(76,141,255,.06); box-shadow:inset 3px 0 0 var(--cyan);}
+  .wl-row:hover{background:rgba(41,98,255,.05);}
+  .wl-row.active{background:rgba(41,98,255,.06); box-shadow:inset 3px 0 0 var(--cyan);}
   .wl-name{font-size:12px; font-weight:800; letter-spacing:.3px;}
   .wl-kind{display:block; font-size:9px; color:var(--dim); font-weight:600; letter-spacing:.5px;}
   .wl-price{font-family:var(--num); font-size:12.5px; font-weight:700; font-variant-numeric:tabular-nums;}
   .wl-chg{font-family:var(--num); font-size:10px; font-weight:800; padding:2px 7px; border-radius:6px; min-width:52px; text-align:center;}
-  .wl-chg.up{color:var(--green); background:rgba(22,199,132,.1);}
-  .wl-chg.down{color:var(--red); background:rgba(240,70,92,.1);}
+  .wl-chg.up{color:var(--green); background:rgba(38,166,154,.1);}
+  .wl-chg.down{color:var(--red); background:rgba(239,83,80,.1);}
   .wl-chg.flat{color:var(--muted); background:rgba(116,128,156,.1);}
 
   /* chart panel + legend bar (ย้าย legend ออกจาก canvas → ไม่บังแท่งเทียน) */
   .chart-panel{position:relative;}
   .chart-wrap{position:relative;}
+  /* LW chart overlay controls */
+  .lw-legend{position:absolute; top:8px; left:8px; z-index:5; pointer-events:none; font-family:var(--num); font-size:11px; background:rgba(19,23,34,.7); padding:3px 7px; border-radius:4px;}
+  .lw-legend .up{color:var(--green);} .lw-legend .down{color:var(--red);}
+  .lw-tradelist{border-top:1px solid var(--border);}
+  .lw-trade-head{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; padding:8px 10px; font-weight:600;}
+  .lw-trow{display:flex; align-items:center; gap:10px; padding:6px 10px; cursor:pointer; font-size:12px; border-top:1px solid var(--border);}
+  .lw-trow:hover{background:var(--panel);}
+  .lw-trow.sel{background:var(--panel); outline:1px solid var(--accent);}
+  .lw-trow .dir{width:40px; font-weight:700; font-family:var(--num);}
+  .lw-trow .lbl{width:40px; font-size:10px; font-weight:700; color:var(--ml);}
+  .lw-trow .sub{font-family:var(--num); color:var(--muted); flex:1;}
+  .lw-trow .tag{font-size:9px; padding:1px 5px; border-radius:3px; background:var(--panel2); color:var(--muted);}
+  .lw-trow .tag.open{color:var(--green); background:rgba(38,166,154,.12);}
+  .lw-empty{padding:12px; color:var(--muted); font-size:12px;}
   .chart-legendbar{
     display:flex; align-items:center; gap:8px; padding:5px 9px; margin:8px 0 0;
     background:var(--card); border:1px solid var(--border); border-radius:8px;
@@ -264,8 +280,8 @@
   .gauge .ghead{display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;}
   .gauge .gname{font-size:11px; font-weight:800; letter-spacing:.5px; color:var(--muted);}
   .gsig{font-size:10px; font-weight:900; padding:3px 9px; border-radius:99px; letter-spacing:.5px;}
-  .gsig.CALL{background:rgba(22,199,132,.14); color:var(--green); border:1px solid rgba(22,199,132,.3);}
-  .gsig.PUT{background:rgba(240,70,92,.14); color:var(--red); border:1px solid rgba(240,70,92,.3);}
+  .gsig.CALL{background:rgba(38,166,154,.14); color:var(--green); border:1px solid rgba(38,166,154,.3);}
+  .gsig.PUT{background:rgba(239,83,80,.14); color:var(--red); border:1px solid rgba(239,83,80,.3);}
   .gsig.NEUTRAL{background:rgba(116,128,156,.12); color:var(--muted); border:1px solid rgba(116,128,156,.25);}
   .gauge-svg{display:flex; justify-content:center; margin:6px 0 2px;}
   .gauge-svg svg{max-width:100%; height:auto;}
@@ -281,11 +297,11 @@
   }
   td{padding:8px 12px; border-bottom:1px solid var(--grid); white-space:nowrap;}
   tbody tr{transition:background .1s;}
-  tbody tr:hover{background:rgba(76,141,255,.045);}
+  tbody tr:hover{background:rgba(41,98,255,.045);}
   tbody tr:last-child td{border-bottom:none;}
   .pill{padding:2.5px 9px; border-radius:99px; font-size:10px; font-weight:800; letter-spacing:.3px;}
-  .pill.WIN{background:rgba(22,199,132,.14); color:var(--green);}
-  .pill.LOSE{background:rgba(240,70,92,.14); color:var(--red);}
+  .pill.WIN{background:rgba(38,166,154,.14); color:var(--green);}
+  .pill.LOSE{background:rgba(239,83,80,.14); color:var(--red);}
   .pill.PENDING{background:rgba(232,163,61,.14); color:var(--yellow);}
   .dir-call{color:var(--green); font-weight:800;}
   .dir-put{color:var(--red); font-weight:800;}
@@ -303,7 +319,7 @@
   .guide-score{font-family:var(--num); font-size:22px; font-weight:800; line-height:1;}
   .guide-score.ok{color:var(--green);} .guide-score.wait{color:var(--yellow);} .guide-score.none{color:var(--dim);}
   .guide-action{margin:8px 0 10px; padding:8px 11px; border-radius:9px; font-size:12px; font-weight:800; letter-spacing:.2px; line-height:1.4;}
-  .guide-action.FIRE{background:rgba(22,199,132,.12); color:var(--green); border:1px solid rgba(22,199,132,.4);}
+  .guide-action.FIRE{background:rgba(38,166,154,.12); color:var(--green); border:1px solid rgba(38,166,154,.4);}
   .guide-action.WATCH{background:rgba(56,189,248,.1); color:var(--cyan); border:1px solid rgba(56,189,248,.35);}
   .guide-action.NONE{background:rgba(116,128,156,.08); color:var(--muted); border:1px solid var(--border);}
   .guide-steps{list-style:none; font-size:11.5px;}
@@ -312,9 +328,9 @@
   .gstep{display:flex; flex-direction:column; gap:3px; padding:8px 10px; border-radius:9px; background:rgba(12,18,32,.55); border:1px solid var(--border); font-size:11px; line-height:1.5;}
   .gstep b{font-size:11.5px;}
   .guide-ico{flex-shrink:0; width:19px; height:19px; border-radius:50%; display:grid; place-items:center; font-size:10.5px; font-weight:900; margin-top:1px; line-height:1;}
-  .guide-ico.pass{background:rgba(22,199,132,.16); color:var(--green);}
+  .guide-ico.pass{background:rgba(38,166,154,.16); color:var(--green);}
   .guide-ico.part{background:rgba(232,163,61,.14); color:var(--yellow);}
-  .guide-ico.fail{background:rgba(240,70,92,.12); color:var(--red);}
+  .guide-ico.fail{background:rgba(239,83,80,.12); color:var(--red);}
   .guide-steps .gname{font-weight:700; color:var(--text); flex-shrink:0; white-space:nowrap;}
   .guide-steps .gnote{color:var(--dim); font-size:10.5px; line-height:1.45;}
   .guide-prog{height:6px; border-radius:4px; background:var(--grid); overflow:hidden; margin:10px 0 12px;}
@@ -323,16 +339,16 @@
   .guide-prog.WATCH i{background:linear-gradient(90deg,var(--cyan),var(--blue));}
   .guide-prog.NONE i{background:linear-gradient(90deg,var(--dim),var(--border2));}
   .guide-note{margin-top:10px; padding:9px 11px; border-radius:9px; background:rgba(12,18,32,.6); border:1px dashed var(--border); font-size:11px; line-height:1.5;}
-  .guide-note.ready{color:var(--green); border-color:rgba(22,199,132,.35);}
+  .guide-note.ready{color:var(--green); border-color:rgba(38,166,154,.35);}
   .guide-note.wait{color:var(--dim);}
 
   /* compact setup rows (accordion) */
   .setup-row{border-bottom:1px solid var(--border); cursor:pointer; transition:background .12s;}
-  .setup-row:hover{background:rgba(76,141,255,.04);}
+  .setup-row:hover{background:rgba(41,98,255,.04);}
   .setup-row-head{display:grid; grid-template-columns:80px 50px 1fr 45px; align-items:center; gap:6px; padding:8px 10px; font-size:11.5px;}
   .setup-sym{font-weight:800; color:var(--text); letter-spacing:.3px;}
   .setup-tier{font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; padding:2px 6px; border-radius:5px; text-align:center;}
-  .setup-tier.ok{background:rgba(22,199,132,.15); color:var(--green);}
+  .setup-tier.ok{background:rgba(38,166,154,.15); color:var(--green);}
   .setup-tier.wait{background:rgba(232,163,61,.12); color:var(--yellow);}
   .setup-tier.none{background:rgba(116,128,156,.08); color:var(--dim);}
   .setup-dir{font-size:10.5px; font-weight:700;}
@@ -341,7 +357,7 @@
   .setup-row.expanded .setup-row-detail{display:block;}
   .setup-row.expanded{background:rgba(12,18,32,.4);}
   .tier{display:inline-block; font-size:9.5px; font-weight:900; padding:3px 9px; border-radius:99px; letter-spacing:.4px;}
-  .tier.FIRE{background:rgba(22,199,132,.16); color:var(--green); border:1px solid rgba(22,199,132,.5);}
+  .tier.FIRE{background:rgba(38,166,154,.16); color:var(--green); border:1px solid rgba(38,166,154,.5);}
   .tier.WATCH{background:rgba(56,189,248,.13); color:var(--cyan); border:1px solid rgba(56,189,248,.45);}
   .tier.NONE{background:rgba(116,128,156,.1); color:var(--muted); border:1px solid var(--border);}
 
@@ -351,13 +367,13 @@
   }
   .feed-row:last-child{border-bottom:none;}
   .feed-row .fdir{width:52px; text-align:center; font-weight:900; font-size:11px; border-radius:6px; padding:2px 0;}
-  .feed-row .fdir.CALL{background:rgba(22,199,132,.14); color:var(--green);}
-  .feed-row .fdir.PUT{background:rgba(240,70,92,.14); color:var(--red);}
+  .feed-row .fdir.CALL{background:rgba(38,166,154,.14); color:var(--green);}
+  .feed-row .fdir.PUT{background:rgba(239,83,80,.14); color:var(--red);}
   .feed-row .ftime{color:var(--dim); font-family:var(--num); font-size:10.5px;}
   .feed-row .fprice{font-family:var(--num); font-weight:700; margin-left:auto;}
   .feed-row .fconf{font-family:var(--num); color:var(--muted); font-size:11px;}
   .hi-badge{
-    display:inline-block; background:linear-gradient(135deg,#E8A33D,#ff8a3d); color:#1a1305;
+    display:inline-block; background:linear-gradient(135deg,#FF9800,#ff8a3d); color:#1a1305;
     font-size:9px; font-weight:900; border-radius:10px; padding:1px 6px; margin-left:4px; vertical-align:1px;
     font-family:var(--num); letter-spacing:.3px;
   }
@@ -577,45 +593,41 @@
               <button class="tf-btn" data-tf="1h">1h</button>
               <button class="tf-btn" data-tf="4h">4h</button>
             </span>
-            <span class="tf-group" id="zoomGroup" title="ซูม + ล้อเมาส์ · ลากเพื่อเลื่อนดูอดีต">
-              <button class="tf-btn" id="zoomOut" title="ซูมออก">−</button>
-              <button class="tf-btn" id="zoomIn" title="ซูมเข้า">+</button>
-              <button class="tf-btn" id="zoomReset" title="กลับมุมมองล่าสุด">⟲</button>
-              <button class="tf-btn" id="btnFullscreen" title="ขยายเต็มจอ">⛶</button>
-            </span>
+            <span class="tf-group" id="zoomGroup" title="ลากเพื่อเลื่อน · ล้อเมาส์/สองนิ้วเพื่อซูม (มือถือ: pinch)">
+            <button class="tf-btn" id="zoomReset" title="กลับมุมมองล่าสุด"><i class="ti ti-refresh"></i></button>
+            <button class="tf-btn" id="addSrR" title="เพิ่มเส้น S/R (คลิกวางบนกราฟ)"><i class="ti ti-layout-horizontal"></i></button>
+            <button class="tf-btn" id="btnFullscreen" title="ขยายเต็มจอ"><i class="ti ti-maximize"></i></button>
+            <button class="tf-btn" id="btnTradeList" title="รายการสัญญาณ"><i class="ti ti-list"></i></button>
           </span>
         </h3>
         <div class="chart-legendbar" id="chartLegendBar">
           <span class="lb-ohlc" id="lbOhlc">—</span>
           <span class="lb-spacer"></span>
           <span id="lbValues"></span>
-          <span class="lb-tools">
-            <button class="tf-btn" id="addSrR" title="เพิ่มเส้นต้าน R (ลากปรับระดับได้)">+R</button>
-            <button class="tf-btn" id="addSrS" title="เพิ่มเส้นรับ S (ลากปรับระดับได้)">+S</button>
-          </span>
           <button class="lb-collapse" id="lbCollapse" title="ย่อ/ขยายค่า indicator">▾</button>
         </div>
-        <div class="chart-wrap" style="height:460px;">
-          <canvas id="candleChart" class="chart"></canvas>
+        <div class="chart-wrap" id="lwWrap" style="height:460px;">
+          <div id="candleChart"></div>
+        </div>
+        <div class="lw-legend" id="lwLegend"></div>
+        <!-- trade list (คลิกเลือกเพื่อดู SL/TP เฉพาะรายการ) -->
+        <div class="lw-tradelist" id="lwTradeList" style="display:none; border-top:1px solid var(--border); max-height:220px; overflow-y:auto;">
+          <div class="lw-trade-head">คลิกแถวเพื่อดู Entry / SL / TP บนกราฟ (เห็นทีละรายการ)</div>
+          <div id="lwTradeRows"></div>
         </div>
         <div class="ind-bar" id="chartIndBar">
           <span class="ind-chip active" data-ind="bb">BB (20,2)</span>
           <span class="ind-chip active" data-ind="ema">EMA 50/100/200</span>
           <span class="ind-chip active" data-ind="sma5">SMA5</span>
-          <span class="ind-chip active" data-ind="rsi">RSI(14)</span>
-          <span class="ind-chip active" data-ind="adx">ADX(14)</span>
-          <span class="ind-chip active" data-ind="fractal">Fractal</span>
           <span class="ind-chip" data-ind="vol">Volume</span>
-          <span class="ind-spacer"></span>
-          <span class="ind-chip" data-ind="grip">Grid</span>
         </div>
         <div class="chart-legend">
-          <span><i style="background:var(--cyan);"></i>EMA50</span>
-          <span><i style="background:var(--purple);"></i>EMA100</span>
+          <span><i style="background:var(--purple);"></i>EMA50</span>
+          <span><i style="background:var(--ml);"></i>EMA100</span>
           <span><i style="background:var(--yellow);"></i>EMA200</span>
-          <span><i style="background:#8ca0c8;"></i>BB</span>
-          <span><i style="background:var(--green);"></i>Fractal Low</span>
-          <span><i style="background:var(--red);"></i>Fractal High</span>
+          <span><i style="background:var(--blue);"></i>BB</span>
+          <span><i style="background:var(--green);"></i>ML (▲ CALL)</span>
+          <span><i style="background:var(--blue);"></i>Rule-base (▼ PUT)</span>
         </div>
       </div>
 
@@ -643,7 +655,7 @@
     <div class="ov-bottom">
       <div class="panel ov-equity-panel">
         <h3><span class="ph purple"></span>Equity Curve</h3>
-        <div style="height:280px;"><canvas id="equityChart" class="chart"></canvas></div>
+        <div style="height:280px;"><div id="equityChart"></div></div>
       </div>
       <div class="panel ov-feed-panel">
         <h3><span class="ph green"></span>สัญญาณล่าสุด</h3>
@@ -888,7 +900,7 @@
 
     <div class="j-equity">
       <h3>Equity Curve</h3>
-      <div style="height:260px;"><canvas id="equityFullChart" class="chart"></canvas></div>
+      <div style="height:260px;"><div id="equityFullChart"></div></div>
     </div>
 
     <div class="j-section open" id="jSecDaily">
@@ -1083,7 +1095,7 @@ function showToast(msg, type){
     document.body.appendChild(c);
   }
   const d = document.createElement('div');
-  const bg = type === 'CALL' ? '#16C784' : type === 'PUT' ? '#F0465C' : '#4C8DFF';
+  const bg = type === 'CALL' ? '#26A69A' : type === 'PUT' ? '#EF5350' : '#2962FF';
   d.style.cssText = `background:${bg};color:#fff;padding:10px 14px;border-radius:8px;margin-bottom:8px;font-size:12px;font-family:monospace;box-shadow:0 2px 8px rgba(0,0,0,.3);opacity:0;transition:opacity .3s;`;
   d.textContent = msg;
   c.appendChild(d);
@@ -1225,6 +1237,10 @@ function fractal(nd, l=7, r=7){
 }
 
 function drawCandles(canvas, data){
+  if(!canvas||!canvas.getContext){ return; }
+  lastCandles=data;
+  // กราฟหลักถูกแทนด้วย lightweight-charts (drawLWChart) แล้ว ฟังก์ชันนี้คงไว้เป็น fallback/inert
+  {
   const dpr=window.devicePixelRatio||1;
   const rect=canvas.getBoundingClientRect();
   canvas.width=rect.width*dpr; canvas.height=rect.height*dpr;
@@ -1232,9 +1248,8 @@ function drawCandles(canvas, data){
   const W=rect.width, H=rect.height;
   ctx.clearRect(0,0,W,H);
   if(!data||data.length<2){
-    ctx.fillStyle='#4C5566'; ctx.font='13px Segoe UI'; ctx.fillText('รอข้อมูลราคา...',20,H/2); return;
+    ctx.fillStyle='#787B86'; ctx.font='13px IBM Plex Sans'; ctx.fillText('รอข้อมูลราคา...',20,H/2); return;
   }
-  lastCandles=data;
   // normalise: รองรับทั้ง /api/prices (open/high/low/close/ts) และ /api/candles (o/h/l/c/t)
   const norm=d=>d.o!=null?{o:d.o,h:d.h,l:d.l,c:d.c,t:d.t,v:d.v||0}:{o:d.open,h:d.high,l:d.low,c:d.close,t:d.ts||d.t,v:d.volume||0};
   const nd=data.map(norm);
@@ -1301,7 +1316,7 @@ function drawCandles(canvas, data){
       const y=yMap(g.v);
       ctx.strokeStyle=g.major?GRID_MAJ:GRID_SOFT;
       ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle='#4C5566'; ctx.textAlign='right'; ctx.fillText(g.v,W-6,y+3); ctx.textAlign='left';
+      ctx.fillStyle='#565B66'; ctx.textAlign='right'; ctx.fillText(g.v,W-6,y+3); ctx.textAlign='left';
     });
     // clip พื้นที่วาดจริง (กัน gradient/pill ล้นกรอบ)
     ctx.save(); ctx.beginPath(); ctx.rect(padL,pTop,plotW,plot); ctx.clip();
@@ -1356,8 +1371,8 @@ function drawCandles(canvas, data){
   // ── EMA 50/100/200 (แทน EMA20 เดิม → EMA100) ──
   if(chartInd.ema){
     drawLine(ema(closes,200),'rgba(243,168,70,.95)',1.6);
-    drawLine(ema(closes,100),'rgba(76,141,255,.9)',1.2);
-    drawLine(ema(closes,50),'rgba(76,141,255,.9)',1.2);
+    drawLine(ema(closes,100),'rgba(41,98,255,.9)',1.2);
+    drawLine(ema(closes,50),'rgba(41,98,255,.9)',1.2);
   }
 
   // ── SMA5 ──
@@ -1372,10 +1387,10 @@ function drawCandles(canvas, data){
     fr.forEach(p=>{
       const x=pxForData(p.i), y=py(p.v);
       if(p.t==='H'){
-        ctx.fillStyle='#F0465C';
+        ctx.fillStyle='#EF5350';
         ctx.beginPath(); ctx.moveTo(x,y-7); ctx.lineTo(x-4,y); ctx.lineTo(x+4,y); ctx.closePath(); ctx.fill();
       } else {
-        ctx.fillStyle='#16C784';
+        ctx.fillStyle='#26A69A';
         ctx.beginPath(); ctx.moveTo(x,y+7); ctx.lineTo(x-4,y); ctx.lineTo(x+4,y); ctx.closePath(); ctx.fill();
       }
     });
@@ -1397,7 +1412,7 @@ function drawCandles(canvas, data){
       if(y<padT-10||y>padT+plotH+10) return;
       const nearEma=lastEma200!=null&&Math.abs(lv.price-lastEma200)<=srSnapDist;
       const dragging=srDrag&&srDrag.id===lv.id;
-      const col=nearEma?'#E8A33D':(lv.type==='R'?'#F0465C':'#16C784');
+      const col=nearEma?'#FF9800':(lv.type==='R'?'#EF5350':'#26A69A');
       const alpha=(nearEma||lv.manual||dragging)?'':'bb';
       ctx.strokeStyle=col+alpha; ctx.lineWidth=dragging?1.6:1.1;
       ctx.setLineDash(lv.manual||dragging?[6,4]:[2,4]);
@@ -1415,7 +1430,7 @@ function drawCandles(canvas, data){
       if(nearEma){
         ctx.strokeStyle='rgba(247,184,71,.5)'; ctx.lineWidth=1;
         ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
-        ctx.fillStyle='#E8A33D'; ctx.font='bold 8.5px IBM Plex Mono,monospace';
+        ctx.fillStyle='#FF9800'; ctx.font='bold 8.5px IBM Plex Mono,monospace';
         const btxt='EMA200';
         const btw=ctx.measureText(btxt).width+8;
         ctx.beginPath(); ctx.roundRect(padL+2,Math.max(y-13,padT+2),btw,12,3); ctx.fill();
@@ -1426,7 +1441,7 @@ function drawCandles(canvas, data){
   }
 
   // ── grid + price labels (right axis) — ข้าม label ที่ชนกับ label S/R ──
-  ctx.strokeStyle='#1C2029'; ctx.fillStyle='#4C5566'; ctx.font='9.5px IBM Plex Mono,monospace';
+  ctx.strokeStyle='#1C2029'; ctx.fillStyle='#565B66'; ctx.font='9.5px IBM Plex Mono,monospace';
   const GRID=5;
   for(let i=0;i<=GRID;i++){
     const y=padT+plotH*i/GRID;
@@ -1439,7 +1454,7 @@ function drawCandles(canvas, data){
   // ── candles ──
   view.forEach((d,i)=>{
     const x=pxForData(i+start), up=d.c>=d.o;
-    ctx.strokeStyle=up?'#16C784':'#F0465C'; ctx.fillStyle=up?'#16C784':'#F0465C';
+    ctx.strokeStyle=up?'#26A69A':'#EF5350'; ctx.fillStyle=up?'#26A69A':'#EF5350';
     ctx.beginPath(); ctx.moveTo(x,py(d.h)); ctx.lineTo(x,py(d.l)); ctx.stroke();
     const yO=py(d.o),yC=py(d.c),top=Math.min(yO,yC),hgt=Math.max(Math.abs(yO-yC),1);
     ctx.fillRect(x-bw/2,top,bw,hgt);
@@ -1471,7 +1486,7 @@ function drawCandles(canvas, data){
       const isOpen=m.result==='PENDING';
 
       // สีตามผล — ทุกระบบใช้สีเดียวกัน
-      const color=isWin?'#16C784':isLose?'#F0465C':'#E8A33D';
+      const color=isWin?'#26A69A':isLose?'#EF5350':'#FF9800';
 
       // ชื่อระบบ
       const sysLabel=m.type==='ML'?'ML':m.importance===1?'IMP1':m.importance===2?'IMP2':'RBF';
@@ -1527,7 +1542,7 @@ function drawCandles(canvas, data){
       ctx.beginPath(); ctx.roundRect(x-lw/2,lyClamped-8,lw,16,4); ctx.stroke();
 
       // text — split color
-      const dirColor=isCall?'#16C784':'#F0465C';
+      const dirColor=isCall?'#26A69A':'#EF5350';
       const parts=[{t:dirText,c:dirColor},{t:' @'+priceStr,c:'#EDEFF3'},{t:' ['+sysLabel+']',c:'#838B9C'},{t:' '+resultText,c:color}];
       let tx=x-lw/2+5;
       ctx.textAlign='left'; ctx.font='bold 9px IBM Plex Mono,monospace';
@@ -1551,40 +1566,40 @@ function drawCandles(canvas, data){
       ctx.globalAlpha=0.7;
       if(m.cfd.sl){
         const ySL=py(m.cfd.sl);
-        ctx.strokeStyle='#F0465C'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+        ctx.strokeStyle='#EF5350'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
         ctx.beginPath(); ctx.moveTo(padL,ySL); ctx.lineTo(xEnd,ySL); ctx.stroke(); ctx.setLineDash([]);
         ctx.fillStyle='rgba(10,12,16,.85)'; ctx.font='bold 8px IBM Plex Mono,monospace';
         const slText='SL '+m.cfd.sl.toFixed(2);
         const slW=ctx.measureText(slText).width+6;
         ctx.fillRect(xEnd+3,ySL-7,slW,12);
-        ctx.fillStyle='#F0465C'; ctx.fillText(slText,xEnd+6,ySL+3);
+        ctx.fillStyle='#EF5350'; ctx.fillText(slText,xEnd+6,ySL+3);
       }
       if(m.cfd.tp1){
         const yTP1=py(m.cfd.tp1);
-        ctx.strokeStyle='#E8A33D'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+        ctx.strokeStyle='#FF9800'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
         ctx.beginPath(); ctx.moveTo(padL,yTP1); ctx.lineTo(xEnd,yTP1); ctx.stroke(); ctx.setLineDash([]);
         ctx.fillStyle='rgba(10,12,16,.85)'; ctx.font='bold 8px IBM Plex Mono,monospace';
         const tp1Text='TP1 '+m.cfd.tp1.toFixed(2);
         const tp1W=ctx.measureText(tp1Text).width+6;
         ctx.fillRect(xEnd+3,yTP1-7,tp1W,12);
-        ctx.fillStyle='#E8A33D'; ctx.fillText(tp1Text,xEnd+6,yTP1+3);
+        ctx.fillStyle='#FF9800'; ctx.fillText(tp1Text,xEnd+6,yTP1+3);
       }
       if(m.cfd.tp2){
         const yTP2=py(m.cfd.tp2);
-        ctx.strokeStyle='#16C784'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+        ctx.strokeStyle='#26A69A'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
         ctx.beginPath(); ctx.moveTo(padL,yTP2); ctx.lineTo(xEnd,yTP2); ctx.stroke(); ctx.setLineDash([]);
         ctx.fillStyle='rgba(10,12,16,.85)'; ctx.font='bold 8px IBM Plex Mono,monospace';
         const tp2Text='TP2 '+m.cfd.tp2.toFixed(2);
         const tp2W=ctx.measureText(tp2Text).width+6;
         ctx.fillRect(xEnd+3,yTP2-7,tp2W,12);
-        ctx.fillStyle='#16C784'; ctx.fillText(tp2Text,xEnd+6,yTP2+3);
+        ctx.fillStyle='#26A69A'; ctx.fillText(tp2Text,xEnd+6,yTP2+3);
       }
       ctx.globalAlpha=1;
     });
   }
 
   // ── last price: เส้น + tag pill ──
-  const lp=view[view.length-1].c, lc=lp>=view[view.length-1].o?'#16C784':'#F0465C';
+  const lp=view[view.length-1].c, lc=lp>=view[view.length-1].o?'#26A69A':'#EF5350';
   ctx.strokeStyle=lc; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(padL,py(lp)); ctx.lineTo(W-padR,py(lp)); ctx.stroke(); ctx.setLineDash([]);
   const tag=lp.toFixed(dec);
   ctx.font='bold 10px IBM Plex Mono,monospace';
@@ -1600,11 +1615,11 @@ function drawCandles(canvas, data){
   if(chartInd.vol){
     const vh=volH-4, vmax=Math.max(...view.map(d=>d.v),1);
     ctx.fillStyle='#10131A'; ctx.fillRect(0,volTop,W,volH);
-    ctx.fillStyle='#4C5566'; ctx.font='9.5px IBM Plex Mono,monospace'; ctx.textAlign='left';
+    ctx.fillStyle='#565B66'; ctx.font='9.5px IBM Plex Mono,monospace'; ctx.textAlign='left';
     ctx.fillText('VOL',padL+2,volTop+10);
     view.forEach((d,i)=>{
       const x=pxForData(i+start), hh=d.v/vmax*(vh-6);
-      ctx.fillStyle=(d.c>=d.o)?'rgba(22,199,132,.25)':'rgba(240,70,92,.25)';
+      ctx.fillStyle=(d.c>=d.o)?'rgba(38,166,154,.25)':'rgba(239,83,80,.25)';
       ctx.fillRect(x-bw/2,volTop+vh-2-hh,bw,hh);
     });
     volTop+=volH;
@@ -1618,11 +1633,11 @@ function drawCandles(canvas, data){
       oy,
       min:0, max:100,                       // สเกล RSI คงที่ 0–100
       guides:[{v:0},{v:30},{v:50,major:true},{v:70},{v:100}],
-      zones:[{v0:70,v1:100,color:'rgba(240,70,92,.08)'},
-             {v0:0,v1:30,color:'rgba(22,199,132,.08)'}],
+      zones:[{v0:70,v1:100,color:'rgba(239,83,80,.08)'},
+             {v0:0,v1:30,color:'rgba(38,166,154,.08)'}],
       fill:{arr:rv, color:'rgba(247,184,71,.30)'},
-      lines:[{arr:rv, color:'#E8A33D', width:1.2}],
-      pill:{arr:rv, color:'#E8A33D'}
+      lines:[{arr:rv, color:'#FF9800', width:1.2}],
+      pill:{arr:rv, color:'#FF9800'}
     });
     oy+=PANE_H;
   }
@@ -1636,19 +1651,19 @@ function drawCandles(canvas, data){
       oy,
       min:0, max:aMax,
       guides:[{v:0},{v:20},{v:40,major:true},{v:60},{v:80}],
-      zones:[{v0:0,v1:20,color:'rgba(22,199,132,.07)'}],
+      zones:[{v0:0,v1:20,color:'rgba(38,166,154,.07)'}],
       fill:{arr:aa.adx, color:'rgba(247,184,71,.22)'},
-      lines:[{arr:aa.pdi, color:'rgba(22,199,132,.75)', width:1.2},
-             {arr:aa.ndi, color:'rgba(240,70,92,.75)', width:1.2},
-             {arr:aa.adx, color:'#E8A33D', width:1.2}],
-      pill:{arr:aa.adx, color:'#E8A33D'}
+      lines:[{arr:aa.pdi, color:'rgba(38,166,154,.75)', width:1.2},
+             {arr:aa.ndi, color:'rgba(239,83,80,.75)', width:1.2},
+             {arr:aa.adx, color:'#FF9800', width:1.2}],
+      pill:{arr:aa.adx, color:'#FF9800'}
     });
   }
 
   // ── time strip: แยกจากกรอบล่างสุดด้วยเส้นคั่น ไม่เบียดขอบ ADX ──
   ctx.strokeStyle='rgba(255,255,255,.06)';
   ctx.beginPath(); ctx.moveTo(padL,H-timeStrip); ctx.lineTo(W-padR,H-timeStrip); ctx.stroke();
-  ctx.fillStyle='#4C5566'; ctx.font='9.5px IBM Plex Mono,monospace';
+  ctx.fillStyle='#565B66'; ctx.font='9.5px IBM Plex Mono,monospace';
   ctx.textAlign='left';
   ctx.fillText(view[0].t?fmtHM(view[0].t):'',padL,H-6);
   ctx.fillText(view[view.length-1].t?fmtHM(view[view.length-1].t):'',Math.min(pxForData(end),W-padR-70),H-6);
@@ -1669,7 +1684,7 @@ function drawCandles(canvas, data){
       if(d){
         const bx=pxForData(bi), by=py(d.c);
         // ไฮไลต์แท่งที่ hover
-        ctx.fillStyle='rgba(76,141,255,.10)';
+        ctx.fillStyle='rgba(41,98,255,.10)';
         ctx.fillRect(bx-bw/2,padT,bw,plotH);
         // เส้นกากบาท
         ctx.strokeStyle='rgba(232,238,251,.35)'; ctx.lineWidth=1;
@@ -1705,7 +1720,7 @@ function drawCandles(canvas, data){
         [['O',d.o,up],['H',d.h,up],['L',d.l,up],['C',d.c,up]].forEach((r,i)=>{
           const yy=by2+28+i*11;
           ctx.fillStyle='#838B9C'; ctx.fillText(r[0],bx2+7,yy);
-          ctx.fillStyle=r[2]?'#16C784':'#F0465C';
+          ctx.fillStyle=r[2]?'#26A69A':'#EF5350';
           ctx.fillText(r[1].toFixed(dec),bx2+26,yy);
         });
       }
@@ -1714,6 +1729,7 @@ function drawCandles(canvas, data){
 
   // ── legend overlay: ค่าล่าสุดของ indicator (อัปเดตทุก redraw) ──
   updateLegendOverlay(nd, legendIdx);
+  }
 }
 function updateLegendOverlay(nd, idx){
   const bar=document.getElementById('chartLegendBar'); if(!bar) return;
@@ -1749,8 +1765,8 @@ function updateLegendOverlay(nd, idx){
   }
   if(chartInd.sma5){ const s5=sma(closes,5)[at]; chip('sma5','SMA5','#EDEFF3',s5); }
   if(chartInd.bb){ const b=bollinger(closes,20,2); chip('bb','BB', '#8ca0c8', b.up[at], ' / '+f(b.low[at])); }
-  if(chartInd.rsi){ const rv=rsi(closes,14)[at]; chip('rsi','RSI14','#E8A33D',rv); }
-  if(chartInd.adx){ const a=adx(nd.map(d=>d.h),nd.map(d=>d.l),closes,14); chip('adx','ADX','#E8A33D',a.adx[at], ' +'+f(a.pdi[at])+' −'+f(a.ndi[at])); }
+  if(chartInd.rsi){ const rv=rsi(closes,14)[at]; chip('rsi','RSI14','#FF9800',rv); }
+  if(chartInd.adx){ const a=adx(nd.map(d=>d.h),nd.map(d=>d.l),closes,14); chip('adx','ADX','#FF9800',a.adx[at], ' +'+f(a.pdi[at])+' −'+f(a.ndi[at])); }
   document.getElementById('lbValues').innerHTML=chips.join('');
 }
 function zoomChartAt(factor, frac){
@@ -1838,8 +1854,8 @@ function gaugeSVG(g){
     <div class="gauge-svg">
       <svg width="220" height="96" viewBox="0 0 220 96">
         <path d="${arcPath(cx,cy,r,a0,aEnd)}" stroke="#1C2029" stroke-width="${w}" fill="none" stroke-linecap="round"/>
-        <path d="${arcPath(cx,cy,r,a0,upEnd)}" stroke="#16C784" stroke-width="${w}" fill="none" stroke-linecap="round"/>
-        <path d="${arcPath(cx,cy,r,upEnd,aEnd)}" stroke="#F0465C" stroke-width="${w}" fill="none" stroke-linecap="round"/>
+        <path d="${arcPath(cx,cy,r,a0,upEnd)}" stroke="#26A69A" stroke-width="${w}" fill="none" stroke-linecap="round"/>
+        <path d="${arcPath(cx,cy,r,upEnd,aEnd)}" stroke="#EF5350" stroke-width="${w}" fill="none" stroke-linecap="round"/>
         <text x="110" y="84" text-anchor="middle" font-size="20" font-weight="800" font-family="IBM Plex Mono,monospace" fill="#EDEFF3">${g.signal==='NEUTRAL'?'NEUTRAL':(g.confidence*100).toFixed(0)+'%'}</text>
       </svg>
     </div>
@@ -1897,18 +1913,280 @@ async function refreshOverview(){
   }catch(e){}
 }
 
+let lwEqChart=null, lwEqSeries=null;
 function drawEquity(points){
   const el=document.getElementById('equityChart'); if(!el) return;
-  const labels=points.map(p=>p.t), values=points.map(p=>p.equity);
-  const up=values.length>0&&values[values.length-1]>=0;
-  const cfg={type:'line',
-    data:{labels,datasets:[{data:values,borderColor:up?'#16C784':'#F0465C',
-      backgroundColor:up?'rgba(22,199,132,.15)':'rgba(240,70,92,.15)',fill:true,pointRadius:0,borderWidth:2,tension:.25}]},
-    options:{responsive:true,maintainAspectRatio:false,animation:false,
-      scales:{x:{display:false},y:{grid:{color:'#1C2029'},ticks:{color:'#4C5566',font:{size:10}}}},
-      plugins:{legend:{display:false}} }};
-  if(equityChart){equityChart.data=cfg.data; equityChart.update('none');} else equityChart=new Chart(el,cfg);
+  const data=(points||[]).map(p=>{
+    let ts;
+    if(typeof p.t==='number') ts=p.t;
+    else if(typeof p.t==='string') ts=Math.floor(new Date(p.t.replace(' ','T')+'Z').getTime()/1000)||Math.floor(new Date(p.t.replace(' ','T')).getTime()/1000);
+    else ts=0;
+    return {time:ts, value:Math.round(p.equity)};
+  }).filter(d=>d.time>0);
+  const startVal=data.length?data[0].value:0;
+  if(!window.LightweightCharts) return;
+  if(!lwEqChart){
+    lwEqChart=LightweightCharts.createChart(el,{
+      height:el.clientHeight||280, width:el.clientWidth||300,
+      layout:{background:{color:'transparent'},textColor:'#787B86',fontFamily:'IBM Plex Mono, monospace'},
+      grid:{vertLines:{color:'#1E222D'},horzLines:{color:'#1E222D'}},
+      localization:{priceFormatter:p=>'$'+p.toLocaleString(undefined,{maximumFractionDigits:0})},
+      rightPriceScale:{borderColor:'#2A2E39'},
+      timeScale:{borderColor:'#2A2E39',rightOffset:2},
+    });
+    lwEqSeries=lwEqChart.addAreaSeries({
+      lineColor:'#26A69A', topColor:'rgba(38,166,154,0.28)', bottomColor:'rgba(38,166,154,0.02)',
+      lineWidth:2, priceFormat:{type:'custom',formatter:p=>'$'+p.toLocaleString(undefined,{maximumFractionDigits:0})},
+    });
+    lwEqSeries.createPriceLine({price:startVal,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,title:'ทุนเริ่มต้น'});
+    window.addEventListener('resize',()=>{ if(lwEqChart&&el.clientWidth>0) lwEqChart.applyOptions({width:el.clientWidth}); });
+  }
+  lwEqSeries.setData(data);
+  const opts={width:el.clientWidth||300,height:el.clientHeight||280};
+   lwEqChart.applyOptions(opts);
+  lwEqChart.timeScale().fitContent();
 }
+
+// ═══════════════════════════════════════════════════════
+// lightweight-charts (TradingView) candlestick chart
+// ═══════════════════════════════════════════════════════
+let lwChart=null, lwCandle=null, lwVol=null;
+let lwEma50=null,lwEma100=null,lwEma200=null;
+let lwSrLines=[];
+let lwActiveLines=[];
+let lwAddingSr=false;
+let lwTradeData=[];
+let _lwFitKey='';   // จำ TF+symbol → fitContent เฉพาะตอนเปลี่ยน
+
+function _candleTime(d){
+  if(d.t==null) return 0;
+  if(typeof d.t==='number') return Math.floor(d.t);
+  if(typeof d.t==='string'){
+    const base=Math.floor(new Date(d.t.replace(' ','T')+'Z').getTime()/1000);
+    return Number.isFinite(base)?base:0;
+  }
+  return 0;
+}
+
+function initLWChart(){
+  if(!window.LightweightCharts) return null;
+  const el=document.getElementById('candleChart');
+  if(lwChart) return;
+  lwChart=LightweightCharts.createChart(el,{
+    height:el.clientHeight||460, width:el.clientWidth||300,
+    layout:{background:{color:'transparent'},textColor:'#787B86',fontFamily:'IBM Plex Mono, monospace'},
+    grid:{vertLines:{color:'#1E222D'},horzLines:{color:'#1E222D'}},
+    crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
+    rightPriceScale:{borderColor:'#2A2E39'},
+    timeScale:{borderColor:'#2A2E39',timeVisible:true,secondsVisible:false,rightOffset:3,barSpacing:8},
+    localization:{locale:'th-TH'},
+  });
+  lwCandle=lwChart.addCandlestickSeries({
+    upColor:'#26A69A',downColor:'#EF5350',borderVisible:false,
+    wickUpColor:'#26A69A',wickDownColor:'#EF5350',
+    priceFormat:{type:'custom',formatter:p=>p},
+  });
+  lwEma50=lwChart.addLineSeries({color:'#9C6FE0',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+  lwEma100=lwChart.addLineSeries({color:'#787B86',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+  lwEma200=lwChart.addLineSeries({color:'#FF9800',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+  lwVol=lwChart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'volScale'});
+  lwChart.priceScale('volScale').applyOptions({scaleMargins:{top:0.82,bottom:0}});
+  _lwOHLClegend();
+  bindLWChart();
+}
+
+function refreshLWResize(){
+  if(!lwChart) return;
+  const el=document.getElementById('candleChart');
+  if(el&&el.clientWidth>0) lwChart.applyOptions({width:el.clientWidth,height:el.clientHeight||460});
+}
+
+function _normLW(prices){
+  return prices.map(d=>({
+    time:_candleTime(d),
+    open:d.o!=null?d.o:d.open,
+    high:d.h!=null?d.h:d.high,
+    low:d.l!=null?d.l:d.low,
+    close:d.c!=null?d.c:d.close,
+    volume:d.v!=null?d.v:d.volume||0,
+  })).filter(d=>d.time>0&&d.open!=null);
+}
+
+function _emaArr(arr,n,key){
+  const out=[]; let prev=null; const k=2/(n+1);
+  for(const d of arr){
+    const v=d.close;
+    if(prev==null) prev=v; else prev=v*k+prev*(1-k);
+    out.push({time:d.time,value:prev});
+  }
+  return out;
+}
+
+function drawLWChart(prices,markers,tf){
+  if(!window.LightweightCharts){ return; }
+  const bars=_normLW(prices);
+  if(!bars.length) return;
+  initLWChart();
+  const needInit=!lwCandle;
+  lwCandle.setData(bars);
+  if(chartInd.vol) lwVol.setData(bars.map(b=>({time:b.time,value:b.volume,color:b.close>=b.open?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'})));
+  else lwVol.setData([]);
+  if(chartInd.ema){ lwEma50.setData(_emaArr(bars,50)); lwEma100.setData(_emaArr(bars,100)); lwEma200.setData(_emaArr(bars,200)); }
+  else { lwEma50.setData([]); lwEma100.setData([]); lwEma200.setData([]); }
+
+  // ── Markers: shape=ทิศทาง, color=ระบบ ──
+  const tsSet=new Set(bars.map(b=>b.time));
+  const markerList=(markers||[]).filter(m=>m&&m.ts&&m.price!=null&&m.direction&&tsSet.has(_candleTime(m))).map(m=>{
+    const color=m.type==='ML'?'#9C6FE0':'#2962FF';
+    const sysLabel=m.type==='ML'?'ML':m.importance===1?'IMP1':m.importance===2?'IMP2':'RBF';
+    return {
+      time:_candleTime(m),
+      position:m.direction==='CALL'?'belowBar':'aboveBar',
+      color,
+      shape:m.direction==='CALL'?'arrowUp':'arrowDown',
+      text:sysLabel+' '+m.direction,
+    };
+  });
+  if(lwCandle) lwCandle.setMarkers(markerList);
+  // fitContent เฉพาะครั้งแรก / เปลี่ยน TF / เปลี่ยน symbol — ไม่รบกวน zoom/pan ที่ผู้ใช้ตั้งไว้
+  const sym=document.getElementById('chartSymbol')?.value||'';
+  const fitKey=tf+'|'+sym;
+  if(fitKey!==_lwFitKey){ _lwFitKey=fitKey; lwChart.timeScale().fitContent(); }
+
+  // ── trade list + auto-select open ──
+  lwTradeData=(markers||[]).filter(m=>m&&m.ts&&m.price!=null&&m.direction);
+  _renderLWMarkers(markers);
+  _buildLWData(markers);
+  _autoSelectOpen(markers);
+}
+
+// ── LW legend: OHLC ของแท่งที่ crosshair ชี้ ──
+function _lwOHLClegend(){
+  const el=document.getElementById('lwLegend'); if(!el) return;
+  el.className='lw-legend';
+  if(!lwCandle) return;
+  lwChart.subscribeCrosshairMove(param=>{
+    if(!param.time) return;
+    const d=param.seriesData.get(lwCandle);
+    if(!d){ return; }
+    const up=typeof d.close!=='undefined';
+    const dirColor=d.close>=d.open?'#26A69A':'#EF5350';
+    el.innerHTML=`<span style="color:#787B86">O</span> <span class="up">${d.open}</span> <span style="color:#787B86">H</span> <span class="up">${d.high}</span> <span style="color:#787B86">L</span> <span class="down">${d.low}</span> <span style="color:#787B86">C</span> <span class="${up?'up':'down'}">${d.close}</span>`;
+  });
+}
+
+// ── trade list (คลิกเพื่อดู SL/TP เฉพาะรายการ) ──
+function _buildLWData(markers){
+  const rowsEl=document.getElementById('lwTradeRows'); if(!rowsEl) return;
+  lwTradeData=markers||[];
+  const items=lwTradeData.map((m,rowIdx)=>{
+    let entry=m.price!=null?Number(m.price):null;
+    let sl=null,tp1=null,tp2=null,res=m.result||(m.cfd&&m.cfd.cfd_result);
+    if(m.cfd){ if(entry==null) entry=m.cfd.effective_entry; sl=m.cfd.sl; tp1=m.cfd.tp1; tp2=m.cfd.tp2; }
+    if(m.cfd&&m.cfd.cfd_result===null&&res==='PENDING') entry=m.cfd.effective_entry||entry;
+    return {rowIdx,ts:m.ts,entry,sl,tp1,tp2,result:m.type==='ML'?'ML':(m.importance===1?'IMP1':m.importance===2?'IMP2':'RBF'),direction:m.direction,res,
+            price:m.price,open:res==='PENDING'};
+  }).filter(t=>t.ts);
+  rowsEl.innerHTML=items.map(t=>{
+    const ent=(t.entry!=null?Number(t.entry).toFixed(2):'–');
+    const cls=t.open?'lw-trow open':'lw-trow';
+    const sc=t.direction==='CALL'?'up':'down';
+    return `<div class="${cls}" data-t="${(t.ts||'').replace ? String(t.ts) : t.ts}">
+      <span class="dir" style="color:${t.direction==='CALL'?'#26A69A':'#EF5350'}">${t.direction}</span>
+      <span class="lbl">${t.result}</span>
+      <span class="sub">${ent}</span>${t.open?'<span class="tag open">OPEN</span>':(t.res?'<span class="tag">'+t.res+'</span>':'<span class="tag"></span>')}
+    </div>`;
+  }).join('') || '<div class="lw-empty">ยังไม่มี trade</div>';
+  rowsEl.querySelectorAll('.lw-trow').forEach(row=>{
+    row.addEventListener('click',()=>{
+      document.querySelectorAll('.lw-trow').forEach(r=>r.classList.remove('sel'));
+      row.classList.add('sel');
+      const t=lwTradeData.find(x=>String(x.ts)===row.dataset.t);
+      _showTrade(t);
+    });
+  });
+}
+
+function _showTrade(t){
+  if(!t||!lwCandle){ return; }
+  _clearPriceLines();
+  const add=(p,color,style,title)=>{
+    if(p==null) return;
+    try{ const ln=lwCandle.createPriceLine({price:Number(p),color,lineWidth:1,lineStyle:style,title,axisLabelVisible:true}); _selLines.push(ln); }catch(e){}
+  };
+  add(t.entry,'#D1D4DC',LightweightCharts.LineStyle.Solid,'ENTRY');
+  add(t.sl,'#EF5350',LightweightCharts.LineStyle.Dashed,'SL');
+  add(t.tp1,'#FF9800',LightweightCharts.LineStyle.Dashed,'TP1');
+  add(t.tp2,'#26A69A',LightweightCharts.LineStyle.Dashed,'TP2');
+}
+
+function _autoSelectOpen(markers){
+  const rowsEl=document.getElementById('lwTradeRows'); if(!rowsEl) return;
+  const openMarker=(markers||[]).find(m=>(m.result==='PENDING')||(m.cfd&&m.cfd.cfd_result==='PENDING'));
+  let target=null;
+  if(openMarker){
+    const row=rowsEl.querySelector(`.lw-trow[data-t="${String(openMarker.ts)}"]`);
+    if(row){ target=row; }
+  }
+  if(!target){ target=rowsEl.querySelector('.lw-trow'); }
+  if(target){
+    target.classList.add('sel');
+    _showTrade(lwTradeData.find(x=>String(x.ts)===target.dataset.t));
+  }
+}
+
+// ── S/R line ที่ผู้ใช้เพิ่มเอง ──
+let _selLines=[];   // เส้น SL/TP ของ trade ที่เลือก
+let _userSr=[];     // เส้น S/R ที่ผู้ใช้เพิ่ม
+let _addingSr=false;
+let _addingTimer=null;
+
+function _clearPriceLines(){
+  if(!lwCandle) return;
+  try{ _selLines.forEach(u=>lwCandle.removePriceLine(u)); _selLines=[]; }catch(e){}
+}
+function _renderLWMarkers(markers){
+  // สงวนไว้ (S/R handled ใน bindLWChart)
+}
+
+// ── bind LW chart controls ──
+function bindLWChart(){
+  if(!lwChart) return;
+  const addSr=document.getElementById('addSrR');
+  if(addSr && !addSr.__lwBound){
+    addSr.__lwBound=true;
+    addSr.addEventListener('click',()=>{
+      _addingSr=!addSr.classList.toggle('active');
+      document.getElementById('candleChart').style.cursor=_addingSr?'crosshair':'default';
+    });
+  }
+  const reset=document.getElementById('zoomReset');
+  if(reset && !reset.__lwBound){ reset.__lwBound=true; reset.addEventListener('click',()=>{ if(lwChart) lwChart.timeScale().fitContent(); }); }
+  const btnFS=document.getElementById('btnFullscreen');
+  if(btnFS && !btnFS.__lwBound){
+    btnFS.__lwBound=true;
+    btnFS.addEventListener('click',()=>{ const p=document.getElementById('chartPanel'); if(p&&p.requestFullscreen){ p.requestFullscreen().then(()=>{ setTimeout(v=>refreshLWResize(),50); }); } });
+  }
+  const btnTL=document.getElementById('btnTradeList');
+  if(btnTL && !btnTL.__lwBound){
+    btnTL.__lwBound=true;
+    btnTL.addEventListener('click',()=>{ const tl=document.getElementById('lwTradeList'); if(tl){ tl.style.display=tl.style.display==='none'?'block':'none'; } });
+  }
+  // click เพื่อวาง S/R (ป้องกัน click ติด ๆ กันจาก pan → ใช้ double-ish delay)
+  lwChart.subscribeClick(param=>{
+    if(!_addingSr || !param.point || !lwCandle) return;
+    const p=lwCandle.coordinateToPrice(param.point.y);
+    if(p==null) return;
+    try{
+      const ln=lwCandle.createPriceLine({price:p,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,title:'S/R'});
+      _userSr.push(ln);
+    }catch(e){}
+    _addingSr=false;
+    const b=document.getElementById('addSrR'); if(b) b.classList.remove('active');
+    document.getElementById('candleChart').style.cursor='default';
+  });
+}
+
 
 async function refreshPrice(){
   try{
@@ -1921,13 +2199,12 @@ async function refreshPrice(){
     const badge=document.getElementById('symbolBadge'); if(badge) badge.textContent=sym;
     const prices=await fetchJSON('/api/candles?tf='+tf+'&count=300&symbol='+encodeURIComponent(sym));
     if(!prices||!prices.length) return;
-    const el=document.getElementById('candleChart');
-    drawCandles(el,prices);
+    let markers=window._signalMarkers||[];
     try{
-      const markers=await fetchJSON('/api/signals/markers?symbol='+encodeURIComponent(sym)+'&limit=50');
+      markers=await fetchJSON('/api/signals/markers?symbol='+encodeURIComponent(sym)+'&limit=50')||[];
       window._signalMarkers=markers;
-      drawCandles(el,prices);
     }catch(e){}
+    drawLWChart(prices,markers,tf);
     const last=prices[prices.length-1], prev=prices[prices.length-2];
     const chg=prev?last.c-prev.c:0;
     const chgPct=prev?chg/prev.c*100:0;
@@ -2022,17 +2299,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     const btn=e.target.closest('.tf-btn'); if(!btn) return;
     document.querySelectorAll('#tfGroup .tf-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
-    resetChartView();
+    lwChart&&lwChart.timeScale().fitContent();
     refreshPrice();
-  });
-  document.getElementById('zoomIn')?.addEventListener('click',()=>zoomChartAt(0.6,0.5));
-  document.getElementById('zoomOut')?.addEventListener('click',()=>zoomChartAt(1.6,0.5));
-  document.getElementById('zoomReset')?.addEventListener('click',resetChartView);
-  document.getElementById('btnFullscreen')?.addEventListener('click',()=>{
-    const p=document.getElementById('chartPanel');
-    if(!p) return;
-    if(document.fullscreenElement){ document.exitFullscreen(); }
-    else if(p.requestFullscreen){ p.requestFullscreen().then(()=>setTimeout(()=>drawCandles(document.getElementById('candleChart'),lastCandles),120)); }
   });
   document.getElementById('chartLegendBar')?.addEventListener('click',e=>{
     const chip=e.target.closest('.lo-chip'); if(!chip) return;
@@ -2041,81 +2309,17 @@ document.addEventListener('DOMContentLoaded',()=>{
     chip.classList.toggle('off',!chartInd[key]);
     const bar=document.querySelector('#chartIndBar .ind-chip[data-ind="'+key+'"]');
     if(bar) bar.classList.toggle('active',chartInd[key]);
-    if(lastCandles.length) drawCandles(document.getElementById('candleChart'),lastCandles);
   });
   document.getElementById('lbCollapse')?.addEventListener('click',()=>{
     document.getElementById('chartLegendBar')?.classList.toggle('collapsed');
   });
-  document.getElementById('addSrR')?.addEventListener('click',()=>addSrLine('R'));
-  document.getElementById('addSrS')?.addEventListener('click',()=>addSrLine('S'));
   document.getElementById('chartIndBar')?.addEventListener('click',e=>{
     const chip=e.target.closest('.ind-chip'); if(!chip) return;
     chip.classList.toggle('active');
     chartInd[chip.dataset.ind]=chip.classList.contains('active');
-    if(lastCandles.length) drawCandles(document.getElementById('candleChart'),lastCandles);
+    if(lastCandles.length) drawLWChart(lastCandles,window._signalMarkers||[]);
   });
-  const cvs=document.getElementById('candleChart');
-  if(cvs){
-    cvs.addEventListener('wheel',e=>{
-      e.preventDefault();
-      const rect=cvs.getBoundingClientRect();
-      const x=e.clientX-rect.left;
-      const g=chartGeom||{};
-      const padLx=(g.padL!=null?g.padL:8), padRx=(g.padR!=null?g.padR:50);
-      const plotW=Math.max((g.W||rect.width)-padLx-padRx,1);
-      const frac=Math.max(0,Math.min(1,(x-padLx)/plotW));
-      zoomChartAt(e.deltaY<0?0.8:1.25, frac);
-    },{passive:false});
-    let drag=null;
-    cvs.addEventListener('mousedown',e=>{
-      const rect=cvs.getBoundingClientRect();
-      const hit=hitSrAt(e.clientX-rect.left,e.clientY-rect.top);
-      if(hit){
-        srDrag={id:hit.id}; srPinned[hit.id]=true;   // ลากแล้ว → fractal ไม่เขียนทับ
-        e.preventDefault();
-        return;
-      }
-      drag={x:e.clientX}; crosshair=null; e.preventDefault();
-    });
-    cvs.addEventListener('mousemove',e=>{
-      if(drag) return;
-      const rect=cvs.getBoundingClientRect();
-      crosshair={x:e.clientX-rect.left, y:e.clientY-rect.top};
-      if(lastCandles.length) drawCandles(cvs,lastCandles);
-    });
-    cvs.addEventListener('dblclick',e=>{
-      const rect=cvs.getBoundingClientRect();
-      const hit=hitSrAt(e.clientX-rect.left,e.clientY-rect.top);
-      if(hit){
-        srLevels=srLevels.filter(l=>l.id!==hit.id);
-        delete srPinned[hit.id];
-        if(lastCandles.length) drawCandles(cvs,lastCandles);
-      }
-    });
-    cvs.addEventListener('mouseleave',()=>{
-      if(crosshair){ crosshair=null; if(lastCandles.length) drawCandles(cvs,lastCandles); }
-    });
-    window.addEventListener('mousemove',e=>{
-      const rect=cvs.getBoundingClientRect();
-      if(srDrag){
-        if(!chartGeom||!lastCandles.length) return;
-        const {min,max,padT,plotH}=chartGeom;
-        const y=e.clientY-rect.top;
-        let p=Math.max(min,Math.min(max,max-(y-padT)/plotH*(max-min)));
-        if(lastEma200!=null&&Math.abs(p-lastEma200)<=srSnapDist) p=lastEma200;   // snap EMA200
-        const lv=srLevels.find(l=>l.id===srDrag.id);
-        if(lv){ lv.price=p; drawCandles(cvs,lastCandles); }
-        return;
-      }
-      if(!drag) return;
-      const plotW=rect.width-58;
-      const idx=Math.round((drag.x-e.clientX)/Math.max(plotW/chartView.count,0.5));
-      if(idx!==0) panChart(idx);
-      drag.x=e.clientX;
-    });
-    window.addEventListener('mouseup',()=>{ drag=null; srDrag=null; });
-  }
-  window.addEventListener('resize',()=>{ if(lastCandles.length) drawCandles(document.getElementById('candleChart'),lastCandles); });
+  window.addEventListener('resize',()=>{ refreshLWResize(); });
 });
 
 async function refreshGauges(){
@@ -2538,18 +2742,38 @@ function renderPeriodTable(){
     </tr>`).join('') || '<tr><td colspan="12" class="empty">ยังไม่มีข้อมูล</td></tr>';
 }
 
+let lwEqFullChart=null, lwEqFullSeries=null;
 function drawEquityFull(points){
   const el=document.getElementById('equityFullChart'); if(!el) return;
-  const labels=points.map(p=>p.t), values=points.map(p=>p.equity);
-  const last=values[values.length-1]||0;
-  const cfg={type:'line',
-    data:{labels,datasets:[{data:values,borderColor:last>=0?'#16C784':'#F0465C',
-      backgroundColor:last>=0?'rgba(22,199,132,.15)':'rgba(240,70,92,.15)',fill:true,pointRadius:0,borderWidth:2,tension:.2}]},
-    options:{responsive:true,maintainAspectRatio:false,animation:false,
-      scales:{x:{ticks:{color:'#4C5566',font:{size:10},maxTicksLimit:6},grid:{color:'#1C2029'}},
-              y:{grid:{color:'#1C2029'},ticks:{color:'#4C5566',font:{size:10}}}},
-      plugins:{legend:{display:false}} }};
-  if(equityFullChart){equityFullChart.data=cfg.data;equityFullChart.update('none');} else equityFullChart=new Chart(el,cfg);
+  const data=(points||[]).map(p=>{
+    let ts;
+    if(typeof p.t==='number') ts=p.t;
+    else if(typeof p.t==='string') ts=Math.floor(new Date(p.t.replace(' ','T')+'Z').getTime()/1000)||Math.floor(new Date(p.t.replace(' ','T')).getTime()/1000);
+    else ts=0;
+    return {time:ts, value:Math.round(p.equity)};
+  }).filter(d=>d.time>0);
+  const startVal=data.length?data[0].value:0;
+  if(!window.LightweightCharts) return;
+  if(!lwEqFullChart){
+    lwEqFullChart=LightweightCharts.createChart(el,{
+      height:el.clientHeight||260, width:el.clientWidth||300,
+      layout:{background:{color:'transparent'},textColor:'#787B86',fontFamily:'IBM Plex Mono, monospace'},
+      grid:{vertLines:{color:'#1E222D'},horzLines:{color:'#1E222D'}},
+      localization:{priceFormatter:p=>'$'+p.toLocaleString(undefined,{maximumFractionDigits:0})},
+      rightPriceScale:{borderColor:'#2A2E39'},
+      timeScale:{borderColor:'#2A2E39',rightOffset:2},
+    });
+    lwEqFullSeries=lwEqFullChart.addAreaSeries({
+      lineColor:'#26A69A', topColor:'rgba(38,166,154,0.28)', bottomColor:'rgba(38,166,154,0.02)',
+      lineWidth:2, priceFormat:{type:'custom',formatter:p=>'$'+p.toLocaleString(undefined,{maximumFractionDigits:0})},
+    });
+    lwEqFullSeries.createPriceLine({price:startVal,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,title:'ทุนเริ่มต้น'});
+    window.addEventListener('resize',()=>{ if(lwEqFullChart&&el.clientWidth>0) lwEqFullChart.applyOptions({width:el.clientWidth}); });
+  }
+  lwEqFullSeries.setData(data);
+  const opts={width:el.clientWidth||300,height:el.clientHeight||260};
+  lwEqFullChart.applyOptions(opts);
+  lwEqFullChart.timeScale().fitContent();
 }
 
 function updateClock(){
