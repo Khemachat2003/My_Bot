@@ -227,6 +227,11 @@
   .lw-trow .sr-del:hover{color:var(--red);}
   .lw-trow .tag.open{color:var(--green); background:rgba(38,166,154,.12);}
   .lw-empty{padding:12px; color:var(--muted); font-size:12px;}
+  .eq-stats{font-size:10px; font-weight:600; color:var(--muted); font-family:var(--num); letter-spacing:.02em;}
+  .eq-stats b{color:var(--text); font-weight:700;}
+  .eq-stats .eq-up{color:var(--green);} .eq-stats .eq-dn{color:var(--red);}
+  .eq-empty{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:var(--muted); font-size:12px; background:rgba(19,23,34,.0); pointer-events:none; text-align:center; padding:0 16px;}
   .chart-legendbar{
     display:flex; align-items:center; gap:8px; padding:5px 9px; margin:8px 0 0;
     background:var(--card); border:1px solid var(--border); border-radius:8px;
@@ -661,8 +666,11 @@
     </div>
     <div class="ov-bottom">
       <div class="panel ov-equity-panel">
-        <h3><span class="ph purple"></span>Equity Curve</h3>
-        <div style="height:280px;"><div id="equityChart"></div></div>
+        <h3><span class="ph purple"></span>Equity Curve <span class="eq-stats" id="eqStatsOv"></span></h3>
+        <div style="position:relative;">
+          <div style="height:260px;"><div id="equityChart"></div></div>
+          <div class="eq-empty" id="eqEmptyOv" style="display:none;">ยังไม่มีข้อมูลเทรดที่จบแล้ว — รอสัญญาณ &amp; ปิดตำแหน่งก่อน</div>
+        </div>
       </div>
       <div class="panel ov-feed-panel">
         <h3><span class="ph green"></span>สัญญาณล่าสุด</h3>
@@ -906,8 +914,11 @@
     </div>
 
     <div class="j-equity">
-      <h3>Equity Curve</h3>
-      <div style="height:260px;"><div id="equityFullChart"></div></div>
+      <h3>Equity Curve <span class="eq-stats" id="eqStatsFull"></span></h3>
+      <div style="position:relative;">
+        <div style="height:260px;"><div id="equityFullChart"></div></div>
+        <div class="eq-empty" id="eqEmptyFull" style="display:none;">ยังไม่มีข้อมูลเทรดที่จบแล้ว — รอสัญญาณ &amp; ปิดตำแหน่งก่อน</div>
+      </div>
     </div>
 
     <div class="j-section open" id="jSecDaily">
@@ -1909,7 +1920,17 @@ async function refreshOverview(){
     elTextCls('ovPnl',j.total_pnl==null?'–':((j.total_pnl>0?'+':'')+j.total_pnl.toFixed(2)),
       'val '+(j.total_pnl>0?'green':(j.total_pnl<0?'red':'muted')));
     elText('ovPnlSub',`${j.n} trades · ชนะ ${j.wins} / แพ้ ${j.losses}`);
-    drawEquity(j.equity||[]);
+    let set0={};
+    let cfdData={points:[]};
+    try{
+      set0=await fetchJSON('/api/journal/settings')||{};
+      const cp=await fetchJSON('/api/cfd/paper')||{};
+      cfdData={points:(cp.trades||[]).filter(t=>t.exit_time), base:5000};
+    }catch(e){}
+    drawEquity({
+      opt:{points:j.equity||[], capital:set0.capital||0, stake:set0.stake||1, cur:set0.currency||'THB'},
+      cfd:cfdData,
+    });
   }catch(e){}
   try{
     const reg=await fetchJSON('/api/models');
@@ -1919,38 +1940,80 @@ async function refreshOverview(){
   }catch(e){}
 }
 
-let lwEqChart=null, lwEqSeries=null;
-function drawEquity(points){
-  const el=document.getElementById('equityChart'); if(!el) return;
-  const data=(points||[]).map(p=>{
-    let ts;
-    if(typeof p.t==='number') ts=p.t;
-    else if(typeof p.t==='string') ts=Math.floor(new Date(p.t.replace(' ','T')+'Z').getTime()/1000)||Math.floor(new Date(p.t.replace(' ','T')).getTime()/1000);
-    else ts=0;
-    return {time:ts, value:Math.round(p.equity)};
+function _eqTS(t){
+  if(t==null) return 0;
+  if(typeof t==='number') return Math.floor(t);
+  const s=String(t);
+  const a=Math.floor(new Date(s.replace(' ','T')+'Z').getTime()/1000);
+  return (Number.isFinite(a)&&a>0)?a:Math.floor(new Date(s.replace(' ','T')).getTime()/1000);
+}
+
+function _buildEqData(opt, cfd){
+  const optPts=((opt&&opt.points)||[]).map(p=>({
+    time:_eqTS(p.t),
+    value:Math.round((opt.capital||0)+((p.equity||0)*(opt.stake||1))),
+  })).filter(d=>d.time>0);
+  let cum=0;
+  const cfdPts=((cfd&&cfd.points)||[]).map(p=>{
+    cum+=(p.pnl||0);
+    return {time:_eqTS(p.exit_time||p.t), value:Math.round((cfd.base||0)+cum)};
   }).filter(d=>d.time>0);
-  const startVal=data.length?data[0].value:0;
+  const optN=optPts.length, cfdN=cfdPts.length;
+  const optCapitalBase=(opt&&opt.capital)||0, cfdBase=(cfd&&cfd.base)||0;
+  const cfdPnl=cfdN?cfdPts[cfdPts.length-1].value-cfdBase:0;
+  const optPnl=optN?optPts[optPts.length-1].value-optCapitalBase:0;
+  return {optPts, cfdPts, optN, cfdN, optPnl, cfdPnl, optCapitalBase, cfdBase};
+}
+
+let lwEqChart=null, lwEqSeries=null, lwEqSeries2=null, lwEqBaseLine=null, lwEqBaseLine2=null;
+function drawEquity(payload){
+  const el=document.getElementById('equityChart'); if(!el) return;
+  const b=_buildEqData(payload&&payload.opt, payload&&payload.cfd);
+  const cur=(payload&&payload.opt&&payload.opt.cur)||'THB';
+  const statsEl=document.getElementById('eqStatsOv');
+  const emptyEl=document.getElementById('eqEmptyOv');
   if(!window.LightweightCharts) return;
   if(!lwEqChart){
     lwEqChart=LightweightCharts.createChart(el,{
-      height:el.clientHeight||280, width:el.clientWidth||300,
+      height:el.clientHeight||260, width:el.clientWidth||300,
       layout:{background:{color:'transparent'},textColor:'#787B86',fontFamily:'IBM Plex Mono, monospace'},
       grid:{vertLines:{color:'#1E222D'},horzLines:{color:'#1E222D'}},
-      localization:{priceFormatter:p=>'$'+p.toLocaleString(undefined,{maximumFractionDigits:0})},
       rightPriceScale:{borderColor:'#2A2E39'},
       timeScale:{borderColor:'#2A2E39',rightOffset:2},
     });
-    lwEqSeries=lwEqChart.addAreaSeries({
-      lineColor:'#26A69A', topColor:'rgba(38,166,154,0.28)', bottomColor:'rgba(38,166,154,0.02)',
-      lineWidth:2, priceFormat:{type:'custom',formatter:p=>'$'+p.toLocaleString(undefined,{maximumFractionDigits:0})},
-    });
-    lwEqSeries.createPriceLine({price:startVal,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,title:'ทุนเริ่มต้น'});
     window.addEventListener('resize',()=>{ if(lwEqChart&&el.clientWidth>0) lwEqChart.applyOptions({width:el.clientWidth}); });
   }
-  lwEqSeries.setData(data);
-  const opts={width:el.clientWidth||300,height:el.clientHeight||280};
-   lwEqChart.applyOptions(opts);
-  lwEqChart.timeScale().fitContent();
+  const fmt=p=>Number(p).toLocaleString('th-TH',{maximumFractionDigits:0});
+  if(b.cfdN && !lwEqSeries){
+    lwEqSeries=lwEqChart.addAreaSeries({
+      lineColor:'#26A69A', topColor:'rgba(38,166,154,0.28)', bottomColor:'rgba(38,166,154,0.02)',
+      lineWidth:2, priceLineVisible:false, lastValueVisible:false,
+      priceFormat:{type:'custom',formatter:p=>'$'+fmt(p)},
+    });
+    lwEqBaseLine=lwEqSeries.createPriceLine({price:b.cfdBase||0,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,title:'CFD ทุน'});
+  }
+  if(b.optN && !lwEqSeries2){
+    lwEqSeries2=lwEqChart.addAreaSeries({
+      lineColor:'#2962FF', topColor:'rgba(41,98,255,0.20)', bottomColor:'rgba(41,98,255,0.02)',
+      lineWidth:2, priceLineVisible:false, lastValueVisible:false,
+      priceFormat:{type:'custom',formatter:p=>fmt(p)+' '+cur},
+    });
+    lwEqBaseLine2=lwEqSeries2.createPriceLine({price:b.optCapitalBase||0,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,title:'Option ทุน'});
+  }
+  if(lwEqSeries) lwEqSeries.setData(b.cfdPts);
+  if(lwEqSeries2) lwEqSeries2.setData(b.optPts);
+  if(lwEqBaseLine) lwEqBaseLine.applyOptions({price:b.cfdBase||0});
+  if(lwEqBaseLine2) lwEqBaseLine2.applyOptions({price:b.optCapitalBase||0});
+  lwEqChart.applyOptions({width:el.clientWidth||300,height:el.clientHeight||260});
+  if(b.optN+b.cfdN>0) lwEqChart.timeScale().fitContent();
+  if(emptyEl) emptyEl.style.display=(b.optN+b.cfdN)>0?'none':'block';
+  if(statsEl){
+    const chips=[];
+    if(b.cfdN) chips.push(`CFD <b>$${fmt((b.cfdBase||0)+b.cfdPnl)}</b> <span class="eq-${b.cfdPnl>=0?'up':'dn'}">(${b.cfdPnl>=0?'+':''}${fmt(b.cfdPnl)})</span> · ${b.cfdN} เทรด`);
+    if(b.optN) chips.push(`Option <b>${fmt(b.optCapitalBase+b.optPnl)} ${cur}</b> <span class="eq-${b.optPnl>=0?'up':'dn'}">(${b.optPnl>=0?'+':''}${fmt(b.optPnl)})</span> · ${b.optN} เทรด`);
+    if(!chips.length) chips.push('รอข้อมูลเทรดที่จบแล้ว');
+    statsEl.innerHTML=chips.join('<span style="color:var(--border)"> | </span>');
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2693,7 +2756,17 @@ async function refreshJournalTab(){
     document.getElementById('jWrSub').textContent = j.n
       ? `${j.wins}W / ${j.losses}L · ${j.daily.length} วัน · CI [${j.ci_low}%–${j.ci_high}%]`
       : 'ยังไม่มีผล';
-    drawEquityFull(j.equity||[]);
+    let set0={};
+    let cfdData={points:[]};
+    try{
+      set0=await fetchJSON('/api/journal/settings')||{};
+      const cp=await fetchJSON('/api/cfd/paper')||{};
+      cfdData={points:(cp.trades||[]).filter(t=>t.exit_time), base:5000};
+    }catch(e){}
+    drawEquityFull({
+      opt:{points:j.equity||[], capital:set0.capital||0, stake:set0.stake||1, cur:set0.currency||'THB'},
+      cfd:cfdData,
+    });
     const daily=j.daily||[];
     document.querySelector('#dailyTable tbody').innerHTML=daily.map(d=>`
       <tr><td>${d.day}</td><td class="mono">${d.n}</td><td class="mono">${d.wins}</td><td class="mono">${d.winrate}%</td>
@@ -2783,38 +2856,56 @@ function renderPeriodTable(){
     </tr>`).join('') || '<tr><td colspan="12" class="empty">ยังไม่มีข้อมูล</td></tr>';
 }
 
-let lwEqFullChart=null, lwEqFullSeries=null;
-function drawEquityFull(points){
+let lwEqFullChart=null, lwEqFullSeries=null, lwEqFullSeries2=null, lwEqFullBase=null, lwEqFullBase2=null;
+function drawEquityFull(payload){
   const el=document.getElementById('equityFullChart'); if(!el) return;
-  const data=(points||[]).map(p=>{
-    let ts;
-    if(typeof p.t==='number') ts=p.t;
-    else if(typeof p.t==='string') ts=Math.floor(new Date(p.t.replace(' ','T')+'Z').getTime()/1000)||Math.floor(new Date(p.t.replace(' ','T')).getTime()/1000);
-    else ts=0;
-    return {time:ts, value:Math.round(p.equity)};
-  }).filter(d=>d.time>0);
-  const startVal=data.length?data[0].value:0;
+  const b=_buildEqData(payload&&payload.opt, payload&&payload.cfd);
+  const cur=(payload&&payload.opt&&payload.opt.cur)||'THB';
+  const fmt=p=>Number(p).toLocaleString('th-TH',{maximumFractionDigits:0});
+  const emptyEl=document.getElementById('eqEmptyFull');
+  const statsEl=document.getElementById('eqStatsFull');
+  const hasData=b.optN+b.cfdN>0;
+  if(emptyEl) emptyEl.style.display=hasData?'none':'block';
   if(!window.LightweightCharts) return;
   if(!lwEqFullChart){
     lwEqFullChart=LightweightCharts.createChart(el,{
       height:el.clientHeight||260, width:el.clientWidth||300,
       layout:{background:{color:'transparent'},textColor:'#787B86',fontFamily:'IBM Plex Mono, monospace'},
       grid:{vertLines:{color:'#1E222D'},horzLines:{color:'#1E222D'}},
-      localization:{priceFormatter:p=>'$'+p.toLocaleString(undefined,{maximumFractionDigits:0})},
       rightPriceScale:{borderColor:'#2A2E39'},
       timeScale:{borderColor:'#2A2E39',rightOffset:2},
     });
-    lwEqFullSeries=lwEqFullChart.addAreaSeries({
-      lineColor:'#26A69A', topColor:'rgba(38,166,154,0.28)', bottomColor:'rgba(38,166,154,0.02)',
-      lineWidth:2, priceFormat:{type:'custom',formatter:p=>'$'+p.toLocaleString(undefined,{maximumFractionDigits:0})},
-    });
-    lwEqFullSeries.createPriceLine({price:startVal,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,title:'ทุนเริ่มต้น'});
     window.addEventListener('resize',()=>{ if(lwEqFullChart&&el.clientWidth>0) lwEqFullChart.applyOptions({width:el.clientWidth}); });
   }
-  lwEqFullSeries.setData(data);
-  const opts={width:el.clientWidth||300,height:el.clientHeight||260};
-  lwEqFullChart.applyOptions(opts);
-  lwEqFullChart.timeScale().fitContent();
+  if(b.cfdN && !lwEqFullSeries){
+    lwEqFullSeries=lwEqFullChart.addAreaSeries({
+      lineColor:'#26A69A', topColor:'rgba(38,166,154,0.28)', bottomColor:'rgba(38,166,154,0.02)',
+      lineWidth:2, priceLineVisible:false, lastValueVisible:false,
+      priceFormat:{type:'custom',formatter:p=>'$'+fmt(p)},
+    });
+    lwEqFullBase=lwEqFullSeries.createPriceLine({price:b.cfdBase||0,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,title:'CFD ทุน'});
+  }
+  if(b.optN && !lwEqFullSeries2){
+    lwEqFullSeries2=lwEqFullChart.addAreaSeries({
+      lineColor:'#2962FF', topColor:'rgba(41,98,255,0.20)', bottomColor:'rgba(41,98,255,0.02)',
+      lineWidth:2, priceLineVisible:false, lastValueVisible:false,
+      priceFormat:{type:'custom',formatter:p=>fmt(p)+' '+cur},
+    });
+    lwEqFullBase2=lwEqFullSeries2.createPriceLine({price:b.optCapitalBase||0,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,title:'Option ทุน'});
+  }
+  if(lwEqFullSeries) lwEqFullSeries.setData(b.cfdPts);
+  if(lwEqFullSeries2) lwEqFullSeries2.setData(b.optPts);
+  if(lwEqFullBase) lwEqFullBase.applyOptions({price:b.cfdBase||0});
+  if(lwEqFullBase2) lwEqFullBase2.applyOptions({price:b.optCapitalBase||0});
+  lwEqFullChart.applyOptions({width:el.clientWidth||300,height:el.clientHeight||260});
+  if(hasData) lwEqFullChart.timeScale().fitContent();
+  if(statsEl){
+    const chips=[];
+    if(b.cfdN) chips.push(`CFD <b>$${fmt((b.cfdBase||0)+b.cfdPnl)}</b> <span class="eq-${b.cfdPnl>=0?'up':'dn'}">(${b.cfdPnl>=0?'+':''}${fmt(b.cfdPnl)})</span> · ${b.cfdN} เทรด`);
+    if(b.optN) chips.push(`Option <b>${fmt((b.optCapitalBase||0)+b.optPnl)} ${cur}</b> <span class="eq-${b.optPnl>=0?'up':'dn'}">(${b.optPnl>=0?'+':''}${fmt(b.optPnl)})</span> · ${b.optN} เทรด`);
+    if(!chips.length) chips.push('รอข้อมูลเทรดที่จบแล้ว');
+    statsEl.innerHTML=chips.join('<span style="color:var(--border)"> | </span>');
+  }
 }
 
 function updateClock(){
