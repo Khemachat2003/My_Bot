@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Equity Curve Demo</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#131722;--panel:#1A1E29;--border:#2A2E39;--text:#D1D4DC;--muted:#787B86;--up:#26A69A;--down:#EF5350;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:13px;padding:16px;}
+.head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;}
+.head h3{font-size:13px;font-weight:600;}
+.stats{display:flex;gap:18px;margin-bottom:10px;}
+.stat{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);}
+.stat b{display:block;font-size:16px;color:var(--text);font-weight:600;}
+.stat b.up{color:var(--up);} .stat b.down{color:var(--down);}
+#eqchart{border:1px solid var(--border);border-radius:6px;}
+.hint{font-size:11px;color:var(--muted);margin-top:8px;}
+</style>
+</head>
+<body>
+
+<div class="head"><h3>Equity Curve — พอร์ตสะสม</h3></div>
+<div class="stats">
+  <div class="stat">ยอดปัจจุบัน<b class="up">$12,480</b></div>
+  <div class="stat">กำไรสุทธิ<b class="up">+$2,480 (+24.8%)</b></div>
+  <div class="stat">Max Drawdown<b class="down">-$610 (-4.7%)</b></div>
+  <div class="stat">จำนวนเทรด<b>142</b></div>
+</div>
+<div id="eqchart"></div>
+<div class="hint">ชี้เมาส์บนเส้นเพื่อดูยอดพอร์ต ณ วันนั้น · ลากเพื่อเลื่อนช่วงเวลา · scroll เพื่อซูม</div>
+
+<script>
+const start = new Date('2025-01-01').getTime()/1000;
+let eq = 10000;
+const data = [];
+for(let i=0;i<180;i++){
+  eq += (Math.random()-0.42)*90;
+  data.push({time: start + i*86400, value: Math.round(eq)});
+}
+const chart = LightweightCharts.createChart(document.getElementById('eqchart'), {
+  width: document.body.clientWidth-32,
+  height: 300,
+  layout:{ background:{color:'#131722'}, textColor:'#D1D4DC', fontFamily:'IBM Plex Mono, monospace' },
+  grid:{ vertLines:{color:'#1E222D'}, horzLines:{color:'#1E222D'} },
+  rightPriceScale:{
+    borderColor:'#2A2E39',
+    // แกน y แสดงเป็นสกุลเงินชัดเจน ไม่ใช่ตัวเลขลอยๆ
+  },
+  timeScale:{
+    borderColor:'#2A2E39',
+    timeVisible:false,
+    // แกน x แสดงวันที่จริง ไม่ใช่ index ลำดับเทรด
+  },
+  localization:{
+    priceFormatter: p => '$' + p.toLocaleString(undefined,{maximumFractionDigits:0}),
+  },
+});
+const series = chart.addAreaSeries({
+  lineColor:'#26A69A', topColor:'rgba(38,166,154,0.28)', bottomColor:'rgba(38,166,154,0.02)',
+  lineWidth:2,
+  priceFormat:{ type:'custom', formatter: p=>'$'+p.toLocaleString(undefined,{maximumFractionDigits:0}) },
+});
+series.setData(data);
+
+// เส้นฐานทุนเริ่มต้น ให้เห็นชัดว่าตอนนี้อยู่เหนือ/ใต้ทุนตั้งต้น
+series.createPriceLine({price:10000, color:'#787B86', lineWidth:1, lineStyle:LightweightCharts.LineStyle.Dashed, title:'ทุนเริ่มต้น'});
+
+chart.timeScale().fitContent();
+window.addEventListener('resize',()=>chart.applyOptions({width:document.body.clientWidth-32}));
+</script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XAUUSD Terminal — Style Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0A0C10; --surface:#12151C; --surface-alt:#171B24; --border:#232732;
+  --text:#EDEFF3; --muted:#838B9C; --dim:#4C5566;
+  --bull:#16C784; --bear:#F0465C; --warn:#E8A33D; --accent:#4C8DFF;
+  --bull-dim:rgba(22,199,132,.12); --bear-dim:rgba(240,70,92,.12); --warn-dim:rgba(232,163,61,.12); --accent-dim:rgba(76,141,255,.12);
+  --font-display:'Archivo',sans-serif; --font-body:'IBM Plex Sans',sans-serif; --font-mono:'IBM Plex Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:13.5px;}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+
+/* topbar */
+.topbar{display:flex;align-items:center;gap:20px;padding:12px 22px;border-bottom:1px solid var(--border);background:var(--surface);}
+.brand{display:flex;align-items:center;gap:10px;}
+.brand .mark{width:30px;height:30px;border-radius:6px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:14px;color:#fff;}
+.brand .name{font-family:var(--font-display);font-weight:700;font-size:14.5px;letter-spacing:-0.01em;}
+.brand .name .sub{color:var(--muted);font-weight:400;font-size:11px;display:block;font-family:var(--font-mono);letter-spacing:.03em;margin-top:1px;}
+.pricebox{display:flex;align-items:baseline;gap:10px;padding:6px 16px;border:1px solid var(--border);border-radius:8px;background:var(--surface-alt);}
+.pricebox .sym{font-size:10.5px;color:var(--muted);font-weight:600;letter-spacing:.04em;align-self:center;}
+.pricebox .price{font-family:var(--font-mono);font-size:24px;font-weight:600;color:var(--bull);}
+.pricebox .chg{font-family:var(--font-mono);font-size:12px;font-weight:500;color:var(--bull);}
+.live{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--bull);font-weight:600;letter-spacing:.05em;border:1px solid var(--bull);border-radius:99px;padding:3px 10px;}
+.live .dot{width:6px;height:6px;border-radius:50%;background:var(--bull);}
+.spacer{flex:1;}
+.clock{font-family:var(--font-mono);font-size:11.5px;color:var(--muted);}
+
+/* layout: sidebar categorized nav */
+.shell{display:grid;grid-template-columns:210px 1fr;min-height:600px;}
+.sidebar{border-right:1px solid var(--border);background:var(--surface);padding:18px 0;}
+.nav-group{margin-bottom:20px;}
+.nav-group-label{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.09em;font-weight:600;padding:0 18px;margin-bottom:8px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 18px;font-size:13px;color:var(--muted);cursor:pointer;border-left:2px solid transparent;font-weight:500;}
+.nav-item:hover{color:var(--text);background:var(--surface-alt);}
+.nav-item.active{color:var(--text);border-left-color:var(--accent);background:var(--surface-alt);}
+.nav-item .count{margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--dim);}
+
+.content{padding:20px 24px;}
+
+/* kpi */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px;}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:13px 14px;}
+.kpi .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600;}
+.kpi .val{font-family:var(--font-mono);font-size:22px;font-weight:600;margin:6px 0 3px;}
+.kpi .val.bull{color:var(--bull);} .kpi .val.bear{color:var(--bear);} .kpi .val.warn{color:var(--warn);}
+.kpi .sub{font-size:10.5px;color:var(--dim);}
+
+/* panel */
+.cols{display:grid;grid-template-columns:1.7fr 1fr;gap:14px;margin-bottom:14px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;}
+.panel h3{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;}
+.panel h3 .accent-bar{display:inline-block;width:3px;height:12px;background:var(--accent);margin-right:8px;border-radius:2px;}
+.chart-placeholder{height:220px;display:flex;align-items:flex-end;gap:3px;border-bottom:1px solid var(--border);padding-bottom:2px;}
+.chart-placeholder span{flex:1;background:var(--accent-dim);border-top:2px solid var(--accent);}
+
+/* table */
+table{width:100%;border-collapse:collapse;font-size:12.5px;}
+th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--border);}
+td{padding:8px 10px;border-bottom:1px solid var(--border);font-family:var(--font-mono);}
+td.bull{color:var(--bull);} td.bear{color:var(--bear);}
+tr:hover td{background:var(--surface-alt);}
+
+/* signal card */
+.signal-card{border:1px solid var(--border);border-left:3px solid var(--bull);border-radius:8px;padding:12px 14px;margin-bottom:8px;background:var(--surface);}
+.signal-card.bear{border-left-color:var(--bear);}
+.signal-top{display:flex;justify-content:space-between;font-size:12.5px;font-weight:600;margin-bottom:4px;}
+.signal-top .dir.bull{color:var(--bull);} .signal-top .dir.bear{color:var(--bear);}
+.signal-meta{font-family:var(--font-mono);font-size:11px;color:var(--muted);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="mark">X</div>
+    <div class="name">XAUUSD Terminal<span class="sub">RULE-BASED · ML · CFD ENGINE</span></div>
+  </div>
+  <div class="pricebox">
+    <span class="sym">XAU/USD</span>
+    <span class="price mono">2,412.85</span>
+    <span class="chg mono">+0.42%</span>
+  </div>
+  <span class="live"><span class="dot"></span>LIVE</span>
+  <div class="spacer"></div>
+  <span class="clock" id="clock">--:--:--</span>
+</div>
+
+<div class="shell">
+  <div class="sidebar">
+    <div class="nav-group">
+      <div class="nav-group-label">มอนิเตอร์สด</div>
+      <div class="nav-item active">ภาพรวม</div>
+      <div class="nav-item">สัญญาณ ML <span class="count">3</span></div>
+      <div class="nav-item">Rule-Based <span class="count">1</span></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-label">รายงานย้อนหลัง</div>
+      <div class="nav-item">Journal / P&amp;L</div>
+      <div class="nav-item">CFD Backtest</div>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="kpi-row">
+      <div class="kpi"><div class="lbl">Win Rate</div><div class="val bull">58.2%</div><div class="sub">จาก 340 สัญญาณ</div></div>
+      <div class="kpi"><div class="lbl">P&amp;L วันนี้</div><div class="val bull">+$412.30</div><div class="sub">18 trade</div></div>
+      <div class="kpi"><div class="lbl">Open Position</div><div class="val warn">2</div><div class="sub">รอ TP/SL</div></div>
+      <div class="kpi"><div class="lbl">Max Drawdown</div><div class="val bear">-4.1%</div><div class="sub">30 วันล่าสุด</div></div>
+    </div>
+
+    <div class="cols">
+      <div class="panel">
+        <h3><span style="display:flex;align-items:center;"><span class="accent-bar"></span>กราฟราคา — M5</span><span class="mono" style="font-weight:400;color:var(--dim);">อัปเดตทุก 5 วิ</span></h3>
+        <div class="chart-placeholder" id="chartBars"></div>
+      </div>
+      <div class="panel">
+        <h3><span style="display:flex;align-items:center;"><span class="accent-bar"></span>สัญญาณล่าสุด</span></h3>
+        <div class="signal-card">
+          <div class="signal-top"><span class="dir bull">CALL · ML</span><span class="mono">2,411.20</span></div>
+          <div class="signal-meta">09:14:02 · confidence 0.81</div>
+        </div>
+        <div class="signal-card bear">
+          <div class="signal-top"><span class="dir bear">PUT · Rule-Based</span><span class="mono">2,415.60</span></div>
+          <div class="signal-meta">08:52:47 · confidence 0.74</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3><span style="display:flex;align-items:center;"><span class="accent-bar"></span>ประวัติเทรดล่าสุด</span></h3>
+      <table>
+        <thead><tr><th>เวลา</th><th>ระบบ</th><th>ทิศทาง</th><th>เข้า</th><th>ผล</th><th>P&amp;L</th></tr></thead>
+        <tbody>
+          <tr><td>09:14:02</td><td>ML</td><td class="bull">CALL</td><td>2,411.20</td><td class="bull">TP1</td><td class="bull">+$62.00</td></tr>
+          <tr><td>08:52:47</td><td>Rule</td><td class="bear">PUT</td><td>2,415.60</td><td class="bear">SL</td><td class="bear">-$40.00</td></tr>
+          <tr><td>08:20:11</td><td>ML</td><td class="bull">CALL</td><td>2,409.90</td><td class="bull">TP2</td><td class="bull">+$118.50</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+function tick(){document.getElementById('clock').textContent=new Date().toLocaleTimeString('th-TH',{hour12:false});}
+tick();setInterval(tick,1000);
+const bars=document.getElementById('chartBars');
+let h='';
+for(let i=0;i<60;i++){h+=`<span style="height:${20+Math.random()*80}%"></span>`;}
+bars.innerHTML=h;
+</script>
+</body>
+</html>
