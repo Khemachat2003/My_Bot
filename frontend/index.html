@@ -1445,10 +1445,12 @@ function drawCandles(canvas, data){
     ctx.fillRect(x-bw/2,top,bw,hgt);
   });
 
-  // ── Signal markers: แสดงจุดเข้า ML + SETUP + CFD levels บนกราฟ ──
+  // ── Signal markers: แสดงจุดเข้าชัดเจน พร้อม vertical line + entry price line ──
   if(window._signalMarkers){
     const tsMap={};
     view.forEach((d,i)=>{ tsMap[d.t]=i; });
+
+    // วาด markers ทีหลังสุด (ทับกราฟทั้งหมด)
     window._signalMarkers.forEach(m=>{
       if(!m.ts||!m.price||!m.direction) return;
       let idx=-1;
@@ -1456,64 +1458,128 @@ function drawCandles(canvas, data){
         if(Math.abs(new Date(t)-new Date(m.ts))<300000){ idx=parseInt(i); break; }
       }
       if(idx<0) return;
-      const x=pxForData(idx+start), y=py(m.price);
+      const dataIdx=idx+start;
+      const x=pxForData(dataIdx), y=py(m.price);
+      const candle=view[idx];
+      if(!candle) return;
+      const candleBottom=py(candle.l), candleTop=py(candle.h);
+      const isCall=m.direction==='CALL';
+
+      // ผลลัพธ์
       const isWin=m.result==='WIN'||m.result==='TP1'||m.result==='TP2';
       const isLose=m.result==='LOSE'||m.result==='SL';
       const isOpen=m.result==='PENDING';
-      const color=m.type==='ML'?(isWin?'#16C784':isLose?'#F0465C':'#8B7FFF'):(isWin?'#16C784':isLose?'#F0465C':'#E8A33D');
 
-      // Entry triangle
-      if(m.direction==='CALL'){
-        ctx.fillStyle=color;
-        ctx.beginPath(); ctx.moveTo(x,y+4); ctx.lineTo(x-5,y+12); ctx.lineTo(x+5,y+12); ctx.closePath(); ctx.fill();
-      } else {
-        ctx.fillStyle=color;
-        ctx.beginPath(); ctx.moveTo(x,y-4); ctx.lineTo(x-5,y-12); ctx.lineTo(x+5,y-12); ctx.closePath(); ctx.fill();
-      }
-      // Label — วางนอกแท่งเสมอทั้ง CALL/PUT (ไม่บังราคา) มีพื้นหลังทึบให้อ่านง่ายเหมือนกันทั้งสองทิศทาง
-      const label=m.type==='ML'?'ML':m.importance===1?'IMP1':m.importance===2?'IMP2':'RBF';
-      ctx.font='bold 7px IBM Plex Mono,monospace'; ctx.textAlign='center';
-      const lw=ctx.measureText(label).width+6;
-      const ly=m.direction==='CALL'?y+22:y-22; // ใต้สามเหลี่ยม (CALL) หรือเหนือสามเหลี่ยม (PUT) ห่างจาก body เสมอ
+      // สีตามผล — ทุกระบบใช้สีเดียวกัน
+      const color=isWin?'#16C784':isLose?'#F0465C':'#E8A33D';
+
+      // ชื่อระบบ
+      const sysLabel=m.type==='ML'?'ML':m.importance===1?'IMP1':m.importance===2?'IMP2':'RBF';
+
+      // ── 1. Vertical line จาก marker ลงมาที่แท่งเทียน ──
+      const vLineTop=isCall?y+14:candleTop-4;
+      const vLineBot=isCall?candleBottom+4:y-14;
+      ctx.strokeStyle=color; ctx.lineWidth=1.5; ctx.globalAlpha=0.5;
+      ctx.setLineDash([2,2]);
+      ctx.beginPath(); ctx.moveTo(x,vLineTop); ctx.lineTo(x,vLineBot); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha=1;
+
+      // ── 2. Entry price horizontal line ──
+      ctx.strokeStyle=color; ctx.lineWidth=1; ctx.globalAlpha=0.35;
+      ctx.setLineDash([6,3]);
+      ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha=1;
+
+      // ── 3. Triangle ใหญ่ ──
+      const triH=10, triW=7;
       ctx.fillStyle=color;
-      ctx.beginPath(); ctx.roundRect(x-lw/2,ly-6,lw,11,3); ctx.fill();
-      ctx.fillStyle='#0A0C10';
-      ctx.fillText(label,x,ly+2);
-      ctx.textAlign='left';
-
-      // CFD levels: SL / TP1 / TP2 lines (เฉพาะที่มี cfd data)
-      if(m.cfd){
-        const eIdx=idx+start;
-        const lineLen=Math.min(40, (W-padR-padL)/4);
-        const xEnd=x+lineLen;
-        // SL line (red)
-        if(m.cfd.sl){
-          const ySL=py(m.cfd.sl);
-          ctx.strokeStyle='#F0465C'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
-          ctx.beginPath(); ctx.moveTo(x,ySL); ctx.lineTo(xEnd,ySL); ctx.stroke();
-          ctx.setLineDash([]);
-          ctx.fillStyle='#F0465C'; ctx.font='6px IBM Plex Mono,monospace';
-          ctx.fillText('SL '+m.cfd.sl.toFixed(2),xEnd+3,ySL+3);
-        }
-        // TP1 line (yellow)
-        if(m.cfd.tp1){
-          const yTP1=py(m.cfd.tp1);
-          ctx.strokeStyle='#E8A33D'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
-          ctx.beginPath(); ctx.moveTo(x,yTP1); ctx.lineTo(xEnd,yTP1); ctx.stroke();
-          ctx.setLineDash([]);
-          ctx.fillStyle='#E8A33D'; ctx.font='6px IBM Plex Mono,monospace';
-          ctx.fillText('TP1 '+m.cfd.tp1.toFixed(2),xEnd+3,yTP1+3);
-        }
-        // TP2 line (green)
-        if(m.cfd.tp2){
-          const yTP2=py(m.cfd.tp2);
-          ctx.strokeStyle='#16C784'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
-          ctx.beginPath(); ctx.moveTo(x,yTP2); ctx.lineTo(xEnd,yTP2); ctx.stroke();
-          ctx.setLineDash([]);
-          ctx.fillStyle='#16C784'; ctx.font='6px IBM Plex Mono,monospace';
-          ctx.fillText('TP2 '+m.cfd.tp2.toFixed(2),xEnd+3,yTP2+3);
-        }
+      if(isCall){
+        // CALL = ขีลูกศรขึ้น วางใต้แท่ง
+        const ty=candleBottom+6;
+        ctx.beginPath(); ctx.moveTo(x,ty+triH); ctx.lineTo(x-triW,ty); ctx.lineTo(x+triW,ty); ctx.closePath(); ctx.fill();
+        // ลูกศรเส้น
+        ctx.strokeStyle=color; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(x,ty+triH); ctx.lineTo(x,ty-4); ctx.stroke();
+      } else {
+        // PUT = ลูกศรชี้ลง วางเหนือแท่ง
+        const ty=candleTop-6;
+        ctx.beginPath(); ctx.moveTo(x,ty-triH); ctx.lineTo(x-triW,ty); ctx.lineTo(x+triW,ty); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle=color; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(x,ty-triH); ctx.lineTo(x,ty+4); ctx.stroke();
       }
+
+      // ── 4. ป้ายข้อมูล: [DIR] @price (SYS) [RESULT] ──
+      const dec2=m.price>=100?2:m.price>=10?1:3;
+      const priceStr=m.price.toFixed(dec2);
+      const dirText=isCall?'▲ CALL':'▼ PUT';
+      const resultText=isWin?'WIN':isLose?'LOSE':'OPEN';
+      const fullLabel=dirText+' @'+priceStr+' ['+sysLabel+'] '+resultText;
+
+      ctx.font='bold 9px IBM Plex Mono,monospace'; ctx.textAlign='center';
+      const lw=ctx.measureText(fullLabel).width+10;
+      const ly=isCall?candleBottom+24:candleTop-24;
+      const lyClamped=Math.min(Math.max(ly,20),H-20);
+
+      // background pill
+      ctx.fillStyle='rgba(10,12,16,.88)';
+      ctx.beginPath(); ctx.roundRect(x-lw/2,lyClamped-8,lw,16,4); ctx.fill();
+      ctx.strokeStyle=color; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.roundRect(x-lw/2,lyClamped-8,lw,16,4); ctx.stroke();
+
+      // text — split color
+      const dirColor=isCall?'#16C784':'#F0465C';
+      const parts=[{t:dirText,c:dirColor},{t:' @'+priceStr,c:'#EDEFF3'},{t:' ['+sysLabel+']',c:'#838B9C'},{t:' '+resultText,c:color}];
+      let tx=x-lw/2+5;
+      ctx.textAlign='left'; ctx.font='bold 9px IBM Plex Mono,monospace';
+      parts.forEach(p=>{
+        ctx.fillStyle=p.c; ctx.fillText(p.t,tx,lyClamped+3); tx+=ctx.measureText(p.t).width;
+      });
+      ctx.textAlign='center';
+    });
+
+    // ── CFD SL/TP levels (วาดทีหลัง ทับทุกอย่าง) ──
+    window._signalMarkers.forEach(m=>{
+      if(!m.cfd||!m.ts||!m.price||!m.direction) return;
+      let idx=-1;
+      for(const [t,i] of Object.entries(tsMap)){
+        if(Math.abs(new Date(t)-new Date(m.ts))<300000){ idx=parseInt(i); break; }
+      }
+      if(idx<0) return;
+      const x=pxForData(idx+start);
+      const lineLen=Math.min(50,(W-padR-padL)/4);
+      const xEnd=x+lineLen;
+      ctx.globalAlpha=0.7;
+      if(m.cfd.sl){
+        const ySL=py(m.cfd.sl);
+        ctx.strokeStyle='#F0465C'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+        ctx.beginPath(); ctx.moveTo(padL,ySL); ctx.lineTo(xEnd,ySL); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle='rgba(10,12,16,.85)'; ctx.font='bold 8px IBM Plex Mono,monospace';
+        const slText='SL '+m.cfd.sl.toFixed(2);
+        const slW=ctx.measureText(slText).width+6;
+        ctx.fillRect(xEnd+3,ySL-7,slW,12);
+        ctx.fillStyle='#F0465C'; ctx.fillText(slText,xEnd+6,ySL+3);
+      }
+      if(m.cfd.tp1){
+        const yTP1=py(m.cfd.tp1);
+        ctx.strokeStyle='#E8A33D'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+        ctx.beginPath(); ctx.moveTo(padL,yTP1); ctx.lineTo(xEnd,yTP1); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle='rgba(10,12,16,.85)'; ctx.font='bold 8px IBM Plex Mono,monospace';
+        const tp1Text='TP1 '+m.cfd.tp1.toFixed(2);
+        const tp1W=ctx.measureText(tp1Text).width+6;
+        ctx.fillRect(xEnd+3,yTP1-7,tp1W,12);
+        ctx.fillStyle='#E8A33D'; ctx.fillText(tp1Text,xEnd+6,yTP1+3);
+      }
+      if(m.cfd.tp2){
+        const yTP2=py(m.cfd.tp2);
+        ctx.strokeStyle='#16C784'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+        ctx.beginPath(); ctx.moveTo(padL,yTP2); ctx.lineTo(xEnd,yTP2); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle='rgba(10,12,16,.85)'; ctx.font='bold 8px IBM Plex Mono,monospace';
+        const tp2Text='TP2 '+m.cfd.tp2.toFixed(2);
+        const tp2W=ctx.measureText(tp2Text).width+6;
+        ctx.fillRect(xEnd+3,yTP2-7,tp2W,12);
+        ctx.fillStyle='#16C784'; ctx.fillText(tp2Text,xEnd+6,yTP2+3);
+      }
+      ctx.globalAlpha=1;
     });
   }
 
