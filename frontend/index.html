@@ -223,6 +223,8 @@
   .lw-trow .lbl{width:40px; font-size:10px; font-weight:700; color:var(--ml);}
   .lw-trow .sub{font-family:var(--num); color:var(--muted); flex:1;}
   .lw-trow .tag{font-size:9px; padding:1px 5px; border-radius:3px; background:var(--panel2); color:var(--muted);}
+  .lw-trow .sr-del{background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px; line-height:1; padding:2px 6px;}
+  .lw-trow .sr-del:hover{color:var(--red);}
   .lw-trow .tag.open{color:var(--green); background:rgba(38,166,154,.12);}
   .lw-empty{padding:12px; color:var(--muted); font-size:12px;}
   .chart-legendbar{
@@ -596,6 +598,7 @@
             <span class="tf-group" id="zoomGroup" title="ลากเพื่อเลื่อน · ล้อเมาส์/สองนิ้วเพื่อซูม (มือถือ: pinch)">
             <button class="tf-btn" id="zoomReset" title="กลับมุมมองล่าสุด"><i class="ti ti-refresh"></i></button>
             <button class="tf-btn" id="addSrR" title="เพิ่มเส้น S/R (คลิกวางบนกราฟ)"><i class="ti ti-layout-horizontal"></i></button>
+            <button class="tf-btn" id="btnSrList" title="รายการเส้น S/R"><i class="ti ti-adjustments-horizontal"></i></button>
             <button class="tf-btn" id="btnFullscreen" title="ขยายเต็มจอ"><i class="ti ti-maximize"></i></button>
             <button class="tf-btn" id="btnTradeList" title="รายการสัญญาณ"><i class="ti ti-list"></i></button>
           </span>
@@ -614,6 +617,10 @@
         <div class="lw-tradelist" id="lwTradeList" style="display:none; border-top:1px solid var(--border); max-height:220px; overflow-y:auto;">
           <div class="lw-trade-head">คลิกแถวเพื่อดู Entry / SL / TP บนกราฟ (เห็นทีละรายการ)</div>
           <div id="lwTradeRows"></div>
+        </div>
+        <div class="lw-tradelist" id="lwSrPanel" style="display:none; border-top:1px solid var(--border); max-height:150px; overflow-y:auto;">
+          <div class="lw-trade-head">เส้น S/R ที่วางเอง (กด <i class="ti ti-trash"></i> เพื่อลบ)</div>
+          <div id="lwSrRows"></div>
         </div>
         <div class="ind-bar" id="chartIndBar">
           <span class="ind-chip active" data-ind="bb">BB (20,2)</span>
@@ -2148,6 +2155,27 @@ function _renderLWMarkers(markers){
   // สงวนไว้ (S/R handled ใน bindLWChart)
 }
 
+function _renderSrRows(){
+  const rowsEl=document.getElementById('lwSrRows'); if(!rowsEl) return;
+  rowsEl.innerHTML=_userSr.map((ln,i)=>{
+    const price=(ln.price()!=null)?Number(ln.price()).toFixed(ln.price()>1000?1:2):'–';
+    return `<div class="lw-trow" data-sr="${i}">
+      <span class="dir" style="width:auto;color:#787B86;font-weight:400">S/R</span>
+      <span class="sub">${price}</span>
+      <button class="sr-del" data-sri="${i}" title="ลบเส้นนี้"><i class="ti ti-trash"></i></button>
+    </div>`;
+  }).join('') || '<div class="lw-empty">ยังไม่มีเส้น S/R</div>';
+  rowsEl.querySelectorAll('.sr-del').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.stopPropagation();
+      const i=Number(btn.dataset.sri);
+      try{ if(lwCandle&&lwCandle.removePriceLine) lwCandle.removePriceLine(_userSr[i]); }catch(err){}
+      _userSr.splice(i,1);
+      _renderSrRows();
+    });
+  });
+}
+
 // ── bind LW chart controls ──
 function bindLWChart(){
   if(!lwChart) return;
@@ -2157,6 +2185,17 @@ function bindLWChart(){
     addSr.addEventListener('click',()=>{
       _addingSr=!addSr.classList.toggle('active');
       document.getElementById('candleChart').style.cursor=_addingSr?'crosshair':'default';
+    });
+  }
+  const btnSrL=document.getElementById('btnSrList');
+  if(btnSrL && !btnSrL.__lwBound){
+    btnSrL.__lwBound=true;
+    btnSrL.addEventListener('click',()=>{
+      const sp=document.getElementById('lwSrPanel');
+      if(sp){
+        sp.style.display=sp.style.display==='none'?'block':'none';
+        if(sp.style.display==='block') _renderSrRows();
+      }
     });
   }
   const reset=document.getElementById('zoomReset');
@@ -2184,6 +2223,8 @@ function bindLWChart(){
     _addingSr=false;
     const b=document.getElementById('addSrR'); if(b) b.classList.remove('active');
     document.getElementById('candleChart').style.cursor='default';
+    const sp=document.getElementById('lwSrPanel');
+    if(sp&&sp.style.display==='block') _renderSrRows();
   });
 }
 
