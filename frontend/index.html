@@ -1122,7 +1122,6 @@ async function checkNewSignals(){
     }
   } catch(e){}
 }
-let equityChart, equityFullChart;
 
 /* ═══════ HELPERS ═══════ */
 function fmtTime(iso){ if(!iso) return '–'; return new Date(iso).toLocaleString('th-TH',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
@@ -2165,7 +2164,8 @@ function bindLWChart(){
   const btnFS=document.getElementById('btnFullscreen');
   if(btnFS && !btnFS.__lwBound){
     btnFS.__lwBound=true;
-    btnFS.addEventListener('click',()=>{ const p=document.getElementById('chartPanel'); if(p&&p.requestFullscreen){ p.requestFullscreen().then(()=>{ setTimeout(v=>refreshLWResize(),50); }); } });
+    btnFS.addEventListener('click',()=>{ const p=document.getElementById('chartPanel'); if(p&&p.requestFullscreen){ const wrap=document.getElementById('lwWrap'); const prev=wrap&&wrap.style.height; if(wrap) wrap.style.height='calc(100vh - 130px)'; p.requestFullscreen().then(()=>{ setTimeout(v=>refreshLWResize(),80); }).catch(()=>{ if(wrap&&prev) wrap.style.height=prev; }); } });
+    document.addEventListener('fullscreenchange',()=>{ if(!document.fullscreenElement){ const wrap=document.getElementById('lwWrap'); if(wrap) wrap.style.height='460px'; refreshLWResize(); } });
   }
   const btnTL=document.getElementById('btnTradeList');
   if(btnTL && !btnTL.__lwBound){
