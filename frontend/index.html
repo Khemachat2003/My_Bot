@@ -148,6 +148,14 @@
   }
   .tf-btn:hover{color:var(--text);}
   .tf-btn.active{background:var(--cyan); color:#04121a;}
+  .tf-btn.has-lbl{display:inline-flex; align-items:center; gap:4px; padding:3px 7px;}
+  .tf-btn.has-lbl .btn-lbl{font-size:10px; font-weight:800;}
+  .tf-btn.has-lbl.active{background:var(--cyan); color:#04121a;}
+  @media(max-width:900px){ .btn-lbl{display:none;} }
+  .ind-hint{font-size:9.5px; color:var(--dim); font-weight:600; letter-spacing:.02em;}
+  .lb-values{display:inline-flex; gap:10px; white-space:nowrap; font-family:var(--num); font-size:10px;}
+  .lb-values b{color:var(--text); font-weight:700;}
+  .lb-values .v-u{color:var(--green);} .lb-values .v-d{color:var(--red);} .lb-values .v-m{color:var(--muted);}
   .ind-bar{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin:10px 0 8px;}
   .ind-chip{
     background:var(--card); border:1px solid var(--border); color:var(--muted); cursor:pointer;
@@ -211,9 +219,13 @@
   /* chart panel + legend bar (ย้าย legend ออกจาก canvas → ไม่บังแท่งเทียน) */
   .chart-panel{position:relative;}
   .chart-wrap{position:relative;}
+  /* loading overlay ตอนสลับ TF/symbol */
+  .chart-wrap.loading{opacity:.65; transition:opacity .15s;}
+  .chart-wrap.loading::after{content:'กำลังโหลด…';
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:var(--muted); font-size:11px; font-weight:700; background:rgba(19,23,34,.35);
+    pointer-events:none; z-index:4; letter-spacing:.08em;}
   /* LW chart overlay controls */
-  .lw-legend{position:absolute; top:8px; left:8px; z-index:5; pointer-events:none; font-family:var(--num); font-size:11px; background:rgba(19,23,34,.7); padding:3px 7px; border-radius:4px;}
-  .lw-legend .up{color:var(--green);} .lw-legend .down{color:var(--red);}
   .lw-tradelist{border-top:1px solid var(--border);}
   .lw-trade-head{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; padding:8px 10px; font-weight:600;}
   .lw-trow{display:flex; align-items:center; gap:10px; padding:6px 10px; cursor:pointer; font-size:12px; border-top:1px solid var(--border);}
@@ -589,9 +601,9 @@
 
       <!-- Main chart panel (TradingView style) -->
       <div class="panel chart-panel" id="chartPanel">
-        <h3><span class="ph cyan"></span><span id="chartTitle">กราฟราคา — Candlestick</span>
+        <h3><span class="ph cyan"></span><span id="chartTitle">กราฟราคา</span>
           <span class="chart-tools">
-            <select id="chartSymbol" class="sym-select"></select>
+            <select id="chartSymbol" class="sym-select" title="เลือกสัญลักษณ์"></select>
             <span class="tf-group" id="tfGroup">
               <button class="tf-btn active" data-tf="1m">1m</button>
               <button class="tf-btn" data-tf="5m">5m</button>
@@ -601,23 +613,22 @@
               <button class="tf-btn" data-tf="4h">4h</button>
             </span>
             <span class="tf-group" id="zoomGroup" title="ลากเพื่อเลื่อน · ล้อเมาส์/สองนิ้วเพื่อซูม (มือถือ: pinch)">
-            <button class="tf-btn" id="zoomReset" title="กลับมุมมองล่าสุด"><i class="ti ti-refresh"></i></button>
-            <button class="tf-btn" id="addSrR" title="เพิ่มเส้น S/R (คลิกวางบนกราฟ)"><i class="ti ti-layout-horizontal"></i></button>
-            <button class="tf-btn" id="btnSrList" title="รายการเส้น S/R"><i class="ti ti-adjustments-horizontal"></i></button>
-            <button class="tf-btn" id="btnFullscreen" title="ขยายเต็มจอ"><i class="ti ti-maximize"></i></button>
-            <button class="tf-btn" id="btnTradeList" title="รายการสัญญาณ"><i class="ti ti-list"></i></button>
+            <button class="tf-btn has-lbl" id="zoomReset" title="กลับมุมมองล่าสุด (fit)"><i class="ti ti-refresh"></i><span class="btn-lbl">กลับมุมมอง</span></button>
+            <button class="tf-btn has-lbl" id="addSrR" title="เพิ่มเส้นแนวรับ/ต้าน S/R — คลิกวางบนกราฟ"><i class="ti ti-layout-horizontal"></i><span class="btn-lbl">เพิ่ม S/R</span></button>
+            <button class="tf-btn has-lbl" id="btnSrList" title="รายการเส้น S/R ที่วางไว้"><i class="ti ti-adjustments-horizontal"></i><span class="btn-lbl">S/R ลิสต์</span></button>
+            <button class="tf-btn has-lbl" id="btnFullscreen" title="ขยายกราฟเต็มจอ"><i class="ti ti-maximize"></i><span class="btn-lbl">เต็มจอ</span></button>
+            <button class="tf-btn has-lbl" id="btnTradeList" title="แสดง/ซ่อนรายการสัญญาณ"><i class="ti ti-list"></i><span class="btn-lbl">สัญญาณ</span></button>
           </span>
         </h3>
         <div class="chart-legendbar" id="chartLegendBar">
           <span class="lb-ohlc" id="lbOhlc">—</span>
           <span class="lb-spacer"></span>
-          <span id="lbValues"></span>
-          <button class="lb-collapse" id="lbCollapse" title="ย่อ/ขยายค่า indicator">▾</button>
+          <span id="lbValues" class="lb-values"></span>
+          <button class="lb-collapse" id="lbCollapse" title="ย่อ/ขยายค่า indicator"><i class="ti ti-chevron-down"></i></button>
         </div>
         <div class="chart-wrap" id="lwWrap" style="height:460px;">
           <div id="candleChart"></div>
         </div>
-        <div class="lw-legend" id="lwLegend"></div>
         <!-- trade list (คลิกเลือกเพื่อดู SL/TP เฉพาะรายการ) -->
         <div class="lw-tradelist" id="lwTradeList" style="display:none; border-top:1px solid var(--border); max-height:220px; overflow-y:auto;">
           <div class="lw-trade-head">คลิกแถวเพื่อดู Entry / SL / TP บนกราฟ (เห็นทีละรายการ)</div>
@@ -628,16 +639,19 @@
           <div id="lwSrRows"></div>
         </div>
         <div class="ind-bar" id="chartIndBar">
-          <span class="ind-chip active" data-ind="bb">BB (20,2)</span>
           <span class="ind-chip active" data-ind="ema">EMA 50/100/200</span>
+          <span class="ind-chip active" data-ind="bb">BB (20,2)</span>
           <span class="ind-chip active" data-ind="sma5">SMA5</span>
           <span class="ind-chip" data-ind="vol">Volume</span>
+          <span class="ind-spacer"></span>
+          <span class="ind-hint" id="indHint">กดเพื่อเปิด/ปิดตัวชี้วัดบนกราฟ</span>
         </div>
         <div class="chart-legend">
-          <span><i style="background:var(--purple);"></i>EMA50</span>
-          <span><i style="background:var(--ml);"></i>EMA100</span>
-          <span><i style="background:var(--yellow);"></i>EMA200</span>
-          <span><i style="background:var(--blue);"></i>BB</span>
+          <span><i style="background:#9C6FE0;"></i>EMA50</span>
+          <span><i style="background:#787B86;"></i>EMA100</span>
+          <span><i style="background:#FF9800;"></i>EMA200</span>
+          <span><i style="background:#2962FF;"></i>BB 20,2</span>
+          <span><i style="background:#26C6DA;"></i>SMA5</span>
           <span><i style="background:var(--green);"></i>ML (▲ CALL)</span>
           <span><i style="background:var(--blue);"></i>Rule-base (▼ PUT)</span>
         </div>
@@ -2021,11 +2035,14 @@ function drawEquity(payload){
 // ═══════════════════════════════════════════════════════
 let lwChart=null, lwCandle=null, lwVol=null;
 let lwEma50=null,lwEma100=null,lwEma200=null;
+let lwBbU=null,lwBbM=null,lwBbL=null,lwSma5=null;
 let lwSrLines=[];
 let lwActiveLines=[];
 let lwAddingSr=false;
 let lwTradeData=[];
 let _lwFitKey='';   // จำ TF+symbol → fitContent เฉพาะตอนเปลี่ยน
+let _lwLastSig=null; // จำแท่งท้ายสุด+สัญญาณ → ข้าม redraw ซ้ำตอน refresh
+let _lwPrevCount=0;  // จำจำนวนแท่งก่อนหน้า → กันข้อมูลหายชั่วคราวทำให้กราฟหดเหลือ 1-2 แท่ง
 
 function _candleTime(d){
   if(d.t==null) return 0;
@@ -2047,7 +2064,7 @@ function initLWChart(){
     grid:{vertLines:{color:'#1E222D'},horzLines:{color:'#1E222D'}},
     crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
     rightPriceScale:{borderColor:'#2A2E39'},
-    timeScale:{borderColor:'#2A2E39',timeVisible:true,secondsVisible:false,rightOffset:3,barSpacing:8},
+    timeScale:{borderColor:'#2A2E39',timeVisible:true,secondsVisible:false,rightOffset:1,barSpacing:7},
     localization:{locale:'th-TH'},
   });
   lwCandle=lwChart.addCandlestickSeries({
@@ -2058,6 +2075,10 @@ function initLWChart(){
   lwEma50=lwChart.addLineSeries({color:'#9C6FE0',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
   lwEma100=lwChart.addLineSeries({color:'#787B86',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
   lwEma200=lwChart.addLineSeries({color:'#FF9800',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+  lwBbU=lwChart.addLineSeries({color:'rgba(41,98,255,.45)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,lineStyle:LightweightCharts.LineStyle.Dotted});
+  lwBbM=lwChart.addLineSeries({color:'#2962FF',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+  lwBbL=lwChart.addLineSeries({color:'rgba(41,98,255,.45)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,lineStyle:LightweightCharts.LineStyle.Dotted});
+  lwSma5=lwChart.addLineSeries({color:'#26C6DA',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
   lwVol=lwChart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'volScale'});
   lwChart.priceScale('volScale').applyOptions({scaleMargins:{top:0.82,bottom:0}});
   _lwOHLClegend();
@@ -2091,36 +2112,102 @@ function _emaArr(arr,n,key){
   return out;
 }
 
+function _smaArr(arr,n){
+  const out=[]; let sum=0;
+  for(let i=0;i<arr.length;i++){
+    sum+=arr[i].close;
+    if(i>=n) sum-=arr[i-n].close;
+    if(i>=n-1) out.push({time:arr[i].time,value:sum/n});
+  }
+  return out;
+}
+
+function _bbArr(arr,n,k){
+  const u=[],m=[],l=[]; let sum=0,sum2=0;
+  for(let i=0;i<arr.length;i++){
+    const c=arr[i].close; sum+=c; sum2+=c*c;
+    if(i>=n){ const oc=arr[i-n].close; sum-=oc; sum2-=oc*oc; }
+    if(i>=n-1){
+      const mean=sum/n, variance=Math.max(0,sum2/n-mean*mean), sd=Math.sqrt(variance);
+      m.push({time:arr[i].time,value:mean});
+      u.push({time:arr[i].time,value:mean+k*sd});
+      l.push({time:arr[i].time,value:mean-k*sd});
+    }
+  }
+  return {u,m,l};
+}
+
+// TF → วินาทีต่อแท่ง (สำหรับ snap marker ให้ตรงกับเวลาเปิดแท่งเทียน)
+const _TF_SECONDS={'1m':60,'5m':300,'15m':900,'30m':1800,'1h':3600,'4h':14400};
+
 function drawLWChart(prices,markers,tf){
   if(!window.LightweightCharts){ return; }
   const bars=_normLW(prices);
   if(!bars.length) return;
   initLWChart();
   const needInit=!lwCandle;
+  const sym=document.getElementById('chartSymbol')?.value||'';
+  const fitKey=tf+'|'+sym;
+  const isNewView=fitKey!==_lwFitKey;
+  if(isNewView) _lwFitKey=fitKey;
+  // ข้ามงานซ้ำถ้าแท่งท้ายสุด (เวลา+close)+สัญญาณ+การตั้งค่า indicator ไม่เปลี่ยน → ลดกระตุกตอน refresh ทุก 5 วิ
+  const last=bars[bars.length-1];
+  const indKey=[chartInd.vol,chartInd.ema,chartInd.bb,chartInd.sma5].join('');
+  if(!needInit&&!isNewView&&_lwLastSig&&_lwLastSig.t===last.time&&_lwLastSig.c===last.close&&_lwLastSig.sig===JSON.stringify(markers||[])&&_lwLastSig.ind===indKey){
+    return;
+  }
+  // กัน "ข้อมูลหายชั่วคราว" (Deriv ตอบไม่ครบ) ทำให้กราฟที่วาดดีแล้วหดเหลือ 1-2 แท่ง
+  if(!needInit&&!isNewView&&_lwPrevCount>100&&bars.length<30&&bars.length<_lwPrevCount/3){
+    const vEl=document.getElementById('lbValues');
+    if(vEl) vEl.innerHTML='<span class="v-m">ข้อมูลแท่งไม่ครบ ('+bars.length+' แท่ง) — กรุณารอ refresh ถัดไป</span>';
+    return;
+  }
+  _lwLastSig={t:last.time,c:last.close,sig:JSON.stringify(markers||[]),tf:tf||'',ind:indKey};
+  _lwPrevCount=bars.length;
+  _lwLastBar=bars[bars.length-1];
+  _lwLastPrev=bars.length>1?bars[bars.length-2].close:null;
+  _renderLWDefaultLegend();
   lwCandle.setData(bars);
   if(chartInd.vol) lwVol.setData(bars.map(b=>({time:b.time,value:b.volume,color:b.close>=b.open?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'})));
   else lwVol.setData([]);
   if(chartInd.ema){ lwEma50.setData(_emaArr(bars,50)); lwEma100.setData(_emaArr(bars,100)); lwEma200.setData(_emaArr(bars,200)); }
   else { lwEma50.setData([]); lwEma100.setData([]); lwEma200.setData([]); }
+  const bbOn=chartInd.bb&&bars.length>=20;
+  if(bbOn){ const bb=_bbArr(bars,20,2); lwBbU.setData(bb.u); lwBbM.setData(bb.m); lwBbL.setData(bb.l); }
+  else { lwBbU.setData([]); lwBbM.setData([]); lwBbL.setData([]); }
+  if(chartInd.sma5&&bars.length>=5){ lwSma5.setData(_smaArr(bars,5)); }
+  else lwSma5.setData([]);
 
-  // ── Markers: shape=ทิศทาง, color=ระบบ ──
+  // ── Markers: shape=ทิศทาง, color=ระบบ — สัญญาณเกิดกลางแท่ง → snap ลงไปที่แท่งที่เปิดก่อนหน้า
+  const activeTf=document.querySelector('#tfGroup .tf-btn.active')?.dataset.tf||tf||'1m';
+  const intSec=_TF_SECONDS[String(activeTf)]||300;
   const tsSet=new Set(bars.map(b=>b.time));
-  const markerList=(markers||[]).filter(m=>m&&m.ts&&m.price!=null&&m.direction&&tsSet.has(_candleTime(m))).map(m=>{
+  const barTimes=[...tsSet].sort((a,b)=>a-b);
+  const snapToBar=ts=>{
+    const t=_candleTime(ts); if(!t) return null;
+    const slot=Math.floor(t/intSec)*intSec;
+    let cand=tsSet.has(slot)?slot:null;
+    // เผื่อ series เริ่มไม่ตรง 0 → หาแท่งที่เปิดในหน้าต่างเดียวกับสัญญาณ
+    for(const bt of barTimes){
+      if(bt>=slot&&bt<slot+intSec){ cand=bt; break; }
+    }
+    return cand;
+  };
+  const markerList=(markers||[]).filter(m=>m&&m.ts&&m.price!=null&&m.direction).map(m=>{
+    const barTime=snapToBar(m); if(barTime==null) return null;
     const color=m.type==='ML'?'#9C6FE0':'#2962FF';
     const sysLabel=m.type==='ML'?'ML':m.importance===1?'IMP1':m.importance===2?'IMP2':'RBF';
     return {
-      time:_candleTime(m),
+      time:barTime,
       position:m.direction==='CALL'?'belowBar':'aboveBar',
       color,
       shape:m.direction==='CALL'?'arrowUp':'arrowDown',
       text:sysLabel+' '+m.direction,
     };
-  });
+  }).filter(Boolean);
   if(lwCandle) lwCandle.setMarkers(markerList);
   // fitContent เฉพาะครั้งแรก / เปลี่ยน TF / เปลี่ยน symbol — ไม่รบกวน zoom/pan ที่ผู้ใช้ตั้งไว้
-  const sym=document.getElementById('chartSymbol')?.value||'';
-  const fitKey=tf+'|'+sym;
-  if(fitKey!==_lwFitKey){ _lwFitKey=fitKey; lwChart.timeScale().fitContent(); }
+  if(isNewView) lwChart.timeScale().fitContent();
 
   // ── trade list + auto-select open ──
   lwTradeData=(markers||[]).filter(m=>m&&m.ts&&m.price!=null&&m.direction);
@@ -2129,18 +2216,37 @@ function drawLWChart(prices,markers,tf){
   _autoSelectOpen(markers);
 }
 
-// ── LW legend: OHLC ของแท่งที่ crosshair ชี้ ──
+// ── LW legend bar: OHLC ของแท่งที่ crosshair ชี้ + ค่า indicator เทียบสีที่เปิดอยู่ ──
+let _lwLastBar=null,_lwLastPrev=null;
+function _renderLWDefaultLegend(){
+  const el=document.getElementById('lbValues'); if(!el) return;
+  const b=_lwLastBar; if(!b){ el.innerHTML=''; return; }
+  const pct=_lwLastPrev!=null?(b.close-_lwLastPrev)/_lwLastPrev*100:0;
+  const cls=!isNaN(b.close)&&b.close>=b.open&&!isNaN(b.open)?'v-u':'v-d';
+  el.innerHTML=`<span class="v-m">ราคา</span> <b class="${cls}">${b.close}</b> <span class="v-m">·</span> <span class="${cls}">${pct>=0?'+':''}${pct.toFixed(2)}%</span> <span class="v-m">·</span> <span class="v-m">${b.time?new Date(b.time*1000).toLocaleTimeString('th-TH'):''}</span>`;
+}
 function _lwOHLClegend(){
-  const el=document.getElementById('lwLegend'); if(!el) return;
-  el.className='lw-legend';
+  const el=document.getElementById('lbOhlc'); if(!el) return;
   if(!lwCandle) return;
   lwChart.subscribeCrosshairMove(param=>{
-    if(!param.time) return;
+    if(!param||!param.time||!param.point||!param.seriesData){ _renderLWDefaultLegend(); return; }
     const d=param.seriesData.get(lwCandle);
-    if(!d){ return; }
-    const up=typeof d.close!=='undefined';
-    const dirColor=d.close>=d.open?'#26A69A':'#EF5350';
-    el.innerHTML=`<span style="color:#787B86">O</span> <span class="up">${d.open}</span> <span style="color:#787B86">H</span> <span class="up">${d.high}</span> <span style="color:#787B86">L</span> <span class="down">${d.low}</span> <span style="color:#787B86">C</span> <span class="${up?'up':'down'}">${d.close}</span>`;
+    if(!d){ el.innerHTML='—'; _renderLWDefaultLegend(); return; }
+    const up=d.close!=null&&d.open!=null&&d.close>=d.open;
+    const cls=up?'up':'dn';
+    el.innerHTML=`O <b class="${cls}">${d.open}</b> H <b class="${cls}">${d.high}</b> L <b class="${cls}">${d.low}</b> C <b class="${cls}">${d.close}</b>`;
+    const vEl=document.getElementById('lbValues');
+    if(vEl){
+      const parts=[];
+      const push=(s,series)=>{
+        if(!series) return;
+        const v=param.seriesData.get(series);
+        if(v&&v.value!=null) parts.push(`<span class="v-m">${s}</span> <b>${v.value}</b>`);
+      };
+      push('EMA50',lwEma50); push('BB',lwBbM); push('SMA5',lwSma5);
+      if(parts.length) vEl.innerHTML=parts.join('');
+      else _renderLWDefaultLegend();
+    }
   });
 }
 
@@ -2301,13 +2407,23 @@ async function refreshPrice(){
     if(!sym){ try{ const s=await fetchJSON('/api/symbol'); if(s&&s.symbol){sym=s.symbol;}}catch(e){} }
     if(!sym) sym='frxXAUUSD';
     const badge=document.getElementById('symbolBadge'); if(badge) badge.textContent=sym;
-    const prices=await fetchJSON('/api/candles?tf='+tf+'&count=300&symbol='+encodeURIComponent(sym));
+    const wrap=document.getElementById('lwWrap');
+    if(wrap) wrap.classList.add('loading');
+    // fetch candles + markers พร้อมกัน → เปลี่ยน TF เร็วขึ้น
+    const [[prices,markers]]=await Promise.all([
+      Promise.all([
+        (async()=>{
+          let p=await fetchJSON('/api/candles?tf='+tf+'&count=300&symbol='+encodeURIComponent(sym));
+          // กรณี Deriv ตอบข้อมูลไม่ครบ → ลองยิง count ใหญ่ขึ้นอีกครั้งกันกราฟเหลือ 1-2 แท่ง
+          if(Array.isArray(p)&&p.length<30) p=await fetchJSON('/api/candles?tf='+tf+'&count=1000&symbol='+encodeURIComponent(sym));
+          return p;
+        })(),
+        fetchJSON('/api/signals/markers?symbol='+encodeURIComponent(sym)+'&limit=50').catch(()=>window._signalMarkers||[])
+      ])
+    ]);
+    if(wrap) wrap.classList.remove('loading');
     if(!prices||!prices.length) return;
-    let markers=window._signalMarkers||[];
-    try{
-      markers=await fetchJSON('/api/signals/markers?symbol='+encodeURIComponent(sym)+'&limit=50')||[];
-      window._signalMarkers=markers;
-    }catch(e){}
+    if(Array.isArray(markers)) window._signalMarkers=markers;
     drawLWChart(prices,markers,tf);
     const last=prices[prices.length-1], prev=prices[prices.length-2];
     const chg=prev?last.c-prev.c:0;
