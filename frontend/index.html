@@ -237,6 +237,8 @@
   .lw-trow .tag{font-size:9px; padding:1px 5px; border-radius:3px; background:var(--panel2); color:var(--muted);}
   .lw-trow .sr-del{background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px; line-height:1; padding:2px 6px;}
   .lw-trow .sr-del:hover{color:var(--red);}
+  .lw-trade-head .sr-clear{background:rgba(120,123,134,.12); border:none; color:var(--muted); font-size:9px; text-transform:none; letter-spacing:.02em; padding:2px 8px; border-radius:6px; cursor:pointer; margin-left:8px; font-weight:600; float:right;}
+  .lw-trade-head .sr-clear:hover{color:#fff; background:rgba(239,83,80,.75);}
   .lw-trow .tag.open{color:var(--green); background:rgba(38,166,154,.12);}
   .lw-empty{padding:12px; color:var(--muted); font-size:12px;}
   .eq-stats{font-size:10px; font-weight:600; color:var(--muted); font-family:var(--num); letter-spacing:.02em;}
@@ -259,6 +261,8 @@
   .chart-legendbar #lbValues{display:inline-flex; gap:4px;}
   .chart-legendbar.collapsed #lbValues{display:none;}
   .chart-legendbar .lb-tools{display:inline-flex; gap:4px; flex-shrink:0;}
+  .lw-modehint{position:absolute; left:50%; top:10px; transform:translateX(-50%); z-index:5; pointer-events:none; background:rgba(41,98,255,.15); border:1px solid rgba(41,98,255,.5); color:#8fb0ff; font-size:11px; padding:5px 12px; border-radius:8px; font-family:monospace; white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,.3);}
+  .chart-wrap.adding-sr #candleChart{outline:1px dashed rgba(41,98,255,.5); outline-offset:-2px; border-radius:6px;}
   .chart-legendbar .lb-collapse{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;line-height:1;padding:2px 4px;flex-shrink:0;}
   .chart-legendbar.collapsed .lb-collapse{transform:rotate(180deg);}
   .lo-chip{
@@ -614,7 +618,8 @@
           </span>
           <span class="tf-group" id="zoomGroup" title="ลากเพื่อเลื่อน · ล้อเมาส์/สองนิ้วเพื่อซูม (มือถือ: pinch)">
             <button class="tf-btn has-lbl" id="zoomReset" title="กลับมุมมองล่าสุด (fit)"><i class="ti ti-refresh"></i><span class="btn-lbl">กลับมุมมอง</span></button>
-            <button class="tf-btn has-lbl" id="addSrR" title="เพิ่มเส้นแนวรับ/ต้าน S/R — คลิกวางบนกราฟ"><i class="ti ti-layout-horizontal"></i><span class="btn-lbl">เพิ่ม S/R</span></button>
+            <button class="tf-btn has-lbl" id="addSrR" title="กดเพื่อเริ่มวางเส้นแนวรับ/ต้าน — คลิกบนกราฟเพื่อวาง"><i class="ti ti-layout-horizontal"></i><span class="btn-lbl">เพิ่ม S/R</span></button>
+            <button class="tf-btn has-lbl" id="btnDelSr" title="กดเพื่อเปิดโหมดลบ — คลิกที่เส้น S/R เพื่อลบเส้นนั้น"><i class="ti ti-eraser"></i><span class="btn-lbl">ลบ S/R</span></button>
             <button class="tf-btn has-lbl" id="btnSrList" title="รายการเส้น S/R ที่วางไว้"><i class="ti ti-adjustments-horizontal"></i><span class="btn-lbl">S/R ลิสต์</span></button>
             <button class="tf-btn has-lbl" id="btnFullscreen" title="ขยายกราฟเต็มจอ"><i class="ti ti-maximize"></i><span class="btn-lbl">เต็มจอ</span></button>
             <button class="tf-btn has-lbl" id="btnTradeList" title="แสดง/ซ่อนรายการสัญญาณ"><i class="ti ti-list"></i><span class="btn-lbl">สัญญาณ</span></button>
@@ -628,6 +633,7 @@
         </div>
         <div class="chart-wrap" id="lwWrap" style="height:460px;">
           <div id="candleChart"></div>
+          <div class="lw-modehint" id="lwModeHint" style="display:none;"></div>
         </div>
         <!-- trade list (คลิกเลือกเพื่อดู SL/TP เฉพาะรายการ) -->
         <div class="lw-tradelist" id="lwTradeList" style="display:none; border-top:1px solid var(--border); max-height:220px; overflow-y:auto;">
@@ -635,7 +641,7 @@
           <div id="lwTradeRows"></div>
         </div>
         <div class="lw-tradelist" id="lwSrPanel" style="display:none; border-top:1px solid var(--border); max-height:150px; overflow-y:auto;">
-          <div class="lw-trade-head">เส้น S/R ที่วางเอง (กด <i class="ti ti-trash"></i> เพื่อลบ)</div>
+          <div class="lw-trade-head">เส้น S/R ที่วางเอง <button id="srClearAll" class="sr-clear" title="ลบเส้น S/R ทั้งหมด">ล้างทั้งหมด</button></div>
           <div id="lwSrRows"></div>
         </div>
         <div class="ind-bar" id="chartIndBar">
@@ -2086,17 +2092,20 @@ function initLWChart(){
   lwBbM=lwChart.addLineSeries({color:'#2962FF',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
   lwBbL=lwChart.addLineSeries({color:'rgba(41,98,255,.45)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,lineStyle:LightweightCharts.LineStyle.Dotted});
   lwSma5=lwChart.addLineSeries({color:'#26C6DA',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
-  // sub-pane ล่าง: RSI + ADX (+DI/-DI) แชร์สเกล 0–100 แบบ TradingView
-  lwRsi=lwChart.addLineSeries({color:'#9C6FE0',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,priceScaleId:'subScale',priceFormat:{type:'custom',formatter:v=>v==null?'–':v.toFixed(1)}});
-  lwAdx=lwChart.addLineSeries({color:'#FF9800',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,priceScaleId:'subScale'});
-  lwPdi=lwChart.addLineSeries({color:'#26A69A',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,priceScaleId:'subScale'});
-  lwNdi=lwChart.addLineSeries({color:'#EF5350',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,priceScaleId:'subScale'});
-  lwChart.priceScale('subScale').applyOptions({scaleMargins:{top:0.74,bottom:0.02}});
+  // sub-panes (แยกกัน): ADX แถวบน · RSI แถวกลาง · Volume แถวล่าง — ต่างมีสเกล+ค่าของตัวเอง
+  // แบ่งแถบ: ราคา [0–44%] · ADX [44–62%] · RSI [66–82%] · Volume [86–100%]
+  lwRsi=lwChart.addLineSeries({color:'#9C6FE0',lineWidth:1,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false,priceScaleId:'rsiScale',priceFormat:{type:'custom',formatter:v=>v==null?'–':v.toFixed(1)}});
+  lwAdx=lwChart.addLineSeries({color:'#FF9800',lineWidth:1,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false,priceScaleId:'adxScale',priceFormat:{type:'custom',formatter:v=>v==null?'–':v.toFixed(1)}});
+  lwPdi=lwChart.addLineSeries({color:'#26A69A',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,priceScaleId:'adxScale'});
+  lwNdi=lwChart.addLineSeries({color:'#EF5350',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,priceScaleId:'adxScale'});
+  lwChart.priceScale('right').applyOptions({scaleMargins:{top:0.05,bottom:0.56}});
+  lwChart.priceScale('adxScale').applyOptions({scaleMargins:{top:0.44,bottom:0.38}});
+  lwChart.priceScale('rsiScale').applyOptions({scaleMargins:{top:0.66,bottom:0.18}});
+  lwChart.priceScale('volScale').applyOptions({scaleMargins:{top:0.86,bottom:0}});
   try{ lwRsi.createPriceLine({price:70,color:'rgba(120,123,134,.45)',lineStyle:LightweightCharts.LineStyle.Dotted,title:'70',axisLabelVisible:false});
     lwRsi.createPriceLine({price:30,color:'rgba(120,123,134,.45)',lineStyle:LightweightCharts.LineStyle.Dotted,title:'30',axisLabelVisible:false});
     lwAdx.createPriceLine({price:20,color:'rgba(120,123,134,.5)',lineStyle:LightweightCharts.LineStyle.Dotted,title:'20',axisLabelVisible:false}); }catch(e){}
   lwVol=lwChart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'volScale'});
-  lwChart.priceScale('volScale').applyOptions({scaleMargins:{top:0.82,bottom:0}});
   _lwOHLClegend();
   bindLWChart();
 }
@@ -2241,8 +2250,8 @@ function drawLWChart(prices,markers,tf){
     fractalMarkers=fractal(nd,7,7).map(p=>({
       time:bars[p.i].time,
       position:p.t==='H'?'aboveBar':'belowBar',
-      color:'#787B86',
-      shape:'square',
+      color:'#8A94A6',
+      shape:p.t==='H'?'arrowDown':'arrowUp',
       text:'',
     }));
   }
@@ -2395,7 +2404,27 @@ function bindLWChart(){
     addSr.__lwBound=true;
     addSr.addEventListener('click',()=>{
       _addingSr=addSr.classList.toggle('active');
+      if(_addingSr){
+        _deletingSr=false;
+        const db=document.getElementById('btnDelSr'); if(db) db.classList.remove('active');
+        document.getElementById('lwWrap')?.classList.add('adding-sr');
+      } else document.getElementById('lwWrap')?.classList.remove('adding-sr');
       document.getElementById('candleChart').style.cursor=_addingSr?'crosshair':'default';
+      const uh=document.getElementById('lwModeHint'); if(uh&&uh.__lwUpd) uh.__lwUpd();
+    });
+  }
+  const btnDelSr=document.getElementById('btnDelSr');
+  if(btnDelSr && !btnDelSr.__lwBound){
+    btnDelSr.__lwBound=true;
+    btnDelSr.addEventListener('click',()=>{
+      _deletingSr=btnDelSr.classList.toggle('active');
+      if(_deletingSr){
+        _addingSr=false;
+        const ab=document.getElementById('addSrR'); if(ab) ab.classList.remove('active');
+        document.getElementById('lwWrap')?.classList.remove('adding-sr');
+      }
+      document.getElementById('candleChart').style.cursor=_deletingSr?'pointer':'default';
+      const uh2=document.getElementById('lwModeHint'); if(uh2&&uh2.__lwUpd) uh2.__lwUpd();
     });
   }
   const btnSrL=document.getElementById('btnSrList');
@@ -2408,6 +2437,28 @@ function bindLWChart(){
         if(sp.style.display==='block') _renderSrRows();
       }
     });
+  }
+  const srClear=document.getElementById('srClearAll');
+  if(srClear && !srClear.__lwBound){
+    srClear.__lwBound=true;
+    srClear.addEventListener('click',()=>{
+      _userSr.forEach(ln=>{ try{ lwCandle.removePriceLine(ln); }catch(e){} });
+      _userSr=[];
+      _renderSrRows();
+    });
+  }
+  // ชื่อพื้นหลังเพื่อบอกโหมด
+  const hint=document.getElementById('lwModeHint');
+  if(hint && !hint.__lwBound){
+    hint.__lwBound=true;
+    const upd=()=>{
+      if(_addingSr) hint.textContent='โหมดวางเส้น S/R — คลิกกราฟเพื่อวางเส้นแนวนอน';
+      else if(_deletingSr) hint.textContent='โหมดลบเส้น S/R — คลิกใกล้เส้นที่จะลบ';
+      else hint.textContent='',
+      hint.style.display=(_addingSr||_deletingSr)?'block':'none';
+    };
+    hint.__lwUpd=upd;
+    upd();
   }
   const reset=document.getElementById('zoomReset');
   if(reset && !reset.__lwBound){ reset.__lwBound=true; reset.addEventListener('click',()=>{ if(lwChart) lwChart.timeScale().fitContent(); }); }
@@ -2422,20 +2473,45 @@ function bindLWChart(){
     btnTL.__lwBound=true;
     btnTL.addEventListener('click',()=>{ const tl=document.getElementById('lwTradeList'); if(tl){ const show=tl.style.display==='none'; tl.style.display=show?'block':'none'; if(show) tl.scrollIntoView({block:'nearest',behavior:'smooth'}); } });
   }
-  // click เพื่อวาง S/R (ป้องกัน click ติด ๆ กันจาก pan → ใช้ double-ish delay)
+  const updHint=()=>{ const h=document.getElementById('lwModeHint'); if(h&&h.__lwUpd) h.__lwUpd(); };
+  // click เพื่อวาง / ลบ S/R
   lwChart.subscribeClick(param=>{
-    if(!_addingSr || !param.point || !lwCandle) return;
-    const p=lwCandle.coordinateToPrice(param.point.y);
-    if(p==null) return;
-    try{
-      const ln=lwCandle.createPriceLine({price:p,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,title:'S/R'});
-      _userSr.push(ln);
-    }catch(e){}
-    _addingSr=false;
-    const b=document.getElementById('addSrR'); if(b) b.classList.remove('active');
-    document.getElementById('candleChart').style.cursor='default';
-    const sp=document.getElementById('lwSrPanel');
-    if(sp&&sp.style.display==='block') _renderSrRows();
+    if(!param.point || !lwCandle) return;
+    if(_addingSr){
+      const p=lwCandle.coordinateToPrice(param.point.y);
+      if(p==null) return;
+      try{
+        const ln=lwCandle.createPriceLine({price:p,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,title:'S/R'});
+        _userSr.push(ln);
+      }catch(e){}
+      _addingSr=false;
+      const b=document.getElementById('addSrR'); if(b) b.classList.remove('active');
+      document.getElementById('lwWrap')?.classList.remove('adding-sr');
+      document.getElementById('candleChart').style.cursor='default';
+      updHint();
+      const sp=document.getElementById('lwSrPanel');
+      if(sp&&sp.style.display==='block') _renderSrRows();
+      showToast('เพิ่มเส้น S/R ราคา '+p.toFixed(2));
+      return;
+    }
+    if(_deletingSr){
+      const p=lwCandle.coordinateToPrice(param.point.y);
+      if(p==null) return;
+      let bi=-1,bd=Infinity;
+      _userSr.forEach((ln,i)=>{ const lp=ln.price(); if(lp!=null){ const d=Math.abs(lp-p); if(d<bd){bd=d;bi=i;} } });
+      if(bi>=0 && bd<=Math.max(p*0.005,0.5)){ // ต้องคลิกห่างจากเส้นไม่เกิน ~0.5% หรือ 0.5 USD
+        try{ lwCandle.removePriceLine(_userSr[bi]); }catch(e){}
+        _userSr.splice(bi,1);
+        showToast('ลบเส้น S/R แล้ว');
+      } else showToast('ไม่พบเส้น S/R ใกล้จุดนี้ — คลิกให้ใกล้เส้นมากขึ้น');
+      _deletingSr=false;
+      const db=document.getElementById('btnDelSr'); if(db) db.classList.remove('active');
+      document.getElementById('candleChart').style.cursor='default';
+      updHint();
+      const sp=document.getElementById('lwSrPanel');
+      if(sp&&sp.style.display==='block') _renderSrRows();
+      return;
+    }
   });
 }
 
