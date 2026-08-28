@@ -135,7 +135,7 @@
   /* chart */
   .chart-wrap{position:relative; height:330px;}
   canvas.chart{width:100%; height:100%; display:block;}
-  .chart-tools{display:inline-flex; align-items:center; gap:8px; margin-left:auto; margin-top:2px;}
+  .chart-toolbar{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:10px 0 2px;}
   .sym-select{
     background:var(--card); color:var(--text); border:1px solid var(--border);
     border-radius:8px; padding:4px 8px; font-size:11px; font-weight:700; font-family:inherit; cursor:pointer;
@@ -429,7 +429,7 @@
     .tbl-wrap{font-size:11.5px;}
     th,td{padding:7px 9px;}
     .gauge .gname{font-size:10px;}
-    .chart-tools{width:100%; justify-content:space-between; margin-top:6px; flex-wrap:wrap; gap:6px;}
+    .chart-toolbar{justify-content:flex-start; gap:6px; margin-top:8px;}
     .sym-select{flex:1 1 100%; font-size:12px; padding:7px 9px;}
     .tf-btn{padding:6px 10px; font-size:11.5px;}
   }
@@ -601,25 +601,25 @@
 
       <!-- Main chart panel (TradingView style) -->
       <div class="panel chart-panel" id="chartPanel">
-        <h3><span class="ph cyan"></span><span id="chartTitle">กราฟราคา</span>
-          <span class="chart-tools">
-            <select id="chartSymbol" class="sym-select" title="เลือกสัญลักษณ์"></select>
-            <span class="tf-group" id="tfGroup">
-              <button class="tf-btn active" data-tf="1m">1m</button>
-              <button class="tf-btn" data-tf="5m">5m</button>
-              <button class="tf-btn" data-tf="15m">15m</button>
-              <button class="tf-btn" data-tf="30m">30m</button>
-              <button class="tf-btn" data-tf="1h">1h</button>
-              <button class="tf-btn" data-tf="4h">4h</button>
-            </span>
-            <span class="tf-group" id="zoomGroup" title="ลากเพื่อเลื่อน · ล้อเมาส์/สองนิ้วเพื่อซูม (มือถือ: pinch)">
+        <h3><span class="ph cyan"></span><span id="chartTitle">กราฟราคา</span></h3>
+        <div class="chart-toolbar">
+          <select id="chartSymbol" class="sym-select" title="เลือกสัญลักษณ์"></select>
+          <span class="tf-group" id="tfGroup">
+            <button class="tf-btn active" data-tf="1m">1m</button>
+            <button class="tf-btn" data-tf="5m">5m</button>
+            <button class="tf-btn" data-tf="15m">15m</button>
+            <button class="tf-btn" data-tf="30m">30m</button>
+            <button class="tf-btn" data-tf="1h">1h</button>
+            <button class="tf-btn" data-tf="4h">4h</button>
+          </span>
+          <span class="tf-group" id="zoomGroup" title="ลากเพื่อเลื่อน · ล้อเมาส์/สองนิ้วเพื่อซูม (มือถือ: pinch)">
             <button class="tf-btn has-lbl" id="zoomReset" title="กลับมุมมองล่าสุด (fit)"><i class="ti ti-refresh"></i><span class="btn-lbl">กลับมุมมอง</span></button>
             <button class="tf-btn has-lbl" id="addSrR" title="เพิ่มเส้นแนวรับ/ต้าน S/R — คลิกวางบนกราฟ"><i class="ti ti-layout-horizontal"></i><span class="btn-lbl">เพิ่ม S/R</span></button>
             <button class="tf-btn has-lbl" id="btnSrList" title="รายการเส้น S/R ที่วางไว้"><i class="ti ti-adjustments-horizontal"></i><span class="btn-lbl">S/R ลิสต์</span></button>
             <button class="tf-btn has-lbl" id="btnFullscreen" title="ขยายกราฟเต็มจอ"><i class="ti ti-maximize"></i><span class="btn-lbl">เต็มจอ</span></button>
             <button class="tf-btn has-lbl" id="btnTradeList" title="แสดง/ซ่อนรายการสัญญาณ"><i class="ti ti-list"></i><span class="btn-lbl">สัญญาณ</span></button>
           </span>
-        </h3>
+        </div>
         <div class="chart-legendbar" id="chartLegendBar">
           <span class="lb-ohlc" id="lbOhlc">—</span>
           <span class="lb-spacer"></span>
@@ -2142,6 +2142,7 @@ const _TF_SECONDS={'1m':60,'5m':300,'15m':900,'30m':1800,'1h':3600,'4h':14400};
 
 function drawLWChart(prices,markers,tf){
   if(!window.LightweightCharts){ return; }
+  lastCandles=prices||[];  // sync ไว้ → ปุ่ม toggle indicator (#chartIndBar) redraw ได้ทันทีโดยไม่ต้องรอ refresh รอบหน้า
   const bars=_normLW(prices);
   if(!bars.length) return;
   initLWChart();
@@ -2204,7 +2205,7 @@ function drawLWChart(prices,markers,tf){
       shape:m.direction==='CALL'?'arrowUp':'arrowDown',
       text:sysLabel+' '+m.direction,
     };
-  }).filter(Boolean);
+  }).filter(Boolean).sort((a,b)=>a.time-b.time);
   if(lwCandle) lwCandle.setMarkers(markerList);
   // fitContent เฉพาะครั้งแรก / เปลี่ยน TF / เปลี่ยน symbol — ไม่รบกวน zoom/pan ที่ผู้ใช้ตั้งไว้
   if(isNewView) lwChart.timeScale().fitContent();
@@ -2540,6 +2541,10 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(lastCandles.length) drawLWChart(lastCandles,window._signalMarkers||[]);
   });
   window.addEventListener('resize',()=>{ refreshLWResize(); });
+  const _chartPanelEl=document.getElementById('chartPanel');
+  if(_chartPanelEl && window.ResizeObserver){
+    new ResizeObserver(()=>refreshLWResize()).observe(_chartPanelEl);
+  }
 });
 
 async function refreshGauges(){
