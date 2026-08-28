@@ -262,6 +262,7 @@
   .chart-legendbar.collapsed #lbValues{display:none;}
   .chart-legendbar .lb-tools{display:inline-flex; gap:4px; flex-shrink:0;}
   .lw-modehint{position:absolute; left:50%; top:10px; transform:translateX(-50%); z-index:5; pointer-events:none; background:rgba(41,98,255,.15); border:1px solid rgba(41,98,255,.5); color:#8fb0ff; font-size:11px; padding:5px 12px; border-radius:8px; font-family:monospace; white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,.3);}
+  .lw-fallback-msg{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:12px; font-family:monospace; text-align:center; padding:20px;}
   .chart-wrap.adding-sr #candleChart{outline:1px dashed rgba(41,98,255,.5); outline-offset:-2px; border-radius:6px;}
   .chart-legendbar .lb-collapse{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;line-height:1;padding:2px 4px;flex-shrink:0;}
   .chart-legendbar.collapsed .lb-collapse{transform:rotate(180deg);}
@@ -2396,84 +2397,80 @@ function _renderSrRows(){
   });
 }
 
-// ── bind LW chart controls ──
-function bindLWChart(){
-  if(!lwChart) return;
-  const addSr=document.getElementById('addSrR');
-  if(addSr && !addSr.__lwBound){
-    addSr.__lwBound=true;
-    addSr.addEventListener('click',()=>{
-      _addingSr=addSr.classList.toggle('active');
-      if(_addingSr){
-        _deletingSr=false;
-        const db=document.getElementById('btnDelSr'); if(db) db.classList.remove('active');
-        document.getElementById('lwWrap')?.classList.add('adding-sr');
-      } else document.getElementById('lwWrap')?.classList.remove('adding-sr');
-      document.getElementById('candleChart').style.cursor=_addingSr?'crosshair':'default';
-      const uh=document.getElementById('lwModeHint'); if(uh&&uh.__lwUpd) uh.__lwUpd();
-    });
-  }
-  const btnDelSr=document.getElementById('btnDelSr');
-  if(btnDelSr && !btnDelSr.__lwBound){
-    btnDelSr.__lwBound=true;
-    btnDelSr.addEventListener('click',()=>{
-      _deletingSr=btnDelSr.classList.toggle('active');
-      if(_deletingSr){
-        _addingSr=false;
-        const ab=document.getElementById('addSrR'); if(ab) ab.classList.remove('active');
-        document.getElementById('lwWrap')?.classList.remove('adding-sr');
-      }
-      document.getElementById('candleChart').style.cursor=_deletingSr?'pointer':'default';
-      const uh2=document.getElementById('lwModeHint'); if(uh2&&uh2.__lwUpd) uh2.__lwUpd();
-    });
-  }
-  const btnSrL=document.getElementById('btnSrList');
-  if(btnSrL && !btnSrL.__lwBound){
-    btnSrL.__lwBound=true;
-    btnSrL.addEventListener('click',()=>{
+// ── helper โหมด S/R (ใช้ทั้งจาก toolbar และ subscribeClick) ──
+function _updSrHint(){
+  const h=document.getElementById('lwModeHint'); if(!h) return;
+  h.textContent=_addingSr?'โหมดวางเส้น S/R — คลิกกราฟเพื่อวางเส้นแนวนอน':
+                  _deletingSr?'โหมดลบเส้น S/R — คลิกใกล้เส้นที่จะลบ':'';
+  h.style.display=(_addingSr||_deletingSr)?'block':'none';
+}
+function _setSrModeCls(){
+  const w=document.getElementById('lwWrap'); if(!w) return;
+  w.classList.toggle('adding-sr',!!_addingSr);
+}
+// ── เก็บเกี่ยวคลิกที่ปุ่มทั้งหมดด้วย event delegation (ไม่พึ่ง chart init — ปุ่มต้องใช้ได้เสมอ) ──
+function bindChartToolbar(){
+  if(window.__ctBound) return; window.__ctBound=true;
+  document.addEventListener('click',e=>{
+    const btn=e.target && e.target.closest ? e.target.closest('.chart-toolbar button, #lwSrPanel .sr-clear') : null;
+    if(!btn) return;
+    const id=btn.id;
+    if(id==='addSrR'){
+      _addingSr=btn.classList.toggle('active');
+      if(_addingSr){ _deletingSr=false; const db=document.getElementById('btnDelSr'); if(db) db.classList.remove('active'); }
+      else _setSrModeCls();
+      _setSrModeCls();
+      const cc=document.getElementById('candleChart'); if(cc) cc.style.cursor=_addingSr?'crosshair':'default';
+      _updSrHint();
+      return;
+    }
+    if(id==='btnDelSr'){
+      _deletingSr=btn.classList.toggle('active');
+      if(_deletingSr){ _addingSr=false; const ab=document.getElementById('addSrR'); if(ab) ab.classList.remove('active'); _setSrModeCls(); }
+      const cc=document.getElementById('candleChart'); if(cc) cc.style.cursor=_deletingSr?'pointer':'default';
+      _updSrHint();
+      return;
+    }
+    if(id==='btnSrList'){
       const sp=document.getElementById('lwSrPanel');
-      if(sp){
-        sp.style.display=sp.style.display==='none'?'block':'none';
-        if(sp.style.display==='block') _renderSrRows();
-      }
-    });
-  }
-  const srClear=document.getElementById('srClearAll');
-  if(srClear && !srClear.__lwBound){
-    srClear.__lwBound=true;
-    srClear.addEventListener('click',()=>{
+      if(sp){ sp.style.display=sp.style.display==='none'?'block':'none'; if(sp.style.display==='block') _renderSrRows(); }
+      return;
+    }
+    if(id==='srClearAll'){
+      if(!lwCandle){ showToast('กราฟยังโหลดไม่เสร็จ'); return; }
       _userSr.forEach(ln=>{ try{ lwCandle.removePriceLine(ln); }catch(e){} });
       _userSr=[];
       _renderSrRows();
-    });
-  }
-  // ชื่อพื้นหลังเพื่อบอกโหมด
-  const hint=document.getElementById('lwModeHint');
-  if(hint && !hint.__lwBound){
-    hint.__lwBound=true;
-    const upd=()=>{
-      if(_addingSr) hint.textContent='โหมดวางเส้น S/R — คลิกกราฟเพื่อวางเส้นแนวนอน';
-      else if(_deletingSr) hint.textContent='โหมดลบเส้น S/R — คลิกใกล้เส้นที่จะลบ';
-      else hint.textContent='',
-      hint.style.display=(_addingSr||_deletingSr)?'block':'none';
-    };
-    hint.__lwUpd=upd;
-    upd();
-  }
-  const reset=document.getElementById('zoomReset');
-  if(reset && !reset.__lwBound){ reset.__lwBound=true; reset.addEventListener('click',()=>{ if(lwChart) lwChart.timeScale().fitContent(); }); }
-  const btnFS=document.getElementById('btnFullscreen');
-  if(btnFS && !btnFS.__lwBound){
-    btnFS.__lwBound=true;
-    btnFS.addEventListener('click',()=>{ const p=document.getElementById('chartPanel'); if(p&&p.requestFullscreen){ const wrap=document.getElementById('lwWrap'); const prev=wrap&&wrap.style.height; if(wrap) wrap.style.height='calc(100vh - 130px)'; p.requestFullscreen().then(()=>{ setTimeout(v=>refreshLWResize(),80); }).catch(()=>{ if(wrap&&prev) wrap.style.height=prev; }); } });
-    document.addEventListener('fullscreenchange',()=>{ if(!document.fullscreenElement){ const wrap=document.getElementById('lwWrap'); if(wrap) wrap.style.height='460px'; refreshLWResize(); } });
-  }
-  const btnTL=document.getElementById('btnTradeList');
-  if(btnTL && !btnTL.__lwBound){
-    btnTL.__lwBound=true;
-    btnTL.addEventListener('click',()=>{ const tl=document.getElementById('lwTradeList'); if(tl){ const show=tl.style.display==='none'; tl.style.display=show?'block':'none'; if(show) tl.scrollIntoView({block:'nearest',behavior:'smooth'}); } });
-  }
-  const updHint=()=>{ const h=document.getElementById('lwModeHint'); if(h&&h.__lwUpd) h.__lwUpd(); };
+      _updSrHint();
+      return;
+    }
+    if(id==='zoomReset'){
+      if(lwChart) lwChart.timeScale().fitContent();
+      else showToast('กราฟยังโหลดไม่เสร็จ');
+      return;
+    }
+    if(id==='btnFullscreen'){
+      const p=document.getElementById('chartPanel');
+      if(p&&p.requestFullscreen){
+        const wrap=document.getElementById('lwWrap'); const prev=wrap&&wrap.style.height;
+        if(wrap) wrap.style.height='calc(100vh - 130px)';
+        p.requestFullscreen().then(()=>{ setTimeout(v=>refreshLWResize(),80); }).catch(()=>{ if(wrap&&prev) wrap.style.height=prev; });
+      }
+      return;
+    }
+    if(id==='btnTradeList'){
+      const tl=document.getElementById('lwTradeList');
+      if(tl){ const show=tl.style.display==='none'; tl.style.display=show?'block':'none'; if(show) tl.scrollIntoView({block:'nearest',behavior:'smooth'}); }
+      return;
+    }
+  });
+  document.addEventListener('fullscreenchange',()=>{ if(!document.fullscreenElement){ const wrap=document.getElementById('lwWrap'); if(wrap) wrap.style.height='460px'; refreshLWResize(); } });
+}
+
+// ── bind LW chart controls (เฉพาะการคลิกวาง/ลบเส้นบนกราฟ) ──
+function bindLWChart(){
+  if(!lwChart) return;
+  _setSrModeCls(); _updSrHint();
   // click เพื่อวาง / ลบ S/R
   lwChart.subscribeClick(param=>{
     if(!param.point || !lwCandle) return;
@@ -2486,9 +2483,9 @@ function bindLWChart(){
       }catch(e){}
       _addingSr=false;
       const b=document.getElementById('addSrR'); if(b) b.classList.remove('active');
-      document.getElementById('lwWrap')?.classList.remove('adding-sr');
-      document.getElementById('candleChart').style.cursor='default';
-      updHint();
+      _setSrModeCls();
+      const cc=document.getElementById('candleChart'); if(cc) cc.style.cursor='default';
+      _updSrHint();
       const sp=document.getElementById('lwSrPanel');
       if(sp&&sp.style.display==='block') _renderSrRows();
       showToast('เพิ่มเส้น S/R ราคา '+p.toFixed(2));
@@ -2506,8 +2503,8 @@ function bindLWChart(){
       } else showToast('ไม่พบเส้น S/R ใกล้จุดนี้ — คลิกให้ใกล้เส้นมากขึ้น');
       _deletingSr=false;
       const db=document.getElementById('btnDelSr'); if(db) db.classList.remove('active');
-      document.getElementById('candleChart').style.cursor='default';
-      updHint();
+      const cc=document.getElementById('candleChart'); if(cc) cc.style.cursor='default';
+      _updSrHint();
       const sp=document.getElementById('lwSrPanel');
       if(sp&&sp.style.display==='block') _renderSrRows();
       return;
@@ -2632,6 +2629,7 @@ async function refreshWatchlist(){
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
+  bindChartToolbar();           // ปุ่มทั้งหมดทำงานทันที แม้ chart ยังไม่โหลด
   loadSymbols();
   document.getElementById('tfGroup')?.addEventListener('click',e=>{
     const btn=e.target.closest('.tf-btn'); if(!btn) return;
@@ -3366,6 +3364,16 @@ async function refreshAll(){
   refreshAll();
   setInterval(refreshAll, REFRESH_MS);
 })();
+
+// ── fallback: ถ้า CDN หลัก (unpkg) โหลดไม่ได้ → ลอง jsdelivr แทน กันกราฟ/ปุ่มตายทั้งหน้า ──
+if(!window.LightweightCharts && !window.__lwFallback){
+  window.__lwFallback=true;
+  const _bs=document.createElement('script');
+  _bs.src='https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js';
+  _bs.onload=()=>{ try{ if(lastCandles&&lastCandles.length) drawLWChart(lastCandles,window._signalMarkers||[]); else refreshPrice(); }catch(e){ console.error('LW fallback draw fail',e); } };
+  _bs.onerror=()=>{ const c=document.getElementById('candleChart'); if(c&&!c.querySelector('canvas')) c.innerHTML='<div class="lw-fallback-msg">โหลดไลบรารีกราฟไม่สำเร็จ — ตรวจการเชื่อมต่อแล้วรีเฟรชใหม่</div>'; };
+  document.head.appendChild(_bs);
+}
 </script>
 </body>
 </html>
