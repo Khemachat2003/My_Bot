@@ -262,6 +262,13 @@
   .chart-legendbar.collapsed #lbValues{display:none;}
   .chart-legendbar .lb-tools{display:inline-flex; gap:4px; flex-shrink:0;}
   .lw-modehint{position:absolute; left:50%; top:10px; transform:translateX(-50%); z-index:5; pointer-events:none; background:rgba(41,98,255,.15); border:1px solid rgba(41,98,255,.5); color:#8fb0ff; font-size:11px; padding:5px 12px; border-radius:8px; font-family:monospace; white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,.3);}
+  #lwWrap{height:auto;}
+  .lw-pane{position:relative;}
+  .lw-pane-label{position:absolute; top:2px; left:8px; z-index:3; pointer-events:none; font-size:10px; color:var(--muted); background:rgba(19,23,34,.65); padding:1px 6px; border-radius:3px; font-family:var(--num);}
+  #candleChart{height:320px;}
+  #volChart{height:78px;}
+  #rsiChart{height:96px;}
+  #adxChart{height:96px;}
   .lw-fallback-msg{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:12px; font-family:monospace; text-align:center; padding:20px;}
   .chart-wrap.adding-sr #candleChart{outline:1px dashed rgba(41,98,255,.5); outline-offset:-2px; border-radius:6px;}
   .chart-legendbar .lb-collapse{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;line-height:1;padding:2px 4px;flex-shrink:0;}
@@ -632,8 +639,11 @@
           <span id="lbValues" class="lb-values"></span>
           <button class="lb-collapse" id="lbCollapse" title="ย่อ/ขยายค่า indicator"><i class="ti ti-chevron-down"></i></button>
         </div>
-        <div class="chart-wrap" id="lwWrap" style="height:460px;">
-          <div id="candleChart"></div>
+        <div class="chart-wrap" id="lwWrap">
+          <div class="lw-pane" id="lwPaneMain"><span class="lw-pane-label">ราคา</span><div id="candleChart"></div></div>
+          <div class="lw-pane" id="lwPaneVol"><span class="lw-pane-label">Volume</span><div id="volChart"></div></div>
+          <div class="lw-pane" id="lwPaneRsi"><span class="lw-pane-label">RSI (14)</span><div id="rsiChart"></div></div>
+          <div class="lw-pane" id="lwPaneAdx"><span class="lw-pane-label">ADX (14)</span><div id="adxChart"></div></div>
           <div class="lw-modehint" id="lwModeHint" style="display:none;"></div>
         </div>
         <!-- trade list (คลิกเลือกเพื่อดู SL/TP เฉพาะรายการ) -->
@@ -664,7 +674,8 @@
           <span><i style="background:#26C6DA;"></i>SMA5</span>
           <span><i style="background:#9C6FE0;"></i>RSI 14</span>
           <span><i style="background:#FF9800;"></i>ADX</span>
-          <span><i style="background:#787B86;"></i>Fractal 15</span>
+          <span><i style="background:#FF9800;"></i>Fractal สูง (ต้าน)</span>
+          <span><i style="background:#26A69A;"></i>Fractal ต่ำ (รับ)</span>
           <span><i style="background:var(--green);"></i>ML (▲ CALL)</span>
           <span><i style="background:var(--blue);"></i>Rule-base (▼ PUT)</span>
         </div>
@@ -2050,6 +2061,7 @@ let lwChart=null, lwCandle=null, lwVol=null;
 let lwEma50=null,lwEma100=null,lwEma200=null;
 let lwBbU=null,lwBbM=null,lwBbL=null,lwSma5=null;
 let lwRsi=null,lwAdx=null,lwPdi=null,lwNdi=null;
+let lwVolC=null,lwRsiC=null,lwAdxC=null,_lwCharts=[];   // multi-pane: instance แยกของ Volume/RSI/ADX
 let lwSrLines=[];
 let lwActiveLines=[];
 let lwAddingSr=false;
@@ -2070,51 +2082,88 @@ function _candleTime(d){
 
 function initLWChart(){
   if(!window.LightweightCharts) return null;
-  const el=document.getElementById('candleChart');
   if(lwChart) return;
-  lwChart=LightweightCharts.createChart(el,{
-    height:el.clientHeight||460, width:el.clientWidth||300,
+  const baseOpts={
     layout:{background:{color:'transparent'},textColor:'#787B86',fontFamily:'IBM Plex Mono, monospace'},
     grid:{vertLines:{color:'#1E222D'},horzLines:{color:'#1E222D'}},
     crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
     rightPriceScale:{borderColor:'#2A2E39'},
     timeScale:{borderColor:'#2A2E39',timeVisible:true,secondsVisible:false,rightOffset:1,barSpacing:7},
     localization:{locale:'th-TH'},
-  });
+  };
+  // ── pane ราคาหลัก (ซ่อนแกนเวลา — แกนเวลาจะอยู่ที่แถบ ADX ล่างสุด) ──
+  const el=document.getElementById('candleChart'); if(!el) return;
+  lwChart=LightweightCharts.createChart(el,{...baseOpts,width:el.clientWidth||300,height:el.clientHeight||320,timeScale:{...baseOpts.timeScale,visible:false}});
   lwCandle=lwChart.addCandlestickSeries({
     upColor:'#26A69A',downColor:'#EF5350',borderVisible:false,
     wickUpColor:'#26A69A',wickDownColor:'#EF5350',
     priceFormat:{type:'custom',formatter:p=>p},
   });
-  lwEma50=lwChart.addLineSeries({color:'#9C6FE0',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
-  lwEma100=lwChart.addLineSeries({color:'#787B86',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
-  lwEma200=lwChart.addLineSeries({color:'#FF9800',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
-  lwBbU=lwChart.addLineSeries({color:'rgba(41,98,255,.45)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,lineStyle:LightweightCharts.LineStyle.Dotted});
-  lwBbM=lwChart.addLineSeries({color:'#2962FF',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
-  lwBbL=lwChart.addLineSeries({color:'rgba(41,98,255,.45)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,lineStyle:LightweightCharts.LineStyle.Dotted});
-  lwSma5=lwChart.addLineSeries({color:'#26C6DA',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
-  // sub-panes (แยกกัน): ADX แถวบน · RSI แถวกลาง · Volume แถวล่าง — ต่างมีสเกล+ค่าของตัวเอง
-  // แบ่งแถบ: ราคา [0–44%] · ADX [44–62%] · RSI [66–82%] · Volume [86–100%]
-  lwRsi=lwChart.addLineSeries({color:'#9C6FE0',lineWidth:1,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false,priceScaleId:'rsiScale',priceFormat:{type:'custom',formatter:v=>v==null?'–':v.toFixed(1)}});
-  lwAdx=lwChart.addLineSeries({color:'#FF9800',lineWidth:1,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false,priceScaleId:'adxScale',priceFormat:{type:'custom',formatter:v=>v==null?'–':v.toFixed(1)}});
-  lwPdi=lwChart.addLineSeries({color:'#26A69A',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,priceScaleId:'adxScale'});
-  lwNdi=lwChart.addLineSeries({color:'#EF5350',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,priceScaleId:'adxScale'});
-  lwChart.priceScale('right').applyOptions({scaleMargins:{top:0.05,bottom:0.56}});
-  lwChart.priceScale('adxScale').applyOptions({scaleMargins:{top:0.44,bottom:0.38}});
-  lwChart.priceScale('rsiScale').applyOptions({scaleMargins:{top:0.66,bottom:0.18}});
-  lwChart.priceScale('volScale').applyOptions({scaleMargins:{top:0.86,bottom:0}});
-  try{ lwRsi.createPriceLine({price:70,color:'rgba(120,123,134,.45)',lineStyle:LightweightCharts.LineStyle.Dotted,title:'70',axisLabelVisible:false});
-    lwRsi.createPriceLine({price:30,color:'rgba(120,123,134,.45)',lineStyle:LightweightCharts.LineStyle.Dotted,title:'30',axisLabelVisible:false});
-    lwAdx.createPriceLine({price:20,color:'rgba(120,123,134,.5)',lineStyle:LightweightCharts.LineStyle.Dotted,title:'20',axisLabelVisible:false}); }catch(e){}
-  lwVol=lwChart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'volScale'});
+  bindLWChart();          // ← เรียกทันทีหลังมี lwChart/lwCandle (ก่อน indicator อื่น) — S/R click ใช้ได้เสมอ
+  try{
+    lwEma50=lwChart.addLineSeries({color:'#9C6FE0',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+    lwEma100=lwChart.addLineSeries({color:'#787B86',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+    lwEma200=lwChart.addLineSeries({color:'#FF9800',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+  }catch(e){ console.error('ema setup fail',e); }
+  try{
+    lwBbU=lwChart.addLineSeries({color:'rgba(41,98,255,.45)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,lineStyle:LightweightCharts.LineStyle.Dotted});
+    lwBbM=lwChart.addLineSeries({color:'#2962FF',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+    lwBbL=lwChart.addLineSeries({color:'rgba(41,98,255,.45)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,lineStyle:LightweightCharts.LineStyle.Dotted});
+  }catch(e){ console.error('bb setup fail',e); }
+  try{ lwSma5=lwChart.addLineSeries({color:'#26C6DA',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false}); }catch(e){ console.error('sma5 setup fail',e); }
+  // ── pane Volume — instance แยก (ไม่ทับราคา 100%) ──
+  try{
+    const vEl=document.getElementById('volChart');
+    if(vEl){
+      lwVolC=LightweightCharts.createChart(vEl,{...baseOpts,width:vEl.clientWidth||300,height:vEl.clientHeight||80,timeScale:{...baseOpts.timeScale,visible:false}});
+      lwVol=lwVolC.addHistogramSeries({priceFormat:{type:'volume'}});
+    }
+  }catch(e){ console.error('volume pane fail',e); }
+  // ── pane RSI — instance แยก มีเส้น 70/30 ของตัวเอง ──
+  try{
+    const rEl=document.getElementById('rsiChart');
+    if(rEl){
+      lwRsiC=LightweightCharts.createChart(rEl,{...baseOpts,width:rEl.clientWidth||300,height:rEl.clientHeight||96,timeScale:{...baseOpts.timeScale,visible:false}});
+      lwRsi=lwRsiC.addLineSeries({color:'#9C6FE0',lineWidth:1,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false,priceFormat:{type:'custom',formatter:v=>v==null?'–':v.toFixed(1)}});
+      lwRsi.createPriceLine({price:70,color:'rgba(120,123,134,.45)',lineStyle:LightweightCharts.LineStyle.Dotted,title:'70'});
+      lwRsi.createPriceLine({price:30,color:'rgba(120,123,134,.45)',lineStyle:LightweightCharts.LineStyle.Dotted,title:'30'});
+    }
+  }catch(e){ console.error('rsi pane fail',e); }
+  // ── pane ADX — instance แยก มีแกนเวลาแถวล่างสุด + เส้น 20 ──
+  try{
+    const aEl=document.getElementById('adxChart');
+    if(aEl){
+      lwAdxC=LightweightCharts.createChart(aEl,{...baseOpts,width:aEl.clientWidth||300,height:aEl.clientHeight||96,timeScale:{...baseOpts.timeScale,visible:true,timeVisible:true}});
+      lwAdx=lwAdxC.addLineSeries({color:'#FF9800',lineWidth:1,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false,priceFormat:{type:'custom',formatter:v=>v==null?'–':v.toFixed(1)}});
+      lwPdi=lwAdxC.addLineSeries({color:'#26A69A',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+      lwNdi=lwAdxC.addLineSeries({color:'#EF5350',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+      lwAdx.createPriceLine({price:20,color:'rgba(120,123,134,.5)',lineStyle:LightweightCharts.LineStyle.Dotted,title:'20'});
+    }
+  }catch(e){ console.error('adx pane fail',e); }
+  _lwSyncPanes();   // pan/zoom ของทุกแถบขยับตามกัน
   _lwOHLClegend();
-  bindLWChart();
+}
+
+// ── sync pan/zoom ข้ามทุกแถบ (ตามแพทเทิร์นใน multi-pane-chart-demo.html) ──
+function _lwSyncPanes(){
+  _lwCharts=[lwChart,lwVolC,lwRsiC,lwAdxC].filter(Boolean);
+  let syncing=false;
+  _lwCharts.forEach(c=>{
+    c.timeScale().subscribeVisibleLogicalRangeChange(range=>{
+      if(syncing||!range) return;
+      syncing=true;
+      _lwCharts.forEach(o=>{ if(o!==c) o.timeScale().setVisibleLogicalRange(range); });
+      syncing=false;
+    });
+  });
 }
 
 function refreshLWResize(){
-  if(!lwChart) return;
-  const el=document.getElementById('candleChart');
-  if(el&&el.clientWidth>0) lwChart.applyOptions({width:el.clientWidth,height:el.clientHeight||460});
+  const map={'candleChart':lwChart,'volChart':lwVolC,'rsiChart':lwRsiC,'adxChart':lwAdxC};
+  for(const id in map){
+    const el=document.getElementById(id); const c=map[id];
+    if(c&&el&&el.clientWidth>0) c.applyOptions({width:el.clientWidth,height:el.clientHeight||460});
+  }
 }
 
 function _normLW(prices){
@@ -2194,28 +2243,35 @@ function drawLWChart(prices,markers,tf){
   _lwLastBar=bars[bars.length-1];
   _lwLastPrev=bars.length>1?bars[bars.length-2].close:null;
   _renderLWDefaultLegend();
-  lwCandle.setData(bars);
-  if(chartInd.vol) lwVol.setData(bars.map(b=>({time:b.time,value:b.volume,color:b.close>=b.open?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'})));
-  else lwVol.setData([]);
-  if(chartInd.ema){ lwEma50.setData(_emaArr(bars,50)); lwEma100.setData(_emaArr(bars,100)); lwEma200.setData(_emaArr(bars,200)); }
-  else { lwEma50.setData([]); lwEma100.setData([]); lwEma200.setData([]); }
+  if(lwCandle) lwCandle.setData(bars);
+  if(lwVol){ if(chartInd.vol) lwVol.setData(bars.map(b=>({time:b.time,value:b.volume,color:b.close>=b.open?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'}))); else lwVol.setData([]); }
+  if(chartInd.ema){ if(lwEma50&&lwEma100&&lwEma200){ lwEma50.setData(_emaArr(bars,50)); lwEma100.setData(_emaArr(bars,100)); lwEma200.setData(_emaArr(bars,200)); } }
+  else { if(lwEma50)lwEma50.setData([]); if(lwEma100)lwEma100.setData([]); if(lwEma200)lwEma200.setData([]); }
   const bbOn=chartInd.bb&&bars.length>=20;
-  if(bbOn){ const bb=_bbArr(bars,20,2); lwBbU.setData(bb.u); lwBbM.setData(bb.m); lwBbL.setData(bb.l); }
-  else { lwBbU.setData([]); lwBbM.setData([]); lwBbL.setData([]); }
-  if(chartInd.sma5&&bars.length>=5){ lwSma5.setData(_smaArr(bars,5)); }
-  else lwSma5.setData([]);
-  // ── RSI + ADX sub-pane (ใช้ rsi()/adx() เดิมจาก checklist) ──
+  if(bbOn&&lwBbU&&lwBbM&&lwBbL){ const bb=_bbArr(bars,20,2); lwBbU.setData(bb.u); lwBbM.setData(bb.m); lwBbL.setData(bb.l); }
+  else { if(lwBbU)lwBbU.setData([]); if(lwBbM)lwBbM.setData([]); if(lwBbL)lwBbL.setData([]); }
+  if(chartInd.sma5&&bars.length>=5&&lwSma5){ lwSma5.setData(_smaArr(bars,5)); }
+  else { if(lwSma5) lwSma5.setData([]); }
+  // ── RSI (pane แยก #rsiChart) ──
+  window.__lastRsi=window.__lastAdx=window.__lastPdi=window.__lastNdi=null;
   const closesArr=bars.map(b=>b.close);
-  if(chartInd.rsi&&bars.length>=16){
+  if(chartInd.rsi&&bars.length>=16&&lwRsi){
     const rv=rsi(closesArr,14);
-    lwRsi.setData(bars.map((b,i)=>({time:b.time,value:rv[i]})).filter(d=>d.value!=null));
-  } else lwRsi.setData([]);
-  if(chartInd.adx&&bars.length>=28){
+    const rdt=bars.map((b,i)=>({time:b.time,value:rv[i]})).filter(d=>d.value!=null);
+    lwRsi.setData(rdt); window.__lastRsi=rdt.length?rdt[rdt.length-1].value:null;
+  } else { if(lwRsi) lwRsi.setData([]); }
+  // ── ADX (pane แยก #adxChart แถวนี้เป็นแถวล่างสุด → มีแกนเวลา) ──
+  if(chartInd.adx&&bars.length>=28&&lwAdx){
     const aa=adx(bars.map(b=>b.high),bars.map(b=>b.low),closesArr,14);
-    lwAdx.setData(bars.map((b,i)=>({time:b.time,value:aa.adx[i]})).filter(d=>d.value!=null));
-    lwPdi.setData(bars.map((b,i)=>({time:b.time,value:aa.pdi[i]})).filter(d=>d.value!=null));
-    lwNdi.setData(bars.map((b,i)=>({time:b.time,value:aa.ndi[i]})).filter(d=>d.value!=null));
-  } else { lwAdx.setData([]); lwPdi.setData([]); lwNdi.setData([]); }
+    const adt=bars.map((b,i)=>({time:b.time,value:aa.adx[i]})).filter(d=>d.value!=null);
+    const pdt=bars.map((b,i)=>({time:b.time,value:aa.pdi[i]})).filter(d=>d.value!=null);
+    const ndt=bars.map((b,i)=>({time:b.time,value:aa.ndi[i]})).filter(d=>d.value!=null);
+    lwAdx.setData(adt); lwPdi.setData(pdt); lwNdi.setData(ndt);
+    window.__lastAdx=adt.length?adt[adt.length-1].value:null;
+    window.__lastPdi=pdt.length?pdt[pdt.length-1].value:null;
+    window.__lastNdi=ndt.length?ndt[ndt.length-1].value:null;
+  } else { if(lwAdx){ lwAdx.setData([]); lwPdi.setData([]); lwNdi.setData([]); } }
+  _renderLWDefaultLegend();   // ← เรียกซ้ำหลังได้ค่า RSI/ADX ล่าสุด → legend แสดงทันที
 
   // ── Markers: shape=ทิศทาง, color=ระบบ — สัญญาณเกิดกลางแท่ง → snap ลงไปที่แท่งที่เปิดก่อนหน้า
   const activeTf=document.querySelector('#tfGroup .tf-btn.active')?.dataset.tf||tf||'1m';
@@ -2244,14 +2300,14 @@ function drawLWChart(prices,markers,tf){
       text:sysLabel+' '+m.direction,
     };
   }).filter(Boolean);
-  // ── Fractal 15: จุดยอดสูง/ต่ำ (สีเทา, รูปสี่เหลี่ยม) — ไม่ซ้ำกับสัญญาณ ──
+  // ── Fractal 15: จุดสูง=ส้ม(แนวต้าน) · จุดต่ำ=เขียว(แนวรับ) — ไม่ซ้ำกับสัญญาณ ──
   let fractalMarkers=[];
   if(chartInd.fractal&&bars.length>=16){
     const nd=bars.map((b,i)=>({o:b.open,h:b.high,l:b.low,c:b.close,i}));
     fractalMarkers=fractal(nd,7,7).map(p=>({
       time:bars[p.i].time,
       position:p.t==='H'?'aboveBar':'belowBar',
-      color:'#8A94A6',
+      color:p.t==='H'?'#FF9800':'#26A69A',   // High=ส้ม / Low=เขียว — ใช้สีที่มีอยู่แล้วในระบบ
       shape:p.t==='H'?'arrowDown':'arrowUp',
       text:'',
     }));
@@ -2275,7 +2331,9 @@ function _renderLWDefaultLegend(){
   const b=_lwLastBar; if(!b){ el.innerHTML=''; return; }
   const pct=_lwLastPrev!=null?(b.close-_lwLastPrev)/_lwLastPrev*100:0;
   const cls=!isNaN(b.close)&&b.close>=b.open&&!isNaN(b.open)?'v-u':'v-d';
-  el.innerHTML=`<span class="v-m">ราคา</span> <b class="${cls}">${b.close}</b> <span class="v-m">·</span> <span class="${cls}">${pct>=0?'+':''}${pct.toFixed(2)}%</span> <span class="v-m">·</span> <span class="v-m">${b.time?new Date(b.time*1000).toLocaleTimeString('th-TH'):''}</span>`;
+  el.innerHTML=`<span class="v-m">ราคา</span> <b class="${cls}">${b.close}</b> <span class="v-m">·</span> <span class="${cls}">${pct>=0?'+':''}${pct.toFixed(2)}%</span> <span class="v-m">·</span> <span class="v-m">${b.time?new Date(b.time*1000).toLocaleTimeString('th-TH'):''}</span>`+
+    (window.__lastRsi!=null?` <span class="v-m">·</span> <span class="v-m" style="color:#9C6FE0;">RSI</span> <b>${Number(window.__lastRsi).toFixed(1)}</b>`:'')+
+    (window.__lastAdx!=null?` <span class="v-m">·</span> <span class="v-m" style="color:#FF9800;">ADX</span> <b>${Number(window.__lastAdx).toFixed(1)}</b>`:'');
 }
 function _lwOHLClegend(){
   const el=document.getElementById('lbOhlc'); if(!el) return;
@@ -2295,7 +2353,7 @@ function _lwOHLClegend(){
         const v=param.seriesData.get(series);
         if(v&&v.value!=null) parts.push(`<span class="v-m">${s}</span> <b>${v.value}</b>`);
       };
-      push('EMA50',lwEma50); push('BB',lwBbM); push('SMA5',lwSma5); push('RSI',lwRsi); push('ADX',lwAdx);
+      push('EMA50',lwEma50); push('BB',lwBbM); push('SMA5',lwSma5);
       if(parts.length) vEl.innerHTML=parts.join('');
       else _renderLWDefaultLegend();
     }
@@ -2366,6 +2424,7 @@ function _autoSelectOpen(markers){
 let _selLines=[];   // เส้น SL/TP ของ trade ที่เลือก
 let _userSr=[];     // เส้น S/R ที่ผู้ใช้เพิ่ม
 let _addingSr=false;
+let _deletingSr=false;   // ← ต้องประกาศ! เดิมอ้างแต่ไม่เคย let — bindLWChart() เรียก _updSrHint() อ่านค่าตรงนี้แล้วระเบิด ReferenceError ก่อนสร้าง sub-pane
 let _addingTimer=null;
 
 function _clearPriceLines(){
@@ -2451,6 +2510,7 @@ function bindChartToolbar(){
     }
     if(id==='btnFullscreen'){
       const p=document.getElementById('chartPanel');
+      if(document.fullscreenElement){ document.exitFullscreen(); return; }   // ← อยู่ในโหมดเต็มจอแล้ว → ออกแทน
       if(p&&p.requestFullscreen){
         const wrap=document.getElementById('lwWrap'); const prev=wrap&&wrap.style.height;
         if(wrap) wrap.style.height='calc(100vh - 130px)';
@@ -2464,7 +2524,17 @@ function bindChartToolbar(){
       return;
     }
   });
-  document.addEventListener('fullscreenchange',()=>{ if(!document.fullscreenElement){ const wrap=document.getElementById('lwWrap'); if(wrap) wrap.style.height='460px'; refreshLWResize(); } });
+  document.addEventListener('fullscreenchange',()=>{
+    const fsBtn=document.getElementById('btnFullscreen');
+    const fsIcon=fsBtn?.querySelector('i'); const fsLbl=fsBtn?.querySelector('.btn-lbl');
+    if(document.fullscreenElement){
+      if(fsIcon) fsIcon.className='ti ti-minimize'; if(fsLbl) fsLbl.textContent='ย่อจอ';
+    }else{
+      if(fsIcon) fsIcon.className='ti ti-maximize'; if(fsLbl) fsLbl.textContent='เต็มจอ';
+      const wrap=document.getElementById('lwWrap'); if(wrap) wrap.style.height='';
+      refreshLWResize();
+    }
+  });
 }
 
 // ── bind LW chart controls (เฉพาะการคลิกวาง/ลบเส้นบนกราฟ) ──
@@ -2513,7 +2583,7 @@ function bindLWChart(){
 }
 
 
-async function refreshPrice(){
+async function refreshPrice(showLoading=false){
   try{
     const tf=document.querySelector('#tfGroup .tf-btn.active')?.dataset.tf||'1m';
     let sym='';
@@ -2523,7 +2593,7 @@ async function refreshPrice(){
     if(!sym) sym='frxXAUUSD';
     const badge=document.getElementById('symbolBadge'); if(badge) badge.textContent=sym;
     const wrap=document.getElementById('lwWrap');
-    if(wrap) wrap.classList.add('loading');
+    if(showLoading && wrap) wrap.classList.add('loading');   // ← แสดง loading เฉพาะตอนผู้ใช้กดเปลี่ยน TF/symbol เอง
     // fetch candles + markers พร้อมกัน → เปลี่ยน TF เร็วขึ้น
     const [[prices,markers]]=await Promise.all([
       Promise.all([
@@ -2584,7 +2654,7 @@ async function loadSymbols(){
     let cur='frxXAUUSD';
     try{ const s=await fetchJSON('/api/symbol'); if(s&&s.symbol) cur=s.symbol; }catch(e){}
     sel.innerHTML=symbolList.map(s=>`<option value="${s.symbol}" ${s.symbol===cur?'selected':''}>${s.label}</option>`).join('');
-    sel.addEventListener('change',()=>refreshPrice());
+    sel.addEventListener('change',()=>refreshPrice(true));   // ← user action → โชว์ loading
   }
   renderWatchlist();
 }
@@ -2610,7 +2680,7 @@ function renderWatchlist(){
     row.addEventListener('click',()=>{
       const sel=document.getElementById('chartSymbol'); if(sel) sel.value=row.dataset.symbol;
       rowsEl.querySelectorAll('.wl-row').forEach(r=>r.classList.toggle('active',r===row));
-      refreshPrice();
+      refreshPrice(true);   // ← user action → โชว์ loading
     });
   });
 }
@@ -2636,7 +2706,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     document.querySelectorAll('#tfGroup .tf-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     lwChart&&lwChart.timeScale().fitContent();
-    refreshPrice();
+    refreshPrice(true);   // ← user action → โชว์ loading
   });
   document.getElementById('chartLegendBar')?.addEventListener('click',e=>{
     const chip=e.target.closest('.lo-chip'); if(!chip) return;
