@@ -113,6 +113,26 @@ DASHBOARD_PASS = os.getenv("DASHBOARD_PASS")
 
 security = HTTPBasic(auto_error=False)
 
+# ── กันรหัสผ่านเริ่มต้นจาก .env.example ถูกใช้จากภายนอก ─────────────────────
+# ถ้ายังไม่ได้เปลี่ยน user/pass เริ่มต้น → อนุญาตเฉพาะการ login จาก localhost
+# (กันคนแปลกหน้า brute-force admin/change-me-please บน VPS ที่เปิด port สาธารณะ)
+_DEFAULT_USER = "admin"
+_DEFAULT_PASS = "change-me-please"
+
+
+def _default_creds_used() -> bool:
+    """True ถ้ายังใช้ user/pass ค่าเริ่มต้นของ .env.example"""
+    return DASHBOARD_USER == _DEFAULT_USER and DASHBOARD_PASS == _DEFAULT_PASS
+
+
+def _is_localhost(request: Request) -> bool:
+    try:
+        host = request.client.host if request.client else ""
+    except Exception:
+        host = ""
+    return host in ("127.0.0.1", "::1", "localhost", "testclient")
+
+
 _SESSION_COOKIE = "xauusd_session"
 _SESSION_DAYS = 7
 
@@ -160,6 +180,10 @@ def require_auth(request: Request, credentials: HTTPBasicCredentials = Depends(s
         ok_user = secrets.compare_digest(credentials.username, DASHBOARD_USER)
         ok_pass = secrets.compare_digest(credentials.password, DASHBOARD_PASS)
         if ok_user and ok_pass:
+            if _default_creds_used() and not _is_localhost(request):
+                print("[Security] ❌ ปฏิเสธ login ด้วยรหัสผ่านเริ่มต้นจาก IP ภายนอก — "
+                      "ตั้ง DASHBOARD_USER/DASHBOARD_PASS ใน .env ก่อน (ดู .env.example)")
+                raise HTTPException(status_code=403, detail="รหัสผ่านเริ่มต้นใช้ได้เฉพาะ localhost — ตั้ง DASHBOARD_USER/DASHBOARD_PASS ใน .env ก่อน")
             return True
     token = request.cookies.get(_SESSION_COOKIE)
     if token and verify_session_token(token):
@@ -186,9 +210,8 @@ def health():
 
 # ── หน้า login (session cookie — ใช้ได้กับทุกเบราว์เซอร์ รวมถึง VS Code) ────
 _LOGIN_MSG = ""
-_HINT = ("<div class='hint'>ค่าเริ่มต้น: <code>admin</code> / <code>change-me-please</code>"
-         "<br>แก้ได้ในไฟล์ .env → DASHBOARD_USER / DASHBOARD_PASS</div>" if DASHBOARD_PASS == "change-me-please"
-         else "<div class='hint'>ชื่อผู้ใช้/รหัสผ่านอยู่ในไฟล์ .env → DASHBOARD_USER / DASHBOARD_PASS</div>")
+# ไม่เฉลย user/pass เริ่มต้นบนหน้า login (กันคนแปลกหน้าลองรหัสผ่านจากที่เห็นบนหน้าเว็บ)
+_HINT = ("<div class='hint'>ชื่อผู้ใช้/รหัสผ่านตั้งได้ในไฟล์ .env → DASHBOARD_USER / DASHBOARD_PASS</div>")
 
 LOGIN_HTML = f"""<!DOCTYPE html>
 <html lang="th">
@@ -267,13 +290,18 @@ def login_page():
 
 
 @app.post("/login")
-def login(body: LoginBody):
+def login(body: LoginBody, request: Request):
     if not DASHBOARD_USER or not DASHBOARD_PASS:
         return RedirectResponse("/", status_code=303)
     ok_user = secrets.compare_digest(body.username, DASHBOARD_USER)
     ok_pass = secrets.compare_digest(body.password, DASHBOARD_PASS)
     if not (ok_user and ok_pass):
         raise HTTPException(status_code=401, detail="ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
+    # กัน brute-force จากอินเทอร์เน็ต: ถ้ายังใช้ user/pass เริ่มต้น → อนุญาตเฉพาะ localhost
+    if _default_creds_used() and not _is_localhost(request):
+        print(f"[Security] ❌ ปฏิเสธ login ด้วยรหัสผ่านเริ่มต้นจาก IP ภายนอก "
+              f"({request.client.host if request.client else '?'}) — ตั้ง DASHBOARD_USER/DASHBOARD_PASS ใน .env ก่อน")
+        raise HTTPException(status_code=403, detail="รหัสผ่านเริ่มต้นใช้ได้เฉพาะ localhost — ตั้ง DASHBOARD_USER/DASHBOARD_PASS ใน .env ก่อน")
     resp = RedirectResponse("/", status_code=303)
     resp.set_cookie(_SESSION_COOKIE, create_session_token(body.username),
                     max_age=_SESSION_DAYS * 86400, httponly=True, samesite="lax")

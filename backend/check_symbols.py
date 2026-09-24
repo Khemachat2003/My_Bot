@@ -13,7 +13,7 @@ import sys
 
 import websocket
 
-from backend.deriv_feed import DERIV_WS_URL, DEFAULT_SYMBOL
+from backend.data_feed.deriv_feed import DERIV_WS_URL, DEFAULT_SYMBOL
 
 try:
     sys.stdout.reconfigure(errors="replace")

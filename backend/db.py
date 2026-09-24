@@ -18,13 +18,7 @@ from typing import Optional
 
 import pandas as pd
 
-try:
-    from backend.deriv_feed import DEFAULT_SYMBOL
-except ModuleNotFoundError:
-    try:
-        from backend.data_feed.deriv_feed import DEFAULT_SYMBOL
-    except ModuleNotFoundError:
-        DEFAULT_SYMBOL = "frxXAUUSD"
+from backend.data_feed.deriv_feed import DEFAULT_SYMBOL
 
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "bot.db"
 DB_PATH.parent.mkdir(exist_ok=True)

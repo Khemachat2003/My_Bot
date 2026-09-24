@@ -43,10 +43,7 @@ from backend.telegram import send_telegram
 from backend.market_hours import is_forex_like, market_open_now, market_open_cooldown, symbol_label, get_session
 from backend.setup_scorer import score_setup
 
-try:
-    from backend.deriv_feed import fetch_candles_history, DEFAULT_SYMBOL
-except ModuleNotFoundError:
-    from backend.data_feed.deriv_feed import fetch_candles_history, DEFAULT_SYMBOL
+from backend.data_feed.deriv_feed import fetch_candles_history, DEFAULT_SYMBOL
 
 SYMBOL = DEFAULT_SYMBOL
 BUFFER_MAX = 5000

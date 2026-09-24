@@ -26,7 +26,7 @@ try:
 except Exception:
     pass
 
-from backend.deriv_feed import DERIV_WS_URL, DEFAULT_SYMBOL
+from backend.data_feed.deriv_feed import DERIV_WS_URL, DEFAULT_SYMBOL
 
 TARGET_SYMBOL = os.getenv("DERIV_SYMBOL", DEFAULT_SYMBOL)
 

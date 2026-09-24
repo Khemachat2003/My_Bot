@@ -1,64 +1,110 @@
-# XAUUSD Trading Bot — Phase 1: Backtest
+# XAUUSD Trading Bot — Live Signal System (Deriv + ML + MT5)
+
+ระบบเทรดทอง XAUUSD แบบ live ครบวงจร: ยิงสัญญาณเข้า Telegram, Dashboard เว็บ,
+โมเดล ML (LightGBM) แยกตาม timeframe, และ MT5 Executor ส่งออเดอร์จริงพร้อม SL/TP
+
+> ⚠️ **หมายเหตุสำคัญ:** ระบบนี้เป็นเครื่องมือช่วยตัดสินใจ ไม่ใช่การรับประกันกำไร
+> การเทรด Forex/ทองคำมีความเสี่ยงสูง — ทดสอบด้วย Demo/phantom mode ก่อนเสมอ
+
+## สถาปัตยกรรม (3 ระบบ + Executor)
+
+รันพร้อมกันด้วย supervisor เดียว (`run_live.py`) — ถ้า process ไหนตาย restart ให้อัตโนมัติ
+
+| ระบบ | โมดูล | หน้าที่ |
+|---|---|---|
+| 🔵 Rule-Based Setup Engine | `backend.setup_feed` + `backend.setup_scorer` | สัญญาณ Sniper Reversion ตาม 11-Checklist (EMA200/EMA100 touch) → Telegram |
+| 🟢 ML Model Engine | `backend.notifier` | LightGBM per-timeframe (`model_m1/m5.joblib`) + dynamic threshold → Telegram |
+| 🌐 Dashboard | `backend.api` (FastAPI) | กราฟ multi-pane, S/R editor, Equity Curve, login ด้วย session cookie |
+| 🏦 MT5 Executor | `mt5_executor.py` (Windows) | ดึงสัญญาณ FIRE จาก VPS → ส่งออเดอร์ MT5 พร้อม SL/TP (fractal + R:R) |
+| 🌍 Macro Feed | `backend.macro_feed` | ดึง DXY รายชั่วโมงจาก Yahoo → ตาราง `macro_1h` (Regime-Gate) |
+| 💾 Backup | `backend.backup` | zip DB + models + candles ส่งเข้า Telegram ทุก 6 ชม. |
+
+**Data feed:** `backend/data_feed/deriv_feed.py` เป็นตัวเดียวที่ดึงข้อมูลจาก Deriv
+(WebSocket, timeout 15s, cache CSV, fallback symbol อัตโนมัติเมื่อตลาดทองปิด)
 
 ## โครงสร้างโปรเจค
 
 ```
 xauusd-bot/
+├── run_live.py             ← รันทุกระบบด้วยคำสั่งเดียว (supervisor + auto-restart)
+├── run_backtest.py         ← backtest rule-based (Phase 1)
+├── mt5_executor.py         ← MT5 order executor (Windows เท่านั้น)
 ├── backend/
-│   ├── data_fetcher.py   ← ดึงข้อมูลราคาจาก yfinance
-│   ├── indicators.py     ← RSI, MACD, EMA, BB, ATR, ADX, Stoch
-│   ├── strategies.py     ← 3 strategies (EMA_RSI, RSI_MACD, BB_Breakout)
-│   ├── backtest.py       ← Backtest engine + Position management
-│   └── report.py         ← สร้างกราฟ + CSV report
-├── data/                 ← Cache ข้อมูลราคา
-├── reports/              ← ผลลัพธ์ backtest
-├── run_backtest.py       ← สคริปต์หลัก ← รันตัวนี้!
-└── requirements.txt
+│   ├── api.py              ← Dashboard (FastAPI + basic auth + session cookie)
+│   ├── db.py               ← SQLite (WAL mode): setup_signals, ml_signals, trade_journal...
+│   ├── setup_feed.py       ← 🔵 Rule-Based live engine
+│   ├── setup_scorer.py     ← 11-Checklist scoring logic
+│   ├── notifier.py         ← 🟢 ML live engine
+│   ├── setup_db.py         ← ตารางฝั่ง Rule-Based
+│   ├── market_hours.py     ← เช็คเวลาเปิด/ปิดตลาด + symbol fallback
+│   ├── telegram.py         ← ส่งแจ้งเตือน (retry + log สถานะ)
+│   ├── macro_feed.py       ← DXY รายชั่วโมง → DB
+│   ├── backup.py           ← backup อัตโนมัติ
+│   ├── data_feed/
+│   │   ├── deriv_feed.py   ← Deriv WebSocket feed (ตัวจริงตัวเดียว)
+│   │   ├── backfill.py     ← ดึงข้อมูลย้อนหลังเป็น CSV
+│   │   └── macro_feed.py   ← backfill correlated assets (yfinance, สำหรับ research)
+│   └── ml_forecaster/      ← เทรน/ตรวจโมเดล (walk-forward, auto-retrain, features v2)
+├── frontend/index.html     ← Dashboard SPA (ใช้ lightweight-charts)
+├── scripts/                ← สคริปต์เช็คการเชื่อมต่อ (test_connection ฯลฯ)
+├── data/                   ← SQLite DB + CSV cache (git-ignored)
+├── docker-compose.yml      ← deploy บน VPS
+└── .github/workflows/      ← auto-deploy เมื่อ push main
 ```
 
-## วิธีติดตั้งและรัน
+## ติดตั้งและรัน (เครื่อง dev)
 
-### 1. ติดตั้ง dependencies
 ```bash
 pip install -r requirements.txt
+cp .env.example .env        # แล้วเติมค่า TELEGRAM_BOT_TOKEN ฯลฯ
+
+python run_live.py          # รันทุกระบบ (api + setup_feed + notifier + macro + retrain)
+python run_live.py --no-api # เทรด headless ไม่เปิด dashboard
 ```
 
-### 2. รัน Backtest
+Dashboard: `http://localhost:8000` (login ด้วย DASHBOARD_USER/DASHBOARD_PASS ใน .env)
+
+> 🔐 **ความปลอดภัย:** หากยังใช้ user/pass เริ่มต้น (`admin`/`change-me-please`)
+> ระบบจะอนุญาตให้ login **จาก localhost เท่านั้น** — ก่อน deploy ขึ้น VPS ให้ตั้ง
+> `DASHBOARD_USER`/`DASHBOARD_PASS` ใหม่ใน .env เสมอ
+
+## เทรนโมเดล ML
+
 ```bash
-python run_backtest.py
+python -m backend.data_feed.backfill --days 60                    # ดึงข้อมูลย้อนหลัง
+python -m backend.ml_forecaster.train_live_models                 # เทรน model_m1/m5
+python -m backend.ml_forecaster.train_walkforward --horizon 5     # ตรวจแบบ walk-forward
+python -m backend.ml_forecaster.auto_retrain                      # เรียนจากสัญญาณจริง (รันใน run_live แล้ว)
 ```
 
-ระบบจะ:
-1. ดึงข้อมูล XAUUSD (Gold Futures GC=F) จาก yfinance ย้อนหลัง 1 ปี
-2. คำนวณ indicators ทั้งหมด
-3. รัน 3 strategies และจำลองการเทรด
-4. แสดงผล Winrate, Profit Factor, Max Drawdown
-5. บันทึกกราฟ Equity Curve ที่ reports/
+ควรมีข้อมูลอย่างน้อย 30-90 วัน (M1) ก่อนเชื่อผลโมเดล — ข้อมูลน้อย AUC จะใกล้ 0.5
 
-## 3 Strategies
+## MT5 Executor (Windows)
 
-| Strategy | เงื่อนไข BUY | เงื่อนไข SELL |
-|---|---|---|
-| EMA_RSI | EMA20>50>200, RSI 35-55, MACD hist ↑ | EMA20<50<200, RSI 45-65, MACD hist ↓ |
-| RSI_MACD | RSI<32 + MACD cross up | RSI>68 + MACD cross down |
-| BB_Breakout | BB squeeze แล้ว break upper | BB squeeze แล้ว break lower |
+```bash
+pip install MetaTrader5
+python mt5_executor.py --dry-run   # ทดสอบโดยไม่ส่งออเดอร์จริง
+python mt5_executor.py             # ต้องเปิด MT5 terminal + login ก่อน
+```
 
-## เป้าหมาย Backtest
+ตั้งค่าความเสี่ยงใน .env: `MT5_RISK_PCT=0.5`, `MT5_RR=2.0`, `MT5_DAILY_MAX=20` (ดู .env.example ทั้งหมด)
 
-| Metric | เป้าหมาย | ความหมาย |
-|---|---|---|
-| Winrate | > 50% | ชนะมากกว่าแพ้ |
-| Profit Factor | > 1.5 | กำไรรวม > ขาดทุน x1.5 |
-| Max Drawdown | < 20% | ขาดทุนสูงสุดไม่เกิน 20% |
-| Sharpe Ratio | > 1.0 | ผลตอบแทนดีเทียบกับความเสี่ยง |
+## Deploy ขึ้น VPS (Docker)
 
-## Phase ถัดไป
+```bash
+# บน VPS (ครั้งแรก)
+git clone https://github.com/Khemachat2003/My_Bot.git /opt/xauusd-bot
+cd /opt/xauusd-bot && cp .env.example .env && nano .env
+docker compose up -d --build
+```
 
-- **Phase 2**: Signal Bot + Line/Telegram Alert (FastAPI + Scheduler)
-- **Phase 3**: Dashboard บน Raspberry Pi (Next.js)
-- **Phase 4**: Auto Trade ผ่าน MT5 Python API (ต้องผ่าน Phase 1-2 ก่อน)
+หลังจากนั้นทุก `git push main` → GitHub Actions จะ deploy ให้อัตโนมัติ
+(ตั้ง Secrets: `VPS_HOST`, `VPS_USER`, `SSH_KEY` — ดูรายละเอียดใน workflow)
 
-## หมายเหตุสำคัญ
+## วินัยการเทรดที่ระบบบังคับ
 
-> ⚠️ ระบบนี้เป็นเครื่องมือช่วยตัดสินใจ ไม่ใช่การรับประกันผลกำไร
-> การเทรด Forex มีความเสี่ยงสูง ควรทดสอบด้วย Demo account ก่อนเสมอ
+- Cooldown ต่อ direction + daily cap ต่อทั้ง ML และ Rule-Based
+- สัญญาณเก่าเกิน `MT5_MAX_AGE_MIN` นาที → ข้าม
+- Cooldown พิเศษช่วงตลาดเพิ่งเปิด (`SETUP_MARKET_OPEN_COOLDOWN_MINUTES`)
+- Phantom mode บันทึกสัญญาณทดลองโดยไม่ส่งออเดอร์จริง
+
