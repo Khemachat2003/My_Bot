@@ -21,7 +21,7 @@ from pathlib import Path
 import pandas as pd
 import websocket
 
-from backend.data_feed.deriv_feed import DERIV_WS_URL, DEFAULT_SYMBOL, DATA_DIR
+from backend.data_feed.deriv_feed import DERIV_WS_URL, DEFAULT_SYMBOL, DATA_DIR, connect_ws
 
 
 def fetch_chunk(symbol: str, granularity: int, end_epoch: int, count: int = 5000,
@@ -36,7 +36,7 @@ def fetch_chunk(symbol: str, granularity: int, end_epoch: int, count: int = 5000
         "style": "candles",
         "granularity": granularity,
     }
-    ws = websocket.create_connection(DERIV_WS_URL, timeout=timeout)
+    ws = connect_ws(timeout)
     try:
         ws.send(json.dumps(req))
         raw = ws.recv()

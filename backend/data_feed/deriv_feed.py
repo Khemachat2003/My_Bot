@@ -36,8 +36,62 @@ try:
 except Exception:
     pass
 
-# 🟢 แก้ไข URL หลักให้ถูกต้อง พร้อมระบุ app_id=1089
-DERIV_WS_URL = "wss://ws.derivws.com/websockets/v3?app_id=1089"
+# 🟢 (แก้ 2026-09-29) Deriv ย้าย WebSocket gateway — endpoint เดิม (ws.derivws.com/websockets/v3)
+# ถูกปิดฝั่ง Deriv (Cloudflare ตอบ HTTP 520) ตั้งแต่ ~21 ก.ย. 2026 ทำให้ทั้งระบบไม่มีราคา/สัญญาณ
+# endpoint ใหม่ตาม docs ทางการ (https://developers.deriv.com): wss://api.derivws.com/trading/v1/options/ws/public
+# — โปรโตคอล message เดิมใช้ได้เหมือนกันทุกอย่าง (ticks_history / style / granularity / subscribe / ping)
+DERIV_WS_URLS = [
+    os.getenv("DERIV_WS_URL_OVERRIDE", "") or "wss://api.derivws.com/trading/v1/options/ws/public",
+    "wss://ws.derivws.com/websockets/v3?app_id=1089",   # fallback: endpoint เดิม (กันไว้ถ้า Deriv เปิดกลับ)
+]
+DERIV_WS_URL = DERIV_WS_URLS[0]     # เก็บชื่อตัวแปรเดิมไว้ให้โค้ด/สคริปต์อื่นที่ import ไปใช้/print
+
+
+# 🚨 Watchdog: ถ้าเชื่อม Deriv ไม่ได้ติดต่อกันหลายรอบ → แจ้ง Telegram เอง
+# (บทเรียน 21 ก.ย. 2026: Deriv ปิด endpoint เดิม ระบบเงียบ 8 วันโดยไม่มีใครรู้)
+FEED_DOWN_ALERT_AFTER = int(os.getenv("FEED_DOWN_ALERT_AFTER", "20"))          # จำนวนครั้งที่ fail ติดกันก่อนแจ้ง
+FEED_DOWN_ALERT_INTERVAL = int(os.getenv("FEED_DOWN_ALERT_INTERVAL_MIN", "30")) * 60   # เว้นช่วงแจ้งซ้ำ (วินาที)
+_FAIL_STREAK = {"n": 0, "alerted_at": 0.0}
+
+
+def _alert_feed_down(last_err) -> None:
+    """แจ้ง Telegram เมื่อต่อ Deriv ไม่ได้ติดกันหลายรอบ (ครั้งเดียวต่อ FEED_DOWN_ALERT_INTERVAL)"""
+    if _FAIL_STREAK["n"] < FEED_DOWN_ALERT_AFTER:
+        return
+    if time.time() - _FAIL_STREAK["alerted_at"] < FEED_DOWN_ALERT_INTERVAL:
+        return
+    _FAIL_STREAK["alerted_at"] = time.time()
+    msg = (f"🚨 Deriv data feed ใช้ไม่ได้ติดกัน {_FAIL_STREAK['n']} ครั้ง\n"
+           f"endpoint ที่ลอง: {', '.join(DERIV_WS_URLS)}\n"
+           f"error ล่าสุด: {type(last_err).__name__}: {str(last_err)[:150]}\n"
+           f"→ ระบบจะไม่ได้รับราคา/ไม่ยิงสัญญาณจนกว่าจะต่อได้ "
+           f"(ตรวจ https://developers.deriv.com ว่ามีการเปลี่ยน endpoint หรือไม่)")
+    try:
+        from backend.telegram import send_telegram
+        send_telegram(msg)
+    except Exception:
+        pass
+    print(f"[DerivFeed] ⚠️ แจ้งเตือน Telegram: ต่อ Deriv ไม่ได้ติดกัน {_FAIL_STREAK['n']} ครั้ง")
+
+
+def connect_ws(timeout: int = 15):
+    """เปิด WebSocket ไป Deriv — ลองทุก endpoint ใน DERIV_WS_URLS ตามลำดับจนเจอตัวที่ใช้ได้
+
+    คืน connection ที่ handshake สำเร็จ; ถ้าทุกตัวล้มเหลว raise exception ตัวสุดท้าย
+    """
+    last_err: Optional[Exception] = None
+    for url in DERIV_WS_URLS:
+        try:
+            ws = websocket.create_connection(
+                url, timeout=timeout, header=["Origin: https://app.deriv.com"])
+            _FAIL_STREAK["n"] = 0        # ต่อได้ → รีเซ็ตตัวนับ fail
+            return ws
+        except Exception as e:
+            last_err = e
+            print(f"[DerivFeed] connect ล้มเหลว: {url} → {type(e).__name__}: {str(e)[:120]}")
+    _FAIL_STREAK["n"] += 1
+    _alert_feed_down(last_err)
+    raise last_err
 
 # 🟢 ปรับ symbol ผ่าน .env ได้ (DERIV_SYMBOL=R_100 เช่น) โดยไม่ต้องแก้โค้ด
 # หมายเหตุ: frxXAUUSD คือราคาทองจริง ตลาดปิดวันเสาร์-อาทิตย์ (และช่วงปิดตลาด Forex)
@@ -53,23 +107,24 @@ DATA_DIR.mkdir(exist_ok=True)
 
 # ─── 1. ดึงแท่งเทียนย้อนหลัง (historical candles) ────────────────────────────
 
-def fetch_candles_history(
+def _fetch_candles_once(
     symbol: str = DEFAULT_SYMBOL,
     granularity: int = 60,     # วินาทีต่อแท่ง: 60=1m, 300=5m, 900=15m
     count: int = 1000,
     timeout: int = 15,
+    end: str = "latest",       # "latest" หรือ epoch (string) ไว้ขยับย้อนหลังตอน pagination
 ) -> pd.DataFrame:
     req = {
         "ticks_history": symbol,
         "adjust_start_time": 1,
         "count": count,
-        "end": "latest",
+        "end": end,
         "start": 1,
         "style": "candles",
         "granularity": granularity,
     }
 
-    ws = websocket.create_connection(DERIV_WS_URL, timeout=timeout)
+    ws = connect_ws(timeout)
     try:
         ws.send(json.dumps(req))
         raw = ws.recv()
@@ -88,6 +143,60 @@ def fetch_candles_history(
     df = df.rename(columns={"open": "open", "high": "high", "low": "low", "close": "close"})
     df["volume"] = 0.0
     df = df.set_index("datetime")[["open", "high", "low", "close", "volume"]].astype(float)
+
+    return df
+
+
+# 🟢 (แก้ 2026-09-29) endpoint ใหม่จำกัดจำนวนแท่งต่อ request (~1,000 แท่ง)
+# เดิม setup_feed ขอ 3,500 แท่ง → ได้จริง ~1,000 → แท่ง M5 (resample) เหลือ ~200
+# ซึ่งน้อยกว่า SETUP_MIN_BARS (215) → ไม่มีการให้คะแนนและไม่ยิงสัญญาณเลย (แบบเงียบ)
+# วิธีแก้: ยิงหลาย request แล้วขยับ "end" ย้อนหลังไปเรื่อย ๆ จนได้ครบตามที่ขอ
+MAX_CANDLES_PER_REQUEST = int(os.getenv("DERIV_MAX_CANDLES_PER_REQUEST", "1000"))
+MAX_HISTORY_PAGES = int(os.getenv("DERIV_MAX_HISTORY_PAGES", "12"))
+
+
+def fetch_candles_history(
+    symbol: str = DEFAULT_SYMBOL,
+    granularity: int = 60,     # วินาทีต่อแท่ง: 60=1m, 300=5m, 900=15m
+    count: int = 1000,
+    timeout: int = 15,
+) -> pd.DataFrame:
+    """ดึงแท่งเทียนย้อนหลัง `count` แท่ง — ถ้าเกินเพดานต่อ request จะยิงหลายหน้าให้อัตโนมัติ"""
+    frames: list[pd.DataFrame] = []
+    rows = 0
+    end: str = "latest"
+    earliest_seen: "pd.Timestamp | None" = None
+
+    for page in range(MAX_HISTORY_PAGES):
+        want = min(count - rows, MAX_CANDLES_PER_REQUEST)
+        if want <= 0:
+            break
+        try:
+            batch = _fetch_candles_once(symbol=symbol, granularity=granularity,
+                                        count=want, timeout=timeout, end=end)
+        except Exception as e:
+            print(f"[DerivFeed] ดึงหน้า {page + 1} ล้มเหลว: {type(e).__name__}: {str(e)[:120]}")
+            break
+        if batch is None or batch.empty:
+            break
+
+        frames.append(batch)
+        rows += len(batch)
+        first_ts = batch.index[0]
+
+        # หมายเหตุ: endpoint ใหม่อาจคืนมาน้อยกว่าที่ขอ (มีเพดาน ~1,000 แท่ง/รอบ)
+        # จึงไม่หยุดด้วยเงื่อนไข len(batch) < want — ใช้ตัวกันลูปด้านล่างแทน
+        if earliest_seen is not None and first_ts >= earliest_seen:
+            break                    # ช่วงเวลาไม่ขยับย้อนหลัง — กันลูปค้าง
+        earliest_seen = first_ts
+        end = str(int(first_ts.timestamp()) - granularity)   # ย้อนไปก่อนแท่งเก่าสุด
+        time.sleep(0.3)              # กัน rate-limit
+
+    if not frames:
+        raise RuntimeError(f"ดึงแท่งเทียนไม่ได้เลย ({symbol}, {granularity}s)")
+
+    df = pd.concat(frames).sort_index()
+    df = df[~df.index.duplicated(keep="first")].iloc[-count:]
 
     cache_path = DATA_DIR / f"deriv_{symbol}_{granularity}s.csv"
     df.to_csv(cache_path)
@@ -183,7 +292,7 @@ class DerivTickStream:
             try:
                 symbol = self._active_symbol
                 print(f"[DerivFeed] กำลังเชื่อมต่อ... subscribe {symbol}")
-                self._ws = websocket.create_connection(DERIV_WS_URL, timeout=15)
+                self._ws = connect_ws(15)
                 self._ws.settimeout(25)
 
                 # 🟢 ใช้ ticks_history + subscribe:1 แทน {"ticks": symbol} เฉยๆ

@@ -26,13 +26,13 @@ try:
 except Exception:
     pass
 
-from backend.data_feed.deriv_feed import DERIV_WS_URL, DEFAULT_SYMBOL
+from backend.data_feed.deriv_feed import DERIV_WS_URL, DEFAULT_SYMBOL, connect_ws
 
 TARGET_SYMBOL = os.getenv("DERIV_SYMBOL", DEFAULT_SYMBOL)
 
 
 def fetch_active_symbols() -> tuple[list[dict], dict]:
-    ws = websocket.create_connection(DERIV_WS_URL, timeout=15)
+    ws = connect_ws(15)
     ws.send(json.dumps({"active_symbols": "brief"}))
     raw = ws.recv()
     ws.close()

@@ -23,7 +23,7 @@ from pathlib import Path
 import pandas as pd
 import websocket  # pip install websocket-client
 
-DERIV_WS_URL = "wss://ws.derivws.com/websockets/v3?app_id=1089"
+DERIV_WS_URL = "wss://api.derivws.com/trading/v1/options/ws/public"   # endpoint ใหม่ (เดิม ws.derivws.com/websockets/v3 ถูกปิด — ตอบ 520)
 MAX_BATCH = 5000       # ขีดจำกัดของ Deriv ต่อ request (ตามที่ fetch_candles_history เดิมใช้)
 SAFETY_MAX_LOOPS = 400  # กันลูปไม่รู้จบถ้า Deriv ตอบวนซ้ำผิดปกติ
 
