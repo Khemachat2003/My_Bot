@@ -57,7 +57,9 @@ def _fetch_candles(symbol: str, tf: str, count: int) -> list[dict]:
     key = (symbol, tf)
     now = time.time()
     cached = _CANDLE_CACHE.get(key)
-    if cached and now - cached[0] < _CANDLE_CACHE_TTL:
+    # ใช้แคชได้เฉพาะเมื่อมีแท่ง >= ที่ขอ — กันเคส watchlist ยิง count=2 ก่อน
+    # แล้วกราฟหลัก (count=300) โดนแคช 2 แท่งภายใน TTL 30 วิ → กราฟว่าง
+    if cached and now - cached[0] < _CANDLE_CACHE_TTL and len(cached[1]) >= count:
         return cached[1]
 
     rows: list[dict] = []
