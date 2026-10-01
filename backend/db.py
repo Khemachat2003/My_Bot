@@ -117,6 +117,10 @@ def init_db() -> None:
 
         CREATE INDEX IF NOT EXISTS idx_ticks_time ON ticks(timestamp);
 
+        -- ราคา: index สำหรับ "ราคาล่าสุดของหลาย symbol" (watchlist)
+        -- เดิมมีแต่ autoindex (ts, symbol) → ถ้ากรองด้วย symbol ต้องสแกนทั้งตาราง
+        CREATE INDEX IF NOT EXISTS idx_prices_symbol_ts ON prices(symbol, ts DESC);
+
         -- MACRO (DXY รายชั่วโมง — ใช้คำนวณ Regime-Gate ตอนยิงสัญญาณ) -----------
         CREATE TABLE IF NOT EXISTS macro_1h (
             ts TEXT PRIMARY KEY,
@@ -319,8 +323,13 @@ def init_db() -> None:
         # Migration 2: ตารางเก่ายังมี PK = (ts) ตัวเดียว → XAUUSD กับ R_100 ที่
         # ts ตรงกันชนกัน (REPLACE ทับ) จนกราฟ scale เพี้ยน/ข้อมูลหาย
         # → rebuild เป็น PK (ts, symbol) เพื่อให้ 2 สัญลักษณ์อยู่ร่วมกันได้
-        pk = [r[1] for r in conn.execute("PRAGMA table_info(prices)").fetchall()
-              if r[5] == 1]
+        # ⚠️ ต้องเก็บ "ทุกคอลัมน์ที่เป็น PK" เรียงตามลำดับ
+        #    ถ้าเอาแค่ pk==1 จะได้ ['ts'] เสมอ → เงื่อนไขไม่เคยเป็นจริง
+        #    → rebuild ตาราง prices ทั้งตารางทุกครั้งที่ start (และดัน index ทิ้ง)
+        pk = [r["name"] for r in sorted(
+            (r for r in conn.execute("PRAGMA table_info(prices)").fetchall() if r["pk"]),
+            key=lambda r: r["pk"],
+        )]
         if pk != ["ts", "symbol"]:
             conn.execute("""
                 CREATE TABLE prices_new (
@@ -803,6 +812,32 @@ def fetch_recent_prices(limit: int = 500, symbol: str | None = None) -> list[dic
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows][::-1]
+
+
+def fetch_last_prices(symbols: list[str], per_symbol: int = 2) -> dict[str, list[dict]]:
+    """ราคาล่าสุดของหลาย symbol ใน query เดียว (สำหรับ watchlist)
+
+    คืน {symbol: [{'c':..,'ts':..}, ...]} เรียงจากใหม่→เก่า
+    ช่วยลด load ของ API: เดิม watchlist ยิง /api/candles 8 ครั้ง (หนึ่งต่อ symbol)
+    → เหลือ 1 request
+    """
+    syms = [s for s in dict.fromkeys(symbols) if s]
+    if not syms:
+        return {}
+    per_symbol = max(1, min(int(per_symbol), 5))
+    part = ("SELECT * FROM (SELECT symbol, close, ts FROM prices "
+            "WHERE symbol = ? ORDER BY ts DESC LIMIT ?)")
+    sql = " UNION ALL ".join([part] * len(syms))
+    params: list = []
+    for s in syms:
+        params += [s, per_symbol]
+    conn = get_conn()
+    rows = conn.execute(sql, params).fetchall()
+    conn.close()
+    out: dict[str, list[dict]] = {s: [] for s in syms}
+    for r in rows:
+        out.setdefault(r["symbol"], []).append({"c": r["close"], "ts": r["ts"]})
+    return out
 
 
 # STATS HELPERS

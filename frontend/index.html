@@ -1184,7 +1184,20 @@ async function checkNewSignals(){
 /* ═══════ HELPERS ═══════ */
 function fmtTime(iso){ if(!iso) return '–'; return new Date(iso).toLocaleString('th-TH',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
 function fmtHM(iso){ if(!iso) return '–'; return new Date(iso).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
-async function fetchJSON(url){ const res=await fetch(url); if(!res.ok) throw new Error(url+' → '+res.status); return res.json(); }
+// timeout บังคับ: ถ้า server ค้าง/ถูก reset จะ reject ใน 15 วิ แทนที่จะค้างตลอด
+// (เดิมไม่มี timeout → Promise.all ค้าง → ทุกอย่างที่รออยู่หลัง await เช่น watchlist ไม่เคยทำงาน)
+async function fetchJSON(url,timeoutMs=15000){
+  const ac=new AbortController();
+  const timer=setTimeout(()=>ac.abort(),timeoutMs);
+  try{
+    const res=await fetch(url,{signal:ac.signal,cache:'no-store'});
+    if(!res.ok) throw new Error(url+' → '+res.status);
+    return await res.json();
+  }catch(e){
+    if(e&&e.name==='AbortError') throw new Error(url+' → timeout '+timeoutMs+'ms');
+    throw e;
+  }finally{ clearTimeout(timer); }
+}
 function dirClass(d){ return d==='CALL'?'dir-call':(d==='PUT'?'dir-put':''); }
 function marginColor(m){ if(m==null||isNaN(m)) return 'muted'; if(m>1) return 'green'; if(m<-1) return 'red'; return 'yellow'; }
 function fmtMargin(m){ return m==null?'–':(m>0?'+':'')+m+'pp'; }
@@ -2699,16 +2712,14 @@ function renderWatchlist(){
 }
 async function refreshWatchlist(){
   renderWatchlist();
-  await Promise.all(symbolList.map(async s=>{
-    try{
-      const c=await fetchJSON('/api/candles?tf=1m&count=3&symbol='+encodeURIComponent(s.symbol));
-      if(!Array.isArray(c)||!c.length) return;
-      const last=c[c.length-1];
-      if(!last) return;
-      const prev=c.length>=2?c[c.length-2]:null;   // ได้แท่งเดียวก็โชว์ราคาได้ (chg จะเป็น flat)
-      _wlCache[s.symbol]={price:last.c, chgPct:(prev&&prev.c)?(last.c-prev.c)/prev.c*100:null};
-    }catch(e){}
-  }));
+  // 1 request ต่อรอบ (เดิมยิง /api/candles 8 ครั้ง = 8 requests ทุก 5 วิ → VPS 1 vCPU ค้าง)
+  try{
+    const rows=await fetchJSON('/api/watchlist');
+    if(Array.isArray(rows)) for(const r of rows){
+      if(!r||!r.symbol||r.price==null) continue;
+      _wlCache[r.symbol]={price:r.price,chgPct:r.chgPct};
+    }
+  }catch(e){ /* ค้างไว้ที่ราคาเดิม ดีกว่าหายทั้งหมด */ }
   renderWatchlist();
 }
 
@@ -3433,12 +3444,15 @@ function renderCFDPaperTrades(d){
 
 async function refreshAll(){
   updateClock();
-  await Promise.all([
+  // watchlist ต้องไม่ถูกบล็อกโดยแผงอื่น — เดิมรออยู่หลัง Promise.all
+  // ถ้าตัวไหนค้าง (VPS ช้า/ถูก reset) ทั้ง Promise.all ไม่จบ → watchlist ไม่มีอะไรขึ้นเลย
+  refreshWatchlist().catch(()=>{});
+  // allSettled: แผงหนึ่งพัง ห้ามลากทั้งรอบ (เดิม Promise.all → reject ทิ้ง → รอบถัดไปก็พังตาม)
+  await Promise.allSettled([
     refreshOverview(),refreshPrice(),refreshGauges(),refreshHeaderSignals(),
     refreshMlTab(),refreshSetupTab(),refreshSetupMini(),refreshSetupAll(),
     refreshJournalTab(),refreshJournalMoney(),refreshCFDPaper(),
   ]);
-  await refreshWatchlist();
   checkNewSignals();
 }
 

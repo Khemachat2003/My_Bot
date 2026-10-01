@@ -1,5 +1,11 @@
 # Deploy ขึ้น VPS (Ubuntu/Debian) — Vultr/Contabo
 
+> 📌 **อ่าน `DEPLOY.md` ที่ root ก่อน** — เป็น SOP มาตรฐานของทีม (commit → push → deploy → เช็ค hash)
+> ไฟล์นี้เป็น**คู่มือติดตั้งครั้งแรก** (เลือก VPS, ติดตั้ง, nginx/HTTPS) ส่วนขั้นตอน deploy
+> ประจำวันให้ใช้ `DEPLOY.md`
+>
+> ⚠️ path ที่ workflow ใช้ default คือ `~/My_Bot` (ไม่ใช่ `/opt/xauusd-bot`)
+
 ## 0) เลือก VPS
 
 | ผู้ให้บริการ | ราคา | สเปค | หมายเหตุ |

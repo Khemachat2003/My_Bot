@@ -51,6 +51,13 @@ TF_GRANULARITY = {
 _CANDLE_CACHE: dict = {}        # (symbol, tf) -> (fetch_ts, rows)
 _CANDLE_CACHE_TTL = 30          # กันยิง Deriv API ถี่เกินเมื่อสลับ TF
 
+# ── watchlist: ราคาล่าสุดทุก symbol ใน request เดียว (ลด load จาก 8 → 1) ──
+_WATCHLIST_SYMBOLS = (
+    "frxXAUUSD", "frxEURUSD", "frxGBPUSD", "frxUSDJPY",
+    "frxAUDUSD", "frxUSDCAD", "frxUSDCHF", "frxNZDUSD",
+)
+_WATCHLIST_CACHE = {"ts": 0.0, "data": None}
+
 
 def _fetch_candles(symbol: str, tf: str, count: int) -> list[dict]:
     """ดึงแท่งเทียน history ตาม TF — cache 30 วิ + fallback resample จาก DB"""
@@ -360,6 +367,34 @@ def get_candles(tf: str = Query("1m", pattern="^(1m|5m|15m|30m|1h|4h)$"),
     """แท่งเทียน history ตาม TF สำหรับกราฟ (1m/5m/15m/30m/1h/4h) — cache 30 วิ"""
     sym = symbol or db.DEFAULT_SYMBOL
     return _fetch_candles(sym, tf, count)
+
+
+@app.get("/api/watchlist")
+def get_watchlist(_auth=Depends(require_auth)):
+    """ราคาล่าสุดของทุก symbol ที่แสดงใน watchlist — request เดียวจบ (cache 10 วิ)
+
+    เดิม frontend ยิง /api/candles ทีละ symbol (8 requests/รอบ) ทำให้ VPS 1 vCPU
+    ค้างและ connection reset → watchlist ไม่ขึ้น ตอนนี้รวมเป็น query เดียว
+    """
+    now = time.time()
+    if _WATCHLIST_CACHE["data"] and now - _WATCHLIST_CACHE["ts"] < 10:
+        return _WATCHLIST_CACHE["data"]
+    try:
+        raw = db.fetch_last_prices(_WATCHLIST_SYMBOLS, per_symbol=2)
+    except Exception:
+        raw = {}
+    out = []
+    for sym in _WATCHLIST_SYMBOLS:
+        rows = raw.get(sym) or []
+        last = rows[0] if rows else None
+        prev = rows[1] if len(rows) >= 2 else None
+        price = last["c"] if last else None
+        chg = None
+        if price is not None and prev and prev.get("c"):
+            chg = (price - prev["c"]) / prev["c"] * 100
+        out.append({"symbol": sym, "price": price, "chgPct": chg, "ts": last["ts"] if last else None})
+    _WATCHLIST_CACHE.update(ts=now, data=out)
+    return out
 
 
 @app.get("/api/prices")
