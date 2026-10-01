@@ -69,7 +69,7 @@ def _fetch_candles(symbol: str, tf: str, count: int) -> list[dict]:
         df = fetch_candles_history(symbol=symbol, granularity=gran, count=count)
         if df is not None and len(df):
             rows = [{
-                "t": pd.Timestamp(ts).isoformat(),
+                "t": pd.Timestamp(ts).strftime("%Y-%m-%d %H:%M:%S"),
                 "o": float(r["open"]), "h": float(r["high"]),
                 "l": float(r["low"]), "c": float(r["close"]),
                 "v": float(r.get("volume", 0) or 0),
@@ -103,7 +103,7 @@ def _resample_from_prices(prices: list[dict], minutes: int) -> list[dict]:
     c = df["close"].resample(rule, closed="left", label="left", origin="epoch").last()
     out = pd.concat([o, h, l, c], axis=1).dropna()
     return [{
-        "t": pd.Timestamp(ts).isoformat(),
+        "t": pd.Timestamp(ts).strftime("%Y-%m-%d %H:%M:%S"),
         "o": float(r["open"]), "h": float(r["high"]),
         "l": float(r["low"]), "c": float(r["close"]), "v": 0,
     } for ts, r in out.iterrows()]
