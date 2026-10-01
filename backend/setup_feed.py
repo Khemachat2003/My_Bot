@@ -378,6 +378,10 @@ class SetupFeedEngine:
 
     # 🎯 ตรวจ 9 Checklist ต่อ timeframe → บันทึก setup_scores เสมอ, ยิงสัญญาณเมื่อ trigger ใหม่
     def _check_setup_scorer(self, now: pd.Timestamp):
+        # 🛡️ กัน crash: ถ้า seed buffer ล้มเหลว buffer จะเป็น DataFrame ว่าง (RangeIndex)
+        # → _resample() เรียก .resample() บน RangeIndex ไม่ได้ (TypeError) ทำให้ engine crash-loop
+        if self.buffer.empty or not isinstance(self.buffer.index, pd.DatetimeIndex):
+            return
         # 🛡️ กันสัญญาณผี: ราคาใน buffer ต้องสดพอ (ไม่ค้างจากช่วงตลาดปิด/feed freeze)
         # — แม้ market_hours พลาด (วันหยุดพิเศษ ฯลฯ) ก็ไม่ยิงจากข้อมูลเก่า
         if not self.buffer.empty:

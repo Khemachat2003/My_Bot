@@ -199,6 +199,18 @@ def fetch_candles_history(
     df = df[~df.index.duplicated(keep="first")].iloc[-count:]
 
     cache_path = DATA_DIR / f"deriv_{symbol}_{granularity}s.csv"
+    # อย่าให้ fetch แบบ count เล็ก (เช่น watchlist count=2, setup_feed count=15)
+    # ทับแคชเดิมที่มีแท่งเยอะกว่า — ไม่งั้น fallback cache/auto_retrain จะได้ข้อมูลไม่ครบ
+    try:
+        if cache_path.exists():
+            with open(cache_path, "r", encoding="utf-8", errors="ignore") as _f:
+                existing_rows = max(0, sum(1 for _ in _f) - 1)
+            if len(df) < existing_rows:
+                print(f"[DerivFeed] ดึง {len(df)} แท่ง ({symbol}, {granularity}s) — "
+                      f"ไม่ทับแคชเดิม ({existing_rows} แท่ง)")
+                return df
+    except Exception:
+        pass
     df.to_csv(cache_path)
     print(f"[DerivFeed] ดึง {len(df)} แท่ง ({symbol}, {granularity}s) → บันทึก {cache_path}")
     return df
