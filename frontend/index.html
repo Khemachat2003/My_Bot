@@ -2701,11 +2701,12 @@ async function refreshWatchlist(){
   renderWatchlist();
   await Promise.all(symbolList.map(async s=>{
     try{
-      const c=await fetchJSON('/api/candles?tf=1m&count=2&symbol='+encodeURIComponent(s.symbol));
-      if(!Array.isArray(c)||c.length<2) return;
-      const last=c[c.length-1], prev=c[c.length-2];
-      if(!last||!prev) return;
-      _wlCache[s.symbol]={price:last.c, chgPct:(last.c-prev.c)/prev.c*100};
+      const c=await fetchJSON('/api/candles?tf=1m&count=3&symbol='+encodeURIComponent(s.symbol));
+      if(!Array.isArray(c)||!c.length) return;
+      const last=c[c.length-1];
+      if(!last) return;
+      const prev=c.length>=2?c[c.length-2]:null;   // ได้แท่งเดียวก็โชว์ราคาได้ (chg จะเป็น flat)
+      _wlCache[s.symbol]={price:last.c, chgPct:(prev&&prev.c)?(last.c-prev.c)/prev.c*100:null};
     }catch(e){}
   }));
   renderWatchlist();

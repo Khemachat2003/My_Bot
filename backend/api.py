@@ -78,13 +78,22 @@ def _fetch_candles(symbol: str, tf: str, count: int) -> list[dict]:
         pass
 
     if not rows:
-        # fallback: resample 1m ที่สะสมใน DB ตาม TF
-        minute = TF_GRANULARITY.get(tf, 60) // 60
-        prices = db.fetch_recent_prices(limit=1000, symbol=symbol)
-        if prices:
-            rows = _resample_from_prices(prices, minute)
+        # fallback: resample 1m ที่สะสมใน DB ตาม TF — ต้องกัน crash เพราะ watchlist
+        # ยิง 10 req/5 วิ ทำให้ Deriv ถูก rate-limit บ่อย ถ้า fallback พัง → 500 → ราคา watchlist ว่าง
+        try:
+            minute = TF_GRANULARITY.get(tf, 60) // 60
+            prices = db.fetch_recent_prices(limit=1000, symbol=symbol)
+            if prices:
+                rows = _resample_from_prices(prices, minute)
+                if count and len(rows) > count:
+                    rows = rows[-count:]   # คืนตามจำนวนที่ขอจริง (ไม่ยัดทั้งก้อน)
+        except Exception as e:
+            print(f"[api] candles fallback fail ({symbol}, {tf}, count={count}): "
+                  f"{type(e).__name__}: {str(e)[:140]}")
+            rows = []
 
-    _CANDLE_CACHE[key] = (now, rows)
+    if rows:
+        _CANDLE_CACHE[key] = (now, rows)   # แคชเฉพาะผลสำเร็จ — กันผลว่าง/พังติดแคช 30 วิ
     return rows
 
 
@@ -94,13 +103,15 @@ def _resample_from_prices(prices: list[dict], minutes: int) -> list[dict]:
     if not prices:
         return []
     df = pd.DataFrame(prices)
-    df["ts"] = pd.to_datetime(df["ts"])
+    df["ts"] = pd.to_datetime(df["ts"], utc=True)   # กัน ts ผสม naive/aware → บังคับ UTC
     df = df.set_index("ts")[["open", "high", "low", "close"]].sort_index()
     rule = f"{minutes}min"
-    o = df["open"].resample(rule, closed="left", label="left", origin="epoch").first()
-    h = df["high"].resample(rule, closed="left", label="left", origin="epoch").max()
-    l = df["low"].resample(rule, closed="left", label="left", origin="epoch").min()
-    c = df["close"].resample(rule, closed="left", label="left", origin="epoch").last()
+    # origin="start_day" (ไม่ใช้ "epoch") — bucket ตรงกันกับ epoch สำหรับ TF ทุกตัวที่ระบบใช้
+    # (1m/5m/15m/30m/1h/4h ล้วนหาร 24h ลงตัว) แต่ไม่ชน edge case tz-aware + origin='epoch'
+    o = df["open"].resample(rule, closed="left", label="left", origin="start_day").first()
+    h = df["high"].resample(rule, closed="left", label="left", origin="start_day").max()
+    l = df["low"].resample(rule, closed="left", label="left", origin="start_day").min()
+    c = df["close"].resample(rule, closed="left", label="left", origin="start_day").last()
     out = pd.concat([o, h, l, c], axis=1).dropna()
     return [{
         "t": pd.Timestamp(ts).strftime("%Y-%m-%d %H:%M:%S"),
