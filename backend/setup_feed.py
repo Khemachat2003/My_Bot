@@ -114,6 +114,7 @@ class SetupFeedEngine:
         self.symbol = symbol
         self.buffer = pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
         self._last_processed_ts: pd.Timestamp | None = None
+        self._last_seed_try: float = 0.0
 
         self._seed_buffer()
         print(f"[SetupFeed:{self.symbol}] poll={POLL_SECONDS}s | "
@@ -165,6 +166,15 @@ class SetupFeedEngine:
         if is_forex_like(self.symbol) and not market_open_now(now):
             self._resolve_pending_signals(now)
             return
+
+        # ถ้า buffer ยังไม่พอ (seed ตอน start ล้มเหลวเพราะ DB lock) → ลอง seed ใหม่เป็นระยะ
+        # ไม่งั้น buffer จะโตจาก poll ละ 1 แท่ง ใช้เวลาหลายชั่วโมงกว่าจะถึง SETUP_MIN_BARS
+        if len(self.buffer) < SETUP_MIN_BARS and time.time() - self._last_seed_try > 60:
+            self._last_seed_try = time.time()
+            print(f"[SetupFeed:{self.symbol}] buffer ยังไม่พอ ({len(self.buffer)} แท่ง) — seed ใหม่")
+            self._seed_buffer()
+            if len(self.buffer) < SETUP_MIN_BARS:
+                return
 
         # ดึงแท่งล่าสุด (count เล็กพอสำหรับ poll บ่อยๆ)
         try:
