@@ -13,6 +13,7 @@
     "test": "vitest run --passWithNoTests",
     "test:visual": "playwright test",
     "test:visual:baseline": "cross-env UI_TARGET=legacy playwright test --update-snapshots",
+    "gen:types": "npx -y openapi-typescript@7 openapi.json -o src/types/api.d.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "npm run lint && npm run typecheck && npm run test && npm run build"

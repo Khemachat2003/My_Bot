@@ -15,6 +15,7 @@ backend (`backend/api.py`) เสิร์ฟหน้า build แล้วจ�
 | `src/features/<name>/` | หนึ่งหน้าจอ/หน้าที่: component + api + css + `index.js` (ทางเข้าเดียว) |
 | `src/shared/` | `api/client.js` (fetch ที่เดียว), `lib/` (format/indicators), `ui/` (toast/dom/css กลาง) |
 | `src/styles/` | `tokens.css` = สี/ฟอนต์ (แหล่งความจริงเดียว), `index.css` = ลำดับ @import ตาม cascade เดิม |
+| `src/types/api.d.ts` | TS types ของ `/api/*` (gen จาก OpenAPI — `npm run gen:types` ห้ามแก้มือ) |
 | `tests/visual/` | playwright: ภาพ 10 ภาพ + network baseline (`__snapshots__`/fixtures = git-ignored) |
 | `scripts/legacy-split/` | สคริปต์แยกไฟล์จาก `index.legacy.html` (อ้างอิงประวัติ/regenerate ได้ — ไม่ต้องแตะต่อ) |
 
