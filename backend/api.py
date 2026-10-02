@@ -59,8 +59,24 @@ _WATCHLIST_SYMBOLS = (
 _WATCHLIST_CACHE: dict = {}      # "sym1,sym2" -> (fetch_ts, rows)
 _WATCHLIST_CACHE_TTL = 10         # วินาที
 _WATCHLIST_LIVE_TTL = 60          # symbol ที่ไม่มีใน DB ดึงสด แต่ไม่ถี่กว่านี้
-_WATCHLIST_LIVE_MAX = 4           # ดึงสดได้ไม่เกินกี่ตัวต่อรอบ (กัน VPS หนัก)
+_WATCHLIST_LIVE_MAX = 12          # สูงพอครอบทุก symbol — ปกติ feed ทำงานจะมีแค่ 1-2 ตัว
+                                  # (กันไว้ด้วย concurrency 3 + cache สองชั้น)
 _WATCHLIST_LIVE_CACHE: dict = {}  # symbol -> (fetch_ts, (last, prev))
+_WATCHLIST_STALE_SEC = 180         # ข้อมูลใน DB เก่ากว่านี้ = ไม่นับ (ไปดึงสดแทน)
+
+
+def _ts_is_stale(ts) -> bool:
+    """ts เก่า/ใช้ไม่ได้ → ต้องดึงสด (กันราคาค้างเป็นเดือน ๆ ใน watchlist)"""
+    if not ts:
+        return True
+    try:
+        from datetime import datetime, timezone
+        dt = datetime.fromisoformat(str(ts))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - dt).total_seconds() > _WATCHLIST_STALE_SEC
+    except Exception:
+        return True
 
 
 def _live_last_prices(symbol: str):
@@ -423,6 +439,10 @@ def get_watchlist(symbols: str = Query("", description="คั่นด้วย
         rows = raw.get(sym) or []
         last = rows[0] if rows else None
         prev = rows[1] if len(rows) >= 2 else None
+        # ข้อมูลใน DB ที่เก่ากว่า _WATCHLIST_STALE_SEC ถือว่าไม่มี (เช่น symbol
+        # เคยอยู่ใน TRADE_SYMBOLS แล้วถูกเอาออก — ราคาค้างเป็นเดือน ๆ)
+        if last and _ts_is_stale(last.get("ts")):
+            last, prev = None, None
         price = last["c"] if last else None
         chg = None
         if price is not None and prev and prev.get("c"):
@@ -437,7 +457,8 @@ def get_watchlist(symbols: str = Query("", description="คั่นด้วย
         todo = missing[:_WATCHLIST_LIVE_MAX]
         try:
             from concurrent.futures import ThreadPoolExecutor
-            with ThreadPoolExecutor(max_workers=len(todo)) as pool:
+            # จำกัด 3 ตัวพร้อมกัน — ยิงพร้อมกันหลายตัว Deriv จะตอบ 429/ว่าง
+            with ThreadPoolExecutor(max_workers=min(3, len(todo))) as pool:
                 pairs = list(pool.map(_live_last_prices, todo))
             for sym, (last, prev) in zip(todo, pairs):
                 if last is None:
