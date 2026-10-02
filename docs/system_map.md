@@ -18,7 +18,8 @@
 2. `setup_feed.py` → `deriv_feed.py` (Deriv WebSocket, symbol fallback `frxXAUUSD`→`deriv_XAU/USD`)
    → เดินแท่ง M1/M5 → `setup_scorer.py` คะแนน 11-Checklist → entry_trigger False→True → บันทึกสัญญาณ
 3. `notifier.py` อ่าน `ml_signals` (ที่ `ml_forecaster/` ยิงเองตาม threshold) กรอง confidence >= 0.55 → Telegram
-4. `mt5_executor.py` (แยกเครื่อง Windows) poll `/api/pending_setup_signals` → ดึงสัญญาณ FIRE → MT5 order + SL/TP
+4. `mt5_executor.py` (แยกเครื่อง Windows) poll `GET /api/signals?limit=N` → ดึงสัญญาณ FIRE → MT5 order + SL/TP
+   (ไม่มี endpoint `/api/pending_setup_signals` — ฟังก์ชัน `db.fetch_pending_setup_signals()` เป็น internal เท่านั้น)
 5. `api.py` เสิร์ฟ dashboard + คำสั่งทั้งหมด
 
 ## ตารางไฟล์ระบบหลัก

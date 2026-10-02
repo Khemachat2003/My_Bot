@@ -31,7 +31,8 @@
 3. **คะแนน** (`setup_scorer.py`): pure function — คะแนน 11-Checklist + EMA200 Rejection
 4. **สัญญาณ**: entry_trigger เปลี่ยน False→True (ไม่ยิงซ้ำในไม้เดิม) → `setup_db.py` เขียน `setup_signals`
 5. **แจ้ง**: `telegram.py` ส่ง (retry + log สถานะใน `telegram_log`)
-6. **ออเดอร์**: `executor/mt5_executor.py` poll `/api/pending_setup_signals` → MT5 + SL/TP
+6. **ออเดอร์**: `executor/mt5_executor.py` poll `GET /api/signals?limit=N` (auth Basic) → กรอง PENDING/FIRE → MT5 + SL/TP
+   (หมายเหตุ: `db.fetch_pending_setup_signals()` มีอยู่ใน backend แต่**ไม่มี endpoint** `/api/pending_setup_signals` — ตรวจจากโค้ดจริง)
 
 ## การไหลของข้อมูลฝั่ง ML (🟢 Notifier)
 
