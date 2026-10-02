@@ -8,7 +8,7 @@ import datetime as dt
 import pandas as pd
 import pytest
 
-import mt5_executor as ex
+from executor import mt5_executor as ex
 
 
 @pytest.fixture(autouse=True)

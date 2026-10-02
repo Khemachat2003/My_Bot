@@ -1,9 +1,12 @@
 """MT5 Forex Executor — ดึงสัญญาณ FIRE จาก VPS (setup engine) แล้วส่งออเดอร์ MT5
 พร้อม SL/TP อัตโนมัติ (ตาม default: fractal M5 + R:R 2.0, เสี่ยง 0.5%/ไม้)
 
-รันบน Windows เท่านั้น (MetaTrader5 python module รองรับ Windows อย่างเป็นทางการ)
+รัน (จาก root ของโปรเจกต์, Windows เท่านั้น — MetaTrader5 module รองรับ Windows):
 - ต้องมี MT5 terminal ติดตั้ง + login บัญชี demo/csd แล้ว
 - โหมด --dry-run ทดสอบได้โดยไม่ต้องมี MT5 (จะ print ออเดอร์ที่ควรส่ง)
+
+    python executor/mt5_executor.py --dry-run
+    python executor/mt5_executor.py
 
 ตั้งค่าใน .env (ฝั่ง Windows):
   MT5_VPS_API_URL=http://<vps-ip>:8000
@@ -23,7 +26,9 @@ import pandas as pd
 import requests
 from dotenv import load_dotenv
 
-ROOT = Path(__file__).resolve().parent
+# ROOT ชี้ root ของโปรเจกต์ (ไฟล์อยู่ที่ executor/ → ขึ้น 1 ชั้น)
+# .env และ mt5_state.db ยังอยู่ที่ root เหมือนเดิม
+ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 STATE_DB = ROOT / "mt5_state.db"
 
