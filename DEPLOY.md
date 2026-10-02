@@ -75,7 +75,7 @@ git push origin main
 ## 3) Deploy มือ (กรณี auto-deploy ไม่ได้ / อยากคุมเอง)
 
 ```bash
-ssh linuxuser@207.148.123.201
+ssh <VPS_USER>@<VPS_HOST>
 cd ~/My_Bot
 git pull --ff-only origin main
 docker compose up -d --build
@@ -110,8 +110,8 @@ GitHub → repo → **Settings → Secrets and variables → Actions → New rep
 
 | ชื่อ secret | ค่า |
 |---|---|
-| `VPS_HOST` | `207.148.123.201` |
-| `VPS_USER` | `linuxuser` |
+| `VPS_HOST` | `<IP หรือ domain ของ VPS>` |
+| `VPS_USER` | `<user ที่ใช้ SSH เข้า VPS>` |
 | `SSH_KEY` | private key แบบ ed25519 (ทั้งก้อน) |
 | `VPS_DIR` | เว้นว่างไว้ = ใช้ `~/My_Bot` |
 
@@ -154,7 +154,7 @@ git rev-parse --short HEAD && git log --oneline -3
 
 ```bash
 docker compose ps                                              # container ขึ้นไหม
-curl -s -u admin:admin070717 http://127.0.0.1:8000/api/health  # API ตอบไหม
+curl -s -u "$DASHBOARD_USER:$DASHBOARD_PASS" http://127.0.0.1:8000/api/health  # API ตอบไหม
 docker compose logs --tail=40 bot                              # มี error ไหม
 docker stats --no-stream                                       # CPU/RAM เกินไหม
 ```

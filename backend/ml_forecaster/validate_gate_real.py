@@ -59,12 +59,18 @@ def _get_env(path: Path) -> dict:
 
 
 def fetch_vps(env: dict, path: str, params: dict | None = None) -> list:
-    base = env.get("MT5_VPS_API_URL", "http://207.148.123.201:8000").rstrip("/")
+    # ค่าทั้งหมดต้องมาจาก .env เท่านั้น (เดิมเคยมี default IP/user/pass ฝังในโค้ด
+    # — ถอนออกเมื่อ refactor/project-structure เพราะความลับต้องไม่ hard-code)
+    base = (env.get("MT5_VPS_API_URL") or "").rstrip("/")
+    if not base:
+        raise SystemExit("ตั้ง MT5_VPS_API_URL ใน .env ก่อน (เช่น http://<vps-ip>:8000)")
     url = f"{base}{path}"
     if params:
         url += "?" + urllib.parse.urlencode(params)
-    user = env.get("MT5_API_USER") or env.get("DASHBOARD_USER") or "admin7717"
-    pwd = env.get("MT5_API_PASS") or env.get("DASHBOARD_PASS") or "admin070717"
+    user = env.get("MT5_API_USER") or env.get("DASHBOARD_USER") or ""
+    pwd = env.get("MT5_API_PASS") or env.get("DASHBOARD_PASS") or ""
+    if not pwd:
+        raise SystemExit("ตั้ง MT5_API_PASS หรือ DASHBOARD_PASS ใน .env ก่อน")
     token = base64.b64encode(f"{user}:{pwd}".encode()).decode()
     req = urllib.request.Request(url, headers={"Authorization": f"Basic {token}",
                                                "User-Agent": "Mozilla/5.0"})
