@@ -17,6 +17,8 @@ export default [
     rules: {
       'no-unused-vars': ['warn', { args: 'none', caughtErrors: 'none' }],
       'no-empty': ['warn', { allowEmptyCatch: true }],
+      // Phase A = move-only: โค้ดจาก index.html เดิม throw แบบไม่แนบ cause — เก็บไว้ก่อน (Phase C ค่อยจัด)
+      'preserve-caught-error': 'off',
     },
   },
   {

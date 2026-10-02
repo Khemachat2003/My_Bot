@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p jsconfig.json",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "test:visual": "playwright test",
     "test:visual:baseline": "cross-env UI_TARGET=legacy playwright test --update-snapshots",
     "format": "prettier --write .",

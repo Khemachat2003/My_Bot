@@ -46,11 +46,12 @@ xauusd-bot/
 │   └── ml_forecaster/      ← เทรน/ตรวจโมเดล (walk-forward, auto-retrain, features v2)
 ├── executor/
 │   └── mt5_executor.py     ← MT5 order executor (Windows เท่านั้น, รันแยกจาก VPS)
-├── frontend/
-│   ├── index.html          ← Dashboard SPA (ใช้ lightweight-charts)
-│   ├── vendor/             ← ไลบรารี JS/CSS ในเครื่อง (กัน CDN ล่ม)
-│   ├── demos/              ← ไฟล์ demo กราฟ standalone (โหลดจาก CDN)
-│   └── design/             ← design briefs (มอบหมายงาน redesign)
+├── frontend/                  ← dashboard SPA (Vite — แก้โค้ดใน src/ แล้ว build เป็น dist/)
+│   ├── src/                   ← โค้ดจริง แบ่งตาม feature (features/, shared/, styles/) — ดู frontend/AGENTS.md
+│   ├── dist/                  ← build output (commit ไว้ — เสิร์ฟจริงที่ GET / เพราะ VPS ไม่มี Node)
+│   ├── vendor/                ← ไลบรารี JS/CSS ในเครื่อง (กัน CDN ล่ม)
+│   ├── demos/                 ← ไฟล์ demo กราฟ standalone (โหลดจาก CDN)
+│   └── design/                ← design briefs (มอบหมายงาน redesign)
 ├── scripts/
 │   ├── diagnostics/        ← เช็คการเชื่อมต่อ/symbol/setup (test_connection ฯลฯ)
 │   ├── data_tools/         ← backfill_ema200, fetch_history_paginated
@@ -84,9 +85,12 @@ Dashboard: `http://localhost:8000` (login ด้วย DASHBOARD_USER/DASHBOARD_
 
 ```bash
 ./venv/Scripts/python.exe -m pip install -r requirements-dev.txt   # ครั้งแรก
-./venv/Scripts/python.exe -m pytest                 # รัน characterization tests (63 เคส)
+./venv/Scripts/python.exe -m pytest                 # รัน characterization tests (65 เคส)
 ./venv/Scripts/python.exe -m ruff check backend     # lint
 ./venv/Scripts/python.exe -m pre-commit install       # เปิด hook ก่อน commit (lint + test)
+
+# frontend (ต้อง npm install ครั้งแรก — ดูรายละเอียด frontend/AGENTS.md):
+cd frontend && npm run check        # lint + typecheck + unit test + build → dist/
 ```
 
 ## เทรนโมเดล ML
