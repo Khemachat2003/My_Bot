@@ -1,4 +1,9 @@
 """
+[_archive] ml_forecaster/confluence.py — เก็บเมื่อ refactor โครงสร้าง (2026-10)
+เหตุผล: import พังมาตั้งแต่เดิม (from backend.ml_forecaster.train import ...
+แต่ train.py ไม่มีอยู่แล้ว) และไม่มี entry point ใดเรียกใช้ — ถ้าจะกลับมาใช้
+ต้องแก้ import ก่อน
+
 confluence.py — Phase 2C: รวม ML forecaster + 3 strategies เดิม (strategies.py)
 
 แนวคิด: ยิงสัญญาณเฉพาะตอนที่ "ทั้ง strategy เดิม (rule-based) และ ML เห็นตรงกัน"
