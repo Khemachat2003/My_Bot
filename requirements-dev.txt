@@ -1,0 +1,6 @@
+# ── เครื่องมือพัฒนา (ไม่ใช่ runtime ของระบบเทรด — ติดตั้งเฉพาะเครื่อง dev) ──────
+# ติดตั้ง:  ./venv/Scripts/python.exe -m pip install -r requirements-dev.txt
+# runtime หลักอยู่ที่ requirements.txt เหมือนเดิม
+ruff>=0.6
+pytest>=8.0
+pre-commit>=3.7

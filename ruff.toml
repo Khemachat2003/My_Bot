@@ -1,0 +1,36 @@
+# ── Ruff — linter + formatter ของโปรเจกต์ (ตั้งแต่ refactor/project-structure) ──
+# หลักการ: เปิดกติกาพื้นฐาน + กติกาจับบั๊กเฉพาะจุดที่ "พังแล้วเจ็บ" เท่านั้น
+# ไม่บังคับสไตล์จัดการเยอะจนแก้โค้ดเดิมกระจาย — โค้ดเดิมคงพฤติกรรมไว้ก่อน
+target-version = "py310"
+line-length = 100
+extend-exclude = [
+    "venv",
+    "_archive",
+    "data",
+    "frontend/vendor",
+    "scripts/backtest",   # โค้ด legacy Phase-1 — แก้น้อยที่สุด
+]
+
+[lint]
+select = [
+    "E",    # pycodestyle errors (ระดับสำคัญ)
+    "F",    # pyflakes: ตัวแปรไม่ใช้, import ซ้ำ, undefined name
+    "W",    # pycodestyle warnings
+    "B",    # bugbear: จุดที่มักเป็นบั๊ก (mutable default, ฯลฯ)
+    "UP",   # ใช้ syntax ที่ Python 3.10 รองรับแล้ว
+    "I",    # import เรียงลำดับ
+]
+ignore = [
+    "E501",   # บรรทัดยาว — โค้ดเดิมมีทั้งไฟล์ที่ comment ไทยยาว จะแก้ทีหลังทีละไฟล์
+    "B008",   # FastAPI ใช้ Depends() ใน default argument เป็น pattern มาตรฐาน
+    "UP007",  # Optional[X] ยังใช้ได้ใน 3.10 — ไม่บังคับแก้ทั้งโปรเจกต์
+]
+
+[lint.per-file-ignores]
+# สคริปต์ legacy ที่ root ของ scripts — ปล่อยผ่อนปรน
+"scripts/*" = ["E402", "F401", "E401"]
+"tests/*" = ["E402"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
