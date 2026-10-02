@@ -141,7 +141,18 @@ def require_auth(request: Request, credentials: HTTPBasicCredentials = Depends(s
     raise HTTPException(status_code=307, headers={"Location": "/login"})
 
 
-app = FastAPI(title="XAUUSD Bot Dashboard")
+# ── /docs + /openapi.json ปิดเป็นค่า default (กันเปิดเผยโครงสร้าง API ทั้งหมด
+#    บน VPS ที่เข้าถึงได้จากอินเทอร์เน็ต) — เปิดเฉพาะตอน dev: DOCS_ENABLED=1 ──
+_DOCS_KW = (
+    {}
+    if os.getenv("DOCS_ENABLED") == "1"
+    else {
+        "docs_url": None,
+        "redoc_url": None,
+        "openapi_url": None,
+    }
+)
+app = FastAPI(title="XAUUSD Bot Dashboard", **_DOCS_KW)
 
 
 @app.on_event("startup")

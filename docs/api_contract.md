@@ -3,6 +3,11 @@
 > กฎ: response ของ endpoint เดิม **ห้ามเปลี่ยน shape** — เพิ่ม field ได้ "ต่อท้าย" เท่านั้น
 > Auth: ทุก endpoint ยกเว้นที่ระบุ — ใช้ HTTP Basic (API/curl) หรือ session cookie จาก `/login`
 > ตัวเรียก: `frontend/src/shared/api/client.js` (จุดเดียว) · `executor/mt5_executor.py` (หากมี) · docker healthcheck
+>
+> **/docs + /openapi.json ปิดเป็นค่า default** (กันเปิดเผยโครงสร้าง API บน VPS) —
+> เปิดเฉพาะ dev ด้วย `DOCS_ENABLED=1` · TS types ของ frontend gen จาก OpenAPI:
+> `DOCS_ENABLED=1 python -c "import json;import backend.api as a;open('frontend/openapi.json','w',encoding='utf-8').write(json.dumps(a.app.openapi(),ensure_ascii=False))"`
+> แล้ว `cd frontend && npm run gen:types` → `src/types/api.d.ts` (commit ไฟล์ types เท่านั้น — openapi.json เป็น intermediate)
 
 ## สาธารณะ (ไม่ต้อง auth)
 
