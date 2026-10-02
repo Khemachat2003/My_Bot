@@ -1,0 +1,33 @@
+/* KPI cards + panels — ย้ายจาก index.html เดิม บรรทัด 104–136 */
+  /* KPI cards */
+  .kpi-row{display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); margin-bottom:16px;}
+  .kpi{
+    background:linear-gradient(180deg,var(--panel),var(--card));
+    border:1px solid var(--border); border-radius:12px; padding:13px 15px;
+    position:relative; overflow:hidden; transition:.15s;
+  }
+  .kpi:hover{border-color:var(--border2); transform:translateY(-1px);}
+  .kpi::before{content:''; position:absolute; inset:0 auto 0 0; width:3px; background:var(--accent); opacity:.7;}
+  .kpi .lbl{font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.09em; font-weight:700;}
+  .kpi .val{font-family:var(--num); font-size:24px; font-weight:800; margin:6px 0 4px; line-height:1;}
+  .kpi .sub{font-size:10.5px; color:var(--muted);}
+  .kpi .sub b{color:var(--text);}
+  .val.green{color:var(--green);} .val.red{color:var(--red);} .val.yellow{color:var(--yellow);}
+  .val.blue{color:var(--blue);} .val.cyan{color:var(--cyan);} .val.purple{color:var(--purple);} .val.muted{color:var(--muted);}
+
+  /* panels */
+  .cols{display:grid; gap:14px; margin-bottom:16px;}
+  .cols.l2{grid-template-columns:minmax(0,1.8fr) minmax(0,1fr);}
+  .cols.l3{grid-template-columns:repeat(3,minmax(0,1fr));}
+  @media(max-width:1150px){.cols.l2,.cols.l3{grid-template-columns:1fr;}}
+
+  .panel{
+    background:linear-gradient(180deg,var(--panel),var(--card));
+    border:1px solid var(--border); border-radius:12px; padding:14px 15px; min-width:0;
+  }
+  .panel h3{
+    font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.1em;
+    margin-bottom:12px; display:flex; align-items:center; gap:8px; font-weight:800;
+  }
+  .panel h3 .ph{width:3px;height:12px;border-radius:2px;display:inline-block;background:var(--accent);margin-right:8px;}
+  .panel h3 .ph.cyan,.panel h3 .ph.green,.panel h3 .ph.blue,.panel h3 .ph.purple,.panel h3 .ph.red{background:var(--accent);}

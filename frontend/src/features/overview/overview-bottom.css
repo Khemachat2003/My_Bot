@@ -1,0 +1,11 @@
+/* แถบสถิติ + equity/ฟีด ล่างของภาพรวม — ย้ายจาก index.html เดิม บรรทัด 546–556 */
+  /* ═══ OVERVIEW BOTTOM ═══ */
+  .ov-status-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 14px;}
+  .ov-stat{display:flex;flex-direction:column;gap:2px;text-align:center;padding:4px 6px;}
+  .ov-stat-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;}
+  .ov-stat-val{font-family:var(--num);font-size:18px;font-weight:800;line-height:1.1;}
+  .ov-stat-val.purple{color:var(--purple);}
+  .ov-stat-sub{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ov-bottom{display:grid;grid-template-columns:1.6fr 1fr;gap:14px;margin-bottom:14px;}
+  @media(max-width:1000px){.ov-bottom{grid-template-columns:1fr;}}
+  .ov-equity-panel,.ov-feed-panel{margin-bottom:0;}

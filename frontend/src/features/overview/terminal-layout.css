@@ -1,0 +1,9 @@
+/* grid 3 คอลัมน์ของแท็บภาพรวม — ย้ายจาก index.html เดิม บรรทัด 186–194 */
+  /* ═══ TRADING TERMINAL LAYOUT (TradingView-like) ═══ */
+  .terminal{display:grid; gap:14px; margin-bottom:16px;
+    grid-template-columns:minmax(230px,260px) minmax(0,1fr) minmax(250px,300px);
+    align-items:start;}
+  @media(max-width:1300px){.terminal{grid-template-columns:220px minmax(0,1fr);}
+    .terminal .side-col{grid-column:1/-1; display:grid; grid-template-columns:1fr 1fr; gap:14px;}}
+  @media(max-width:1000px){.terminal{grid-template-columns:1fr;}
+    .terminal .side-col{grid-column:auto; grid-template-columns:1fr;}}

@@ -1,0 +1,36 @@
+  <!-- ─── OVERVIEW ─── -->
+  <section id="tab-overview">
+    <div class="terminal">
+      <!-- @include src/features/watchlist/view.html -->
+
+      <!-- @include src/features/chart/view.html -->
+
+      <!-- Right side column -->
+      <div class="side-col">
+        <!-- @include src/features/gauges/view.html -->
+        <!-- @include src/features/setup-signals/mini-panel.html -->
+      </div>
+    </div>
+
+    <div class="ov-status-bar">
+      <div class="ov-stat"><span class="ov-stat-lbl">ML Winrate</span><span class="ov-stat-val" id="ovMlWinrate">–</span><span class="ov-stat-sub" id="ovMlWinrateSub">รอสัญญาณ...</span></div>
+      <div class="ov-stat"><span class="ov-stat-lbl">ML Margin</span><span class="ov-stat-val" id="ovMlMargin">–</span><span class="ov-stat-sub" id="ovMlN">–</span></div>
+      <div class="ov-stat"><span class="ov-stat-lbl">Setup Winrate</span><span class="ov-stat-val" id="ovSetWinrate">–</span><span class="ov-stat-sub" id="ovSetWinrateSub">รอสัญญาณ...</span></div>
+      <div class="ov-stat"><span class="ov-stat-lbl">Setup Margin</span><span class="ov-stat-val" id="ovSetMargin">–</span><span class="ov-stat-sub" id="ovSetN">–</span></div>
+      <div class="ov-stat"><span class="ov-stat-lbl">Model M1</span><span class="ov-stat-val purple" id="ovModelM1">–</span><span class="ov-stat-sub" id="ovModelM1Sub">–</span></div>
+      <div class="ov-stat"><span class="ov-stat-lbl">Model M5</span><span class="ov-stat-val purple" id="ovModelM5">–</span><span class="ov-stat-sub" id="ovModelM5Sub">–</span></div>
+    </div>
+    <div class="ov-bottom">
+      <div class="panel ov-equity-panel">
+        <h3><span class="ph purple"></span>Equity Curve <span class="eq-stats" id="eqStatsOv"></span></h3>
+        <div style="position:relative;">
+          <div style="height:260px;"><div id="equityChart"></div></div>
+          <div class="eq-empty" id="eqEmptyOv" style="display:none;">ยังไม่มีข้อมูลเทรดที่จบแล้ว — รอสัญญาณ &amp; ปิดตำแหน่งก่อน</div>
+        </div>
+      </div>
+      <div class="panel ov-feed-panel">
+        <h3><span class="ph green"></span>สัญญาณล่าสุด</h3>
+        <div id="mlRecentFeed" style="max-height:310px;overflow-y:auto;"></div>
+      </div>
+    </div>
+  </section>

@@ -1,0 +1,22 @@
+/* styles/index.css — รวม CSS ทุกไฟล์ "ตามลำดับเดิม" (cascade เหมือน <style> ก้อนเดิมทุกกฎ) */
+/* เพิ่มไฟล์ใหม่ = แทรกตามลำดับที่ต้องการ override — ห้ามสลับลำดับเดิมโดยไม่ตรวจ screenshot */
+@import './tokens.css';
+@import './global.css';
+@import '../features/status-bar/topbar.css';
+@import '../app/layout.css';
+@import '../shared/ui/cards.css';
+@import '../features/chart/chart-base.css';
+@import '../features/overview/terminal-layout.css';
+@import '../features/watchlist/watchlist.css';
+@import '../features/chart/chart-panel.css';
+@import '../features/overview/side-col.css';
+@import '../features/status-bar/statusbar.css';
+@import '../features/chart/chart-fullscreen.css';
+@import '../features/gauges/gauges.css';
+@import '../shared/ui/tables.css';
+@import '../features/setup-signals/setup-guide.css';
+@import '../features/ml-signals/feed.css';
+@import '../features/cfd/open-trades.css';
+@import './responsive.css';
+@import '../shared/ui/report-layout.css';
+@import '../features/overview/overview-bottom.css';

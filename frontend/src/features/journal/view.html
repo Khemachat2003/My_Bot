@@ -1,0 +1,136 @@
+  <!-- ─── JOURNAL REDESIGNED ─── -->
+  <section id="tab-journal" style="display:none;">
+    <div class="j-header">
+      <div class="j-title"><span class="jicon"></span>Journal & P&amp;L</div>
+      <div class="j-actions">
+        <button class="btn" id="btnExportJ" title="Export Excel">⬇ Export</button>
+      </div>
+    </div>
+
+    <div class="j-settings" id="jSettings">
+      <div class="j-settings-head" data-toggle-parent="open">
+        <span class="jsl">ตั้งค่าการเทรด + Export</span>
+        <span class="jsa">▾</span>
+      </div>
+      <div class="j-settings-body">
+        <label>ทุนเริ่มต้น<input type="number" id="setCapital" min="1" step="100"></label>
+        <label>ขนาดต่อไม้<input type="number" id="setStake" min="1" step="10"></label>
+        <label>สกุลเงิน<input type="text" id="setCurrency" maxlength="5" style="width:70px;"></label>
+        <button class="btn accent" id="btnSaveSettings">บันทึก</button>
+        <span id="settStatus" style="font-size:11px;color:var(--green);align-self:center;"></span>
+        <label style="margin-left:12px;">Export จากวัน<input type="date" id="expStart"></label>
+        <label>ถึงวัน<input type="date" id="expEnd"></label>
+        <button class="btn accent" id="btnExport">ดาวน์โหลด Excel</button>
+      </div>
+    </div>
+
+    <div class="j-hero">
+      <div class="j-hero-card pnl">
+        <div class="jh-lbl">Total P&amp;L</div>
+        <div class="jh-val" id="mPnlAll">–</div>
+        <div class="jh-sub" id="mPnlAllSub">–</div>
+      </div>
+      <div class="j-hero-card wr">
+        <div class="jh-lbl">Winrate</div>
+        <div class="jh-val" id="jWr">–</div>
+        <div class="jh-sub" id="jWrSub">–</div>
+      </div>
+      <div class="j-hero-card bal">
+        <div class="jh-lbl">💰 Option Balance</div>
+        <div class="jh-val" id="mBalance">–</div>
+        <div class="jh-sub" id="mBalanceSub">–</div>
+      </div>
+      <div class="j-hero-card bal" style="border-left:2px solid var(--cyan);">
+        <div class="jh-lbl">CFD Balance</div>
+        <div class="jh-val" id="mCfdBalance">–</div>
+        <div class="jh-sub" id="mCfdBalanceSub">–</div>
+      </div>
+    </div>
+
+    <div class="j-compare">
+      <div class="j-cmp-card">
+        <h4><span class="dot ml"></span>ML Model</h4>
+        <div class="j-cmp-stats">
+          <div class="j-cmp-stat"><div class="cs-lbl">Trades</div><div class="cs-val" id="jMlN">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="jMlWr">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">P&amp;L</div><div class="cs-val" id="mPnlMl">–</div></div>
+        </div>
+        <div class="j-cmp-bar"><div class="j-cmp-bar-fill" id="jMlBar" style="width:0%;background:var(--purple);"></div></div>
+        <div class="jh-sub" id="mRoiMl" style="margin-top:6px;">ROI –</div>
+      </div>
+      <div class="j-cmp-card">
+        <h4><span class="dot rb"></span>Rule-Based</h4>
+        <div class="j-cmp-stats">
+          <div class="j-cmp-stat"><div class="cs-lbl">Trades</div><div class="cs-val" id="jRbN">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="jRbWr">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">P&amp;L</div><div class="cs-val" id="mPnlSt">–</div></div>
+        </div>
+        <div class="j-cmp-bar"><div class="j-cmp-bar-fill" id="jRbBar" style="width:0%;background:var(--blue);"></div></div>
+        <div class="jh-sub" id="mRoiSt" style="margin-top:6px;">ROI –</div>
+      </div>
+    </div>
+
+    <div class="j-equity">
+      <h3>Equity Curve <span class="eq-stats" id="eqStatsFull"></span></h3>
+      <div style="position:relative;">
+        <div style="height:260px;"><div id="equityFullChart"></div></div>
+        <div class="eq-empty" id="eqEmptyFull" style="display:none;">ยังไม่มีข้อมูลเทรดที่จบแล้ว — รอสัญญาณ &amp; ปิดตำแหน่งก่อน</div>
+      </div>
+    </div>
+
+    <div class="j-section open" id="jSecDaily">
+      <div class="j-section-head" data-toggle-parent="open">
+        <h3>ผลรายวัน</h3><span class="j-arrow">▾</span>
+      </div>
+      <div class="j-section-body">
+        <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
+          <table id="dailyTable">
+            <thead><tr><th>วัน</th><th>Trades</th><th>Wins</th><th>Winrate</th><th>P&amp;L</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="j-section" id="jSecPeriod">
+      <div class="j-section-head" data-toggle-parent="open">
+        <h3>สรุป ML vs Rule-Based</h3><span class="j-arrow">▾</span>
+      </div>
+      <div class="j-section-body">
+        <div class="j-period-tabs" id="jPeriodTabs">
+          <button class="j-ptab active" data-period="daily">Daily</button>
+          <button class="j-ptab" data-period="weekly">Weekly</button>
+          <button class="j-ptab" data-period="monthly">Monthly</button>
+          <button class="j-ptab" data-period="yearly">Yearly</button>
+        </div>
+        <div class="tbl-wrap" style="max-height:300px;overflow-y:auto;">
+          <table id="periodTable">
+            <thead>
+              <tr>
+                <th>Period</th>
+                <th>Trades</th><th>WR</th><th>P&amp;L</th><th>ROI</th>
+                <th style="border-left:1px solid var(--border);">ML Trades</th><th>ML WR</th><th>ML P&amp;L</th>
+                <th style="border-left:1px solid var(--border);">RB Trades</th><th>RB WR</th><th>RB P&amp;L</th>
+                <th>Balance</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="j-section" id="jSecModel">
+      <div class="j-section-head" data-toggle-parent="open">
+        <h3>Model Registry</h3><span class="j-arrow">▾</span>
+      </div>
+      <div class="j-section-body">
+        <div class="tbl-wrap">
+          <table id="modelTable">
+            <thead><tr><th>Key</th><th>Version</th><th>Horizon</th><th>n_rows</th><th>AUC</th><th>Conf</th><th>Feature Set</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>

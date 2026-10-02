@@ -1,0 +1,31 @@
+{
+  "name": "xauusd-dashboard",
+  "private": true,
+  "version": "1.0.0",
+  "description": "XAUUSD Pro Trading Terminal — dashboard SPA (เสิร์ฟโดย backend/api.py จาก frontend/dist)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p jsconfig.json",
+    "test": "vitest run",
+    "test:visual": "playwright test",
+    "test:visual:baseline": "cross-env UI_TARGET=legacy playwright test --update-snapshots",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
+    "cross-env": "^10.1.0",
+    "eslint": "^10.11.0",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.9",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3"
+  }
+}

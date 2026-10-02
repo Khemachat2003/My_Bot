@@ -1,0 +1,16 @@
+/* shell: sidebar + content — ย้ายจาก index.html เดิม บรรทัด 88–103 */
+  /* ═══ NAV — SIDEBAR ═══ */
+  .shell{display:grid; grid-template-columns:200px 1fr; grid-template-rows:1fr; flex:1; overflow:hidden; min-height:0;}
+  .sidebar{border-right:1px solid var(--border); background:var(--panel); padding:18px 0; overflow-y:auto; flex-shrink:0;}
+  .nav-group{margin-bottom:20px;}
+  .nav-group-label{font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:.09em; font-weight:600; padding:0 18px; margin-bottom:8px;}
+  .nav-item{
+    display:flex; align-items:center; gap:10px; padding:9px 18px; font-size:13px;
+    color:var(--muted); cursor:pointer; border-left:2px solid transparent; font-weight:500; transition:.15s;
+  }
+  .nav-item:hover{color:var(--text); background:rgba(255,255,255,.02);}
+  .nav-item.active{color:var(--text); border-left-color:var(--accent); background:rgba(255,255,255,.03);}
+  .nav-item .count{margin-left:auto; font-family:var(--num); font-size:10.5px; color:var(--dim);}
+
+  /* ═══ CONTENT ═══ */
+  .content{overflow-y:auto; padding:16px 18px 40px; min-height:0;}

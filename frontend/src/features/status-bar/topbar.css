@@ -1,0 +1,45 @@
+/* แถบบน (brand/ราคา/สถิติ/logout) — ย้ายจาก index.html เดิม บรรทัด 43–87 */
+  /* ═══ TOP BAR ═══ */
+  .topbar{
+    display:flex; align-items:center; gap:18px; padding:8px 18px;
+    background:rgba(12,18,32,.85); backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--border); flex-shrink:0;
+    box-shadow:0 2px 18px rgba(0,0,0,.35);
+  }
+  .brand{display:flex; align-items:center; gap:9px; white-space:nowrap;}
+  .brand .logo{
+    width:30px; height:30px; border-radius:8px; display:grid; place-items:center;
+    background:linear-gradient(135deg,#26A69A,#2962FF); font-weight:900; color:#04121a; font-size:14px;
+    box-shadow:0 1px 2px rgba(0,0,0,.3);
+  }
+  .brand .name{font-size:14px; font-weight:800; letter-spacing:.6px;}
+  .brand .name span{color:var(--cyan);}
+  .brand .ver{font-size:9.5px; color:var(--dim); letter-spacing:1.5px; font-weight:700;}
+
+  .pricebox{
+    display:flex; align-items:center; gap:12px; padding:4px 14px; border-radius:10px;
+    background:var(--card); border:1px solid var(--border);
+  }
+  .pricebox .sym{font-size:11px; font-weight:800; color:var(--muted); letter-spacing:.4px;}
+  .pricebox .price{font-family:var(--num); font-size:30px; font-weight:800; line-height:1; letter-spacing:.5px;}
+  .pricebox .price.up{color:var(--green);} .pricebox .price.down{color:var(--red);}
+  .pricebox .chg{font-family:var(--num); font-size:12.5px; font-weight:700; padding:2px 7px; border-radius:6px;}
+  .chg.up{color:var(--green); background:rgba(38,166,154,.1);}
+  .chg.down{color:var(--red); background:rgba(239,83,80,.1);}
+  .live-badge{
+    font-size:10px; font-weight:800; letter-spacing:1px; color:var(--green);
+    border:1px solid rgba(38,166,154,.4); border-radius:99px; padding:3px 9px;
+    display:inline-flex; align-items:center; gap:5px;
+  }
+  .live-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.6s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.2;}}
+
+  .spacer{flex:1;}
+  .topstat{display:flex; gap:14px; align-items:center;}
+  .ts{font-size:10.5px; color:var(--muted); text-align:right; line-height:1.25;}
+  .ts b{display:block; color:var(--text); font-family:var(--num); font-size:13px; font-weight:700;}
+  .logout{
+    font-size:11.5px; color:var(--muted); text-decoration:none;
+    border:1px solid var(--border); border-radius:8px; padding:6px 11px; transition:.15s;
+  }
+  .logout:hover{color:var(--red); border-color:var(--red);}

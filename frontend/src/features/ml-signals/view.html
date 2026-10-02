@@ -1,0 +1,66 @@
+  <!-- ─── ML ─── -->
+  <section id="tab-ml" style="display:none;">
+    <div class="j-hero">
+      <div class="j-hero-card wr">
+        <div class="jh-lbl">ML Winrate</div>
+        <div class="jh-val" id="mlWr">–</div>
+        <div class="jh-sub" id="mlWrSub">–</div>
+      </div>
+      <div class="j-hero-card pnl">
+        <div class="jh-lbl">Resolved / Pending</div>
+        <div class="jh-val" id="mlN">–</div>
+        <div class="jh-sub" id="mlNsub">–</div>
+      </div>
+      <div class="j-hero-card bal">
+        <div class="jh-lbl">Confidence</div>
+        <div class="jh-val" id="mlCi" style="font-size:20px;">–</div>
+        <div class="jh-sub">BE <b id="mlBe">–</b> · Margin <b id="mlMargin">–</b></div>
+      </div>
+    </div>
+    <div class="j-compare" style="margin-bottom:14px;">
+      <div class="j-cmp-card">
+        <h4><span class="dot ml"></span>Hold 15 นาที (M1)</h4>
+        <div class="j-cmp-stats">
+          <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="mlWrM1">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">Trades</div><div class="cs-val" id="mlM1N">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">P&L</div><div class="cs-val" id="mlM1Pnl">–</div></div>
+        </div>
+      </div>
+      <div class="j-cmp-card">
+        <h4><span class="dot rb"></span>Hold 30 นาที (M5)</h4>
+        <div class="j-cmp-stats">
+          <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="mlWrM5">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">Trades</div><div class="cs-val" id="mlM5N">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">P&L</div><div class="cs-val" id="mlM5Pnl">–</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="guide-card">
+      <div class="gname">แนวทางสัญญาณ ML ที่ความมั่นใจสูง (conf ≥ 0.70)</div>
+      <div class="guide-steps" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">
+        <div class="gstep">
+          <b style="color:var(--yellow);">≥ 0.70 — HIGH</b>
+          <span>สัญญาณแรง · ใช้ <b>1/3 ของเงินเดิมพัน</b> · เข้าตามทิศทางสัญญาณ (CALL/PUT)</span>
+        </div>
+        <div class="gstep">
+          <b style="color:var(--green);">0.60 – 0.69</b>
+          <span>สัญญาณปานกลาง · รอจังหวะยืนยันจาก Rule-Based (แนวรับ/ต้าน) ก่อนเข้า</span>
+        </div>
+        <div class="gstep">
+          <b style="color:var(--muted);">&lt; 0.60</b>
+          <span>ความมั่นใจต่ำกว่าจุดคุ้มทุน — <b>ไม่ควรเปิดออเดอร์</b> รอสัญญาณถัดไป</span>
+        </div>
+      </div>
+      <div class="guide-note">จุดคุ้มทุนจริงดูจากค่า <b>Breakeven</b> ด้านบน — จะเปิดออเดอร์ได้เมื่อความมั่นใจ (Win Prob) สูงกว่า Breakeven เสมอ</div>
+    </div>
+    <div class="panel">
+      <h3><span class="ph green"></span>ประวัติสัญญาณ ML ทั้งหมด</h3>
+      <div class="tbl-wrap" style="max-height:480px;overflow-y:auto;">
+        <table id="mlFullTable">
+          <thead><tr><th>เวลา</th><th>TF</th><th>ทิศทาง</th><th>Entry</th><th>Exit</th><th>Win Prob</th><th>Thresh</th><th>Hold</th><th>Model</th><th>ผล</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div id="mlEmpty" class="empty" style="display:none;">ยังไม่มีสัญญาณ ML — รอ notifier.py ทำงาน</div>
+      </div>
+    </div>
+  </section>

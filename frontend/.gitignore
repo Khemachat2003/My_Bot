@@ -1,0 +1,9 @@
+# frontend — ไม่ commit
+node_modules/
+test-results/
+playwright-report/
+# fixtures มีข้อมูลสัญญาณ/P&L จริงจาก DB → ห้ามขึ้น git
+tests/visual/fixtures/
+# screenshot baseline สร้างจากข้อมูลจริง → เก็บในเครื่องเท่านั้น
+tests/visual/__snapshots__/
+# หมายเหตุ: dist/ "ต้อง commit" (VPS ไม่มี Node — backend เสิร์ฟ dist ตรงๆ)

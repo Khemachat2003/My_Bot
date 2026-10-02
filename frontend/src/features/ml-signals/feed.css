@@ -1,0 +1,17 @@
+/* ฟีดสัญญาณ + hi-badge — ย้ายจาก index.html เดิม บรรทัด 397–412 */
+  .feed-row{
+    display:flex; align-items:center; gap:9px; padding:8px 10px; border-bottom:1px solid rgba(19,28,48,.7);
+    font-size:11.5px; font-variant-numeric:tabular-nums;
+  }
+  .feed-row:last-child{border-bottom:none;}
+  .feed-row .fdir{width:52px; text-align:center; font-weight:900; font-size:11px; border-radius:6px; padding:2px 0;}
+  .feed-row .fdir.CALL{background:rgba(38,166,154,.14); color:var(--green);}
+  .feed-row .fdir.PUT{background:rgba(239,83,80,.14); color:var(--red);}
+  .feed-row .ftime{color:var(--dim); font-family:var(--num); font-size:10.5px;}
+  .feed-row .fprice{font-family:var(--num); font-weight:700; margin-left:auto;}
+  .feed-row .fconf{font-family:var(--num); color:var(--muted); font-size:11px;}
+  .hi-badge{
+    display:inline-block; background:linear-gradient(135deg,#FF9800,#ff8a3d); color:#1a1305;
+    font-size:9px; font-weight:900; border-radius:10px; padding:1px 6px; margin-left:4px; vertical-align:1px;
+    font-family:var(--num); letter-spacing:.3px;
+  }

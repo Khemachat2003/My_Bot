@@ -1,0 +1,16 @@
+/* Probability gauge — ย้ายจาก index.html เดิม บรรทัด 307–322 */
+  /* ═══ GAUGES ═══ */
+  .gauge{
+    background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:10px 12px 12px; margin-bottom:10px;
+  }
+  .gauge:last-child{margin-bottom:0;}
+  .gauge .ghead{display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;}
+  .gauge .gname{font-size:11px; font-weight:800; letter-spacing:.5px; color:var(--muted);}
+  .gsig{font-size:10px; font-weight:900; padding:3px 9px; border-radius:99px; letter-spacing:.5px;}
+  .gsig.CALL{background:rgba(38,166,154,.14); color:var(--green); border:1px solid rgba(38,166,154,.3);}
+  .gsig.PUT{background:rgba(239,83,80,.14); color:var(--red); border:1px solid rgba(239,83,80,.3);}
+  .gsig.NEUTRAL{background:rgba(116,128,156,.12); color:var(--muted); border:1px solid rgba(116,128,156,.25);}
+  .gauge-svg{display:flex; justify-content:center; margin:6px 0 2px;}
+  .gauge-svg svg{max-width:100%; height:auto;}
+  .gauge .gmeta{display:flex; justify-content:space-between; font-family:var(--num); font-size:10px; color:var(--dim); margin-top:4px;}

@@ -1,0 +1,14 @@
+/* reset + body + scrollbar + .mono — ย้ายจาก index.html เดิม บรรทัด 29–42 */
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    font-size:13.5px; display:flex; flex-direction:column; overflow:hidden;
+  }
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:#24304f; border-radius:6px; border:2px solid transparent; background-clip:content-box;}
+  ::-webkit-scrollbar-thumb:hover{background:#34446c;}
+  .mono{font-family:var(--num); font-variant-numeric:tabular-nums;}

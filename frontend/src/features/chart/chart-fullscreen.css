@@ -1,0 +1,5 @@
+/* โหมดกราฟเต็มจอ — ย้ายจาก index.html เดิม บรรทัด 302–306 */
+  /* fullscreen */
+  .chart-panel:fullscreen{background:var(--bg); border:none; border-radius:0; padding:10px 14px; display:flex; flex-direction:column;}
+  .chart-panel:fullscreen .chart-wrap{flex:1;}
+  .chart-panel:fullscreen h3{flex-shrink:0;}

@@ -1,0 +1,3 @@
+/* คอลัมน์ขวาของแท็บภาพรวม — ย้ายจาก index.html เดิม บรรทัด 288–290 */
+  /* right side column */
+  .side-col{display:flex; flex-direction:column; gap:14px;}

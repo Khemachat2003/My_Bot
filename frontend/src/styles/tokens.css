@@ -1,0 +1,15 @@
+/* design tokens (สี/ฟอนต์) — แหล่งความจริงเดียว — ย้ายจาก index.html เดิม บรรทัด 15–28 */
+  /* ═══ DESIGN TOKENS ═══ */
+  :root{
+    --bg:#131722; --panel:#1A1E29; --panel2:#1E222D; --card:#1A1E29;
+    --border:#2A2E39; --border2:#363A45;
+    --text:#D1D4DC; --muted:#787B86; --dim:#565B66;
+    --green:#26A69A; --red:#EF5350; --yellow:#FF9800;
+    --blue:#2962FF; --cyan:#2962FF; --purple:#9C6FE0; --ml:#9C6FE0;
+    --grid:#1E222D; --bg2:#1E222D;
+    --accent:var(--blue);
+    --font-display:'Archivo',sans-serif;
+    --font-body:'IBM Plex Sans',sans-serif;
+    --font-mono:'IBM Plex Mono',ui-monospace,monospace;
+    --num:'IBM Plex Mono',ui-monospace,monospace;
+  }

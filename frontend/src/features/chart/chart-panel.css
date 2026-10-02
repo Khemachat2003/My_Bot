@@ -1,0 +1,67 @@
+/* แผงกราฟ + legend bar + panes + toolbar — ย้ายจาก index.html เดิม บรรทัด 221–287 */
+  /* chart panel + legend bar (ย้าย legend ออกจาก canvas → ไม่บังแท่งเทียน) */
+  .chart-panel{position:relative;}
+  .chart-wrap{position:relative;}
+  /* loading overlay ตอนสลับ TF/symbol */
+  .chart-wrap.loading{opacity:.65; transition:opacity .15s;}
+  .chart-wrap.loading::after{content:'กำลังโหลด…';
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:var(--muted); font-size:11px; font-weight:700; background:rgba(19,23,34,.35);
+    pointer-events:none; z-index:4; letter-spacing:.08em;}
+  /* LW chart overlay controls */
+  .lw-tradelist{border-top:1px solid var(--border);}
+  .lw-trade-head{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; padding:8px 10px; font-weight:600;}
+  .lw-trow{display:flex; align-items:center; gap:10px; padding:6px 10px; cursor:pointer; font-size:12px; border-top:1px solid var(--border);}
+  .lw-trow:hover{background:var(--panel);}
+  .lw-trow.sel{background:var(--panel); outline:1px solid var(--accent);}
+  .lw-trow .dir{width:40px; font-weight:700; font-family:var(--num);}
+  .lw-trow .lbl{width:40px; font-size:10px; font-weight:700; color:var(--ml);}
+  .lw-trow .sub{font-family:var(--num); color:var(--muted); flex:1;}
+  .lw-trow .tag{font-size:9px; padding:1px 5px; border-radius:3px; background:var(--panel2); color:var(--muted);}
+  .lw-trow .sr-del{background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px; line-height:1; padding:2px 6px;}
+  .lw-trow .sr-del:hover{color:var(--red);}
+  .lw-trade-head .sr-clear{background:rgba(120,123,134,.12); border:none; color:var(--muted); font-size:9px; text-transform:none; letter-spacing:.02em; padding:2px 8px; border-radius:6px; cursor:pointer; margin-left:8px; font-weight:600; float:right;}
+  .lw-trade-head .sr-clear:hover{color:#fff; background:rgba(239,83,80,.75);}
+  .lw-trow .tag.open{color:var(--green); background:rgba(38,166,154,.12);}
+  .lw-empty{padding:12px; color:var(--muted); font-size:12px;}
+  .eq-stats{font-size:10px; font-weight:600; color:var(--muted); font-family:var(--num); letter-spacing:.02em;}
+  .eq-stats b{color:var(--text); font-weight:700;}
+  .eq-stats .eq-up{color:var(--green);} .eq-stats .eq-dn{color:var(--red);}
+  .eq-empty{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:var(--muted); font-size:12px; background:rgba(19,23,34,.0); pointer-events:none; text-align:center; padding:0 16px;}
+  .chart-legendbar{
+    display:flex; align-items:center; gap:8px; padding:5px 9px; margin:8px 0 0;
+    background:var(--card); border:1px solid var(--border); border-radius:8px;
+    font-family:var(--num); font-size:10px; color:var(--muted);
+    overflow-x:auto; scrollbar-width:thin; flex-shrink:0;
+  }
+  .chart-legendbar .lb-ohlc{display:inline-flex; gap:9px; white-space:nowrap; font-size:10px; flex-shrink:0;}
+  .chart-legendbar .lb-ohlc b{color:var(--text); font-weight:700;}
+  .chart-legendbar .lb-ohlc .up b{color:var(--green);}
+  .chart-legendbar .lb-ohlc .dn b{color:var(--red);}
+  .chart-legendbar .lb-ohlc .muted b{color:var(--muted);}
+  .chart-legendbar .lb-spacer{flex:1; min-width:6px;}
+  .chart-legendbar #lbValues{display:inline-flex; gap:4px;}
+  .chart-legendbar.collapsed #lbValues{display:none;}
+  .chart-legendbar .lb-tools{display:inline-flex; gap:4px; flex-shrink:0;}
+  .lw-modehint{position:absolute; left:50%; top:10px; transform:translateX(-50%); z-index:5; pointer-events:none; background:rgba(41,98,255,.15); border:1px solid rgba(41,98,255,.5); color:#8fb0ff; font-size:11px; padding:5px 12px; border-radius:8px; font-family:monospace; white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,.3);}
+  #lwWrap{height:auto;}
+  .lw-pane{position:relative;}
+  .lw-pane-label{position:absolute; top:2px; left:8px; z-index:3; pointer-events:none; font-size:10px; color:var(--muted); background:rgba(19,23,34,.65); padding:1px 6px; border-radius:3px; font-family:var(--num);}
+  #candleChart{height:320px;}
+  #volChart{height:78px;}
+  #rsiChart{height:96px;}
+  #adxChart{height:96px;}
+  .lw-fallback-msg{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:12px; font-family:monospace; text-align:center; padding:20px;}
+  .chart-wrap.adding-sr #candleChart{outline:1px dashed rgba(41,98,255,.5); outline-offset:-2px; border-radius:6px;}
+  .chart-legendbar .lb-collapse{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;line-height:1;padding:2px 4px;flex-shrink:0;}
+  .chart-legendbar.collapsed .lb-collapse{transform:rotate(180deg);}
+  .lo-chip{
+    background:rgba(10,15,26,.72); border:1px solid var(--border); color:var(--text);
+    font-size:9.5px; font-weight:700; font-family:var(--num); padding:2px 7px; border-radius:6px;
+    display:inline-flex; gap:5px; align-items:center; cursor:pointer;
+  }
+  .lo-chip .sw{width:10px;height:2px;border-radius:2px;display:inline-block;}
+  .lo-chip .lbl{color:var(--muted);}
+  .lo-chip.off{opacity:.4; text-decoration:line-through;}
+  .lo-chip:hover{border-color:var(--purple);}

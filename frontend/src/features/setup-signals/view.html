@@ -1,0 +1,94 @@
+  <!-- ─── SETUP ─── -->
+  <section id="tab-setup" style="display:none;">
+    <div class="j-hero">
+      <div class="j-hero-card wr">
+        <div class="jh-lbl">Setup Winrate</div>
+        <div class="jh-val" id="setWr">–</div>
+        <div class="jh-sub" id="setWrSub">–</div>
+      </div>
+      <div class="j-hero-card pnl">
+        <div class="jh-lbl">Resolved / Pending</div>
+        <div class="jh-val" id="setN">–</div>
+        <div class="jh-sub" id="setNsub">–</div>
+      </div>
+      <div class="j-hero-card bal">
+        <div class="jh-lbl">Confidence</div>
+        <div class="jh-val" id="setCi" style="font-size:20px;">–</div>
+        <div class="jh-sub">BE <b id="setBe">–</b> · Margin <b id="setMargin">–</b></div>
+      </div>
+    </div>
+    <div class="j-compare" style="margin-bottom:14px;">
+      <div class="j-cmp-card">
+        <h4><span class="dot ml"></span>Hold 15 นาที (M1)</h4>
+        <div class="j-cmp-stats">
+          <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="setWrM1">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">Trades</div><div class="cs-val" id="setM1N">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">P&L</div><div class="cs-val" id="setM1Pnl">–</div></div>
+        </div>
+      </div>
+      <div class="j-cmp-card">
+        <h4><span class="dot rb"></span>Hold 30 นาที (M5)</h4>
+        <div class="j-cmp-stats">
+          <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="setWrM5">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">Trades</div><div class="cs-val" id="setM5N">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">P&L</div><div class="cs-val" id="setM5Pnl">–</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="cols l3">
+      <div class="panel"><h3><span class="ph blue"></span>Setup — M5</h3><div id="setupAllM5"></div></div>
+      <div class="panel"><h3><span class="ph blue"></span>Setup — M1</h3><div id="setupAllM1"></div></div>
+      <div class="panel">
+        <h3><span class="ph blue"></span>ประวัติสัญญาณ Rule-Based
+          <select id="setupSymFilter" style="background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:800;font-family:inherit;float:right;">
+            <option value="">ทั้งหมด</option>
+            <option value="frxXAUUSD">XAUUSD</option>
+            <option value="frxEURUSD">EURUSD</option>
+            <option value="frxGBPUSD">GBPUSD</option>
+            <option value="frxUSDJPY">USDJPY</option>
+            <option value="frxAUDUSD">AUDUSD</option>
+            <option value="frxUSDCAD">USDCAD</option>
+            <option value="frxUSDCHF">USDCHF</option>
+            <option value="frxNZDUSD">NZDUSD</option>
+          </select>
+        </h3>
+        <div class="tbl-wrap" style="max-height:420px;overflow-y:auto;">
+          <table id="setupTable">
+            <thead><tr><th>เวลา</th><th>คู่</th><th>TF</th><th>Imp</th><th>ทิศทาง</th><th>Entry</th><th>Exit</th><th>Score</th><th>Tier</th><th>ผ่าน</th><th>ผล</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div id="setEmpty" class="empty" style="display:none;">ยังไม่มีสัญญาณ — รอ setup_feed.py ทำงาน</div>
+        </div>
+      </div>
+
+      <!-- TICK TOUCH RESEARCH MONITOR -->
+      <div style="margin-top:20px;">
+        <h3><span class="ph purple"></span>Tick Touch Research
+          <span style="font-size:11px;color:var(--muted);font-weight:400;margin-left:8px;">เก็บข้อมูล 3 เคสแตะ EMA200 + checklist vote (ไม่ส่งสัญญาณจริง)</span>
+        </h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px;" id="ttCaseCards">
+          <div class="empty" style="grid-column:1/-1;">ยังไม่มีข้อมูล research</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div>
+            <h4 style="color:var(--cyan);font-size:12px;margin-bottom:6px;">🗳 Checklist Vote Weight (WR เมื่อ cond = true)</h4>
+            <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
+              <table id="ttCondTable" style="font-size:11px;">
+                <thead><tr><th>Condition</th><th>True</th><th>Win</th><th>WR</th><th>False WR</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <h4 style="color:var(--cyan);font-size:12px;margin-bottom:6px;">Recent Touches</h4>
+            <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
+              <table id="ttRecentTable" style="font-size:11px;">
+                <thead><tr><th>เวลา</th><th>คู่</th><th>Case</th><th>Dir</th><th>Entry</th><th>Exit</th><th>✓</th><th>ผล</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>

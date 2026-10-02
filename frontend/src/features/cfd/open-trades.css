@@ -1,0 +1,3 @@
+/* grid ของ open trades — ย้ายจาก index.html เดิม บรรทัด 413–415 */
+
+  .open-trade-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;font-size:12px;}

@@ -1,0 +1,3478 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,">
+<title>XAUUSD Pro Trading Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- โหลดไลบรารีจากไฟล์ในเครื่อง (/static = โฟลเดอร์ frontend) กัน CDN ล่มแล้วกราฟหาย -->
+<script src="/static/vendor/chart.umd.min.js"></script>
+<script src="/static/vendor/lightweight-charts.standalone.production.js"></script>
+<link rel="stylesheet" href="/static/vendor/tabler/tabler-icons.min.css">
+<style>
+  /* ═══ DESIGN TOKENS ═══ */
+  :root{
+    --bg:#131722; --panel:#1A1E29; --panel2:#1E222D; --card:#1A1E29;
+    --border:#2A2E39; --border2:#363A45;
+    --text:#D1D4DC; --muted:#787B86; --dim:#565B66;
+    --green:#26A69A; --red:#EF5350; --yellow:#FF9800;
+    --blue:#2962FF; --cyan:#2962FF; --purple:#9C6FE0; --ml:#9C6FE0;
+    --grid:#1E222D; --bg2:#1E222D;
+    --accent:var(--blue);
+    --font-display:'Archivo',sans-serif;
+    --font-body:'IBM Plex Sans',sans-serif;
+    --font-mono:'IBM Plex Mono',ui-monospace,monospace;
+    --num:'IBM Plex Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    font-size:13.5px; display:flex; flex-direction:column; overflow:hidden;
+  }
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:#24304f; border-radius:6px; border:2px solid transparent; background-clip:content-box;}
+  ::-webkit-scrollbar-thumb:hover{background:#34446c;}
+  .mono{font-family:var(--num); font-variant-numeric:tabular-nums;}
+
+  /* ═══ TOP BAR ═══ */
+  .topbar{
+    display:flex; align-items:center; gap:18px; padding:8px 18px;
+    background:rgba(12,18,32,.85); backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--border); flex-shrink:0;
+    box-shadow:0 2px 18px rgba(0,0,0,.35);
+  }
+  .brand{display:flex; align-items:center; gap:9px; white-space:nowrap;}
+  .brand .logo{
+    width:30px; height:30px; border-radius:8px; display:grid; place-items:center;
+    background:linear-gradient(135deg,#26A69A,#2962FF); font-weight:900; color:#04121a; font-size:14px;
+    box-shadow:0 1px 2px rgba(0,0,0,.3);
+  }
+  .brand .name{font-size:14px; font-weight:800; letter-spacing:.6px;}
+  .brand .name span{color:var(--cyan);}
+  .brand .ver{font-size:9.5px; color:var(--dim); letter-spacing:1.5px; font-weight:700;}
+
+  .pricebox{
+    display:flex; align-items:center; gap:12px; padding:4px 14px; border-radius:10px;
+    background:var(--card); border:1px solid var(--border);
+  }
+  .pricebox .sym{font-size:11px; font-weight:800; color:var(--muted); letter-spacing:.4px;}
+  .pricebox .price{font-family:var(--num); font-size:30px; font-weight:800; line-height:1; letter-spacing:.5px;}
+  .pricebox .price.up{color:var(--green);} .pricebox .price.down{color:var(--red);}
+  .pricebox .chg{font-family:var(--num); font-size:12.5px; font-weight:700; padding:2px 7px; border-radius:6px;}
+  .chg.up{color:var(--green); background:rgba(38,166,154,.1);}
+  .chg.down{color:var(--red); background:rgba(239,83,80,.1);}
+  .live-badge{
+    font-size:10px; font-weight:800; letter-spacing:1px; color:var(--green);
+    border:1px solid rgba(38,166,154,.4); border-radius:99px; padding:3px 9px;
+    display:inline-flex; align-items:center; gap:5px;
+  }
+  .live-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.6s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.2;}}
+
+  .spacer{flex:1;}
+  .topstat{display:flex; gap:14px; align-items:center;}
+  .ts{font-size:10.5px; color:var(--muted); text-align:right; line-height:1.25;}
+  .ts b{display:block; color:var(--text); font-family:var(--num); font-size:13px; font-weight:700;}
+  .logout{
+    font-size:11.5px; color:var(--muted); text-decoration:none;
+    border:1px solid var(--border); border-radius:8px; padding:6px 11px; transition:.15s;
+  }
+  .logout:hover{color:var(--red); border-color:var(--red);}
+
+  /* ═══ NAV — SIDEBAR ═══ */
+  .shell{display:grid; grid-template-columns:200px 1fr; grid-template-rows:1fr; flex:1; overflow:hidden; min-height:0;}
+  .sidebar{border-right:1px solid var(--border); background:var(--panel); padding:18px 0; overflow-y:auto; flex-shrink:0;}
+  .nav-group{margin-bottom:20px;}
+  .nav-group-label{font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:.09em; font-weight:600; padding:0 18px; margin-bottom:8px;}
+  .nav-item{
+    display:flex; align-items:center; gap:10px; padding:9px 18px; font-size:13px;
+    color:var(--muted); cursor:pointer; border-left:2px solid transparent; font-weight:500; transition:.15s;
+  }
+  .nav-item:hover{color:var(--text); background:rgba(255,255,255,.02);}
+  .nav-item.active{color:var(--text); border-left-color:var(--accent); background:rgba(255,255,255,.03);}
+  .nav-item .count{margin-left:auto; font-family:var(--num); font-size:10.5px; color:var(--dim);}
+
+  /* ═══ CONTENT ═══ */
+  .content{overflow-y:auto; padding:16px 18px 40px; min-height:0;}
+
+  /* KPI cards */
+  .kpi-row{display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); margin-bottom:16px;}
+  .kpi{
+    background:linear-gradient(180deg,var(--panel),var(--card));
+    border:1px solid var(--border); border-radius:12px; padding:13px 15px;
+    position:relative; overflow:hidden; transition:.15s;
+  }
+  .kpi:hover{border-color:var(--border2); transform:translateY(-1px);}
+  .kpi::before{content:''; position:absolute; inset:0 auto 0 0; width:3px; background:var(--accent); opacity:.7;}
+  .kpi .lbl{font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.09em; font-weight:700;}
+  .kpi .val{font-family:var(--num); font-size:24px; font-weight:800; margin:6px 0 4px; line-height:1;}
+  .kpi .sub{font-size:10.5px; color:var(--muted);}
+  .kpi .sub b{color:var(--text);}
+  .val.green{color:var(--green);} .val.red{color:var(--red);} .val.yellow{color:var(--yellow);}
+  .val.blue{color:var(--blue);} .val.cyan{color:var(--cyan);} .val.purple{color:var(--purple);} .val.muted{color:var(--muted);}
+
+  /* panels */
+  .cols{display:grid; gap:14px; margin-bottom:16px;}
+  .cols.l2{grid-template-columns:minmax(0,1.8fr) minmax(0,1fr);}
+  .cols.l3{grid-template-columns:repeat(3,minmax(0,1fr));}
+  @media(max-width:1150px){.cols.l2,.cols.l3{grid-template-columns:1fr;}}
+
+  .panel{
+    background:linear-gradient(180deg,var(--panel),var(--card));
+    border:1px solid var(--border); border-radius:12px; padding:14px 15px; min-width:0;
+  }
+  .panel h3{
+    font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.1em;
+    margin-bottom:12px; display:flex; align-items:center; gap:8px; font-weight:800;
+  }
+  .panel h3 .ph{width:3px;height:12px;border-radius:2px;display:inline-block;background:var(--accent);margin-right:8px;}
+  .panel h3 .ph.cyan,.panel h3 .ph.green,.panel h3 .ph.blue,.panel h3 .ph.purple,.panel h3 .ph.red{background:var(--accent);}
+
+  /* chart */
+  .chart-wrap{position:relative; height:330px;}
+  canvas.chart{width:100%; height:100%; display:block;}
+  .chart-toolbar{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:10px 0 2px;}
+  .sym-select{
+    background:var(--card); color:var(--text); border:1px solid var(--border);
+    border-radius:8px; padding:4px 8px; font-size:11px; font-weight:700; font-family:inherit; cursor:pointer;
+  }
+  .sym-select:focus{outline:none; border-color:var(--cyan);}
+  .tf-group{display:inline-flex; gap:2px; background:var(--card); border:1px solid var(--border); border-radius:8px; padding:2px;}
+  .tf-btn{
+    background:transparent; border:none; color:var(--muted); cursor:pointer;
+    font-size:10.5px; font-weight:800; font-family:inherit; padding:3px 8px; border-radius:6px;
+  }
+  .tf-btn:hover{color:var(--text);}
+  .tf-btn.active{background:var(--cyan); color:#04121a;}
+  .tf-btn.has-lbl{display:inline-flex; align-items:center; gap:4px; padding:3px 7px;}
+  .tf-btn.has-lbl .btn-lbl{font-size:10px; font-weight:800;}
+  .tf-btn.has-lbl.active{background:var(--cyan); color:#04121a;}
+  @media(max-width:900px){ .btn-lbl{display:none;} }
+  .ind-hint{font-size:9.5px; color:var(--dim); font-weight:600; letter-spacing:.02em;}
+  .lb-values{display:inline-flex; gap:10px; white-space:nowrap; font-family:var(--num); font-size:10px;}
+  .lb-values b{color:var(--text); font-weight:700;}
+  .lb-values .v-u{color:var(--green);} .lb-values .v-d{color:var(--red);} .lb-values .v-m{color:var(--muted);}
+  .ind-bar{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin:10px 0 8px;}
+  .ind-chip{
+    background:var(--card); border:1px solid var(--border); color:var(--muted); cursor:pointer;
+    font-size:10.5px; font-weight:800; font-family:inherit; padding:4px 10px; border-radius:20px; transition:.15s;
+  }
+  .ind-chip:hover{color:var(--text); border-color:var(--purple);}
+  .ind-chip.active{background:var(--purple); color:#fff; border-color:var(--purple);}
+  .ind-spacer{flex:1;}
+  .btn{
+    background:var(--card); border:1px solid var(--border); color:var(--text); cursor:pointer;
+    font-size:11.5px; font-weight:800; font-family:inherit; padding:7px 14px; border-radius:8px; transition:.15s;
+  }
+  .btn:hover{border-color:var(--purple); color:var(--purple);}
+  .btn.accent{background:var(--purple); border-color:var(--purple); color:#fff;}
+  .btn.accent:hover{filter:brightness(1.15); color:#fff;}
+  .sett-row{display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap;}
+  .sett-row label{display:flex; flex-direction:column; gap:4px; font-size:10px; color:var(--muted); font-weight:800; letter-spacing:.05em;}
+  .sett-row input{
+    background:var(--card); border:1px solid var(--border); color:var(--text); border-radius:8px;
+    font-family:var(--num); font-size:14px; font-weight:800; padding:7px 10px; width:110px;
+  }
+  .sett-row input:focus{outline:none; border-color:var(--purple);}
+  .chart-legend{display:flex; gap:14px; font-size:10px; color:var(--muted); margin-top:8px; flex-wrap:wrap;}
+  .chart-legend i{width:10px;height:2px;display:inline-block;margin-right:4px;vertical-align:middle;border-radius:2px;}
+
+  /* ═══ TRADING TERMINAL LAYOUT (TradingView-like) ═══ */
+  .terminal{display:grid; gap:14px; margin-bottom:16px;
+    grid-template-columns:minmax(230px,260px) minmax(0,1fr) minmax(250px,300px);
+    align-items:start;}
+  @media(max-width:1300px){.terminal{grid-template-columns:220px minmax(0,1fr);}
+    .terminal .side-col{grid-column:1/-1; display:grid; grid-template-columns:1fr 1fr; gap:14px;}}
+  @media(max-width:1000px){.terminal{grid-template-columns:1fr;}
+    .terminal .side-col{grid-column:auto; grid-template-columns:1fr;}}
+
+  /* watchlist sidebar */
+  .wlist{
+    background:linear-gradient(180deg,var(--panel),var(--card));
+    border:1px solid var(--border); border-radius:12px; overflow:hidden; display:flex; flex-direction:column;
+  }
+  .wlist-head{
+    display:flex; align-items:center; gap:8px; padding:11px 14px; font-size:10px; font-weight:800;
+    color:var(--muted); text-transform:uppercase; letter-spacing:.12em; border-bottom:1px solid var(--border);
+  }
+  .wlist-head .ph{width:3px;height:12px;border-radius:2px;background:var(--accent);}
+  .wl-scroll{overflow-y:auto; max-height:600px;}
+  .wl-row{
+    display:grid; grid-template-columns:1fr auto auto; gap:8px; align-items:center;
+    padding:9px 14px; cursor:pointer; border-bottom:1px solid rgba(19,28,48,.6);
+    transition:background .12s; position:relative;
+  }
+  .wl-row:hover{background:rgba(41,98,255,.05);}
+  .wl-row.active{background:rgba(41,98,255,.06); box-shadow:inset 3px 0 0 var(--cyan);}
+  .wl-name{font-size:12px; font-weight:800; letter-spacing:.3px;}
+  .wl-kind{display:block; font-size:9px; color:var(--dim); font-weight:600; letter-spacing:.5px;}
+  .wl-price{font-family:var(--num); font-size:12.5px; font-weight:700; font-variant-numeric:tabular-nums;}
+  .wl-chg{font-family:var(--num); font-size:10px; font-weight:800; padding:2px 7px; border-radius:6px; min-width:52px; text-align:center;}
+  .wl-chg.up{color:var(--green); background:rgba(38,166,154,.1);}
+  .wl-chg.down{color:var(--red); background:rgba(239,83,80,.1);}
+  .wl-chg.flat{color:var(--muted); background:rgba(116,128,156,.1);}
+
+  /* chart panel + legend bar (ย้าย legend ออกจาก canvas → ไม่บังแท่งเทียน) */
+  .chart-panel{position:relative;}
+  .chart-wrap{position:relative;}
+  /* loading overlay ตอนสลับ TF/symbol */
+  .chart-wrap.loading{opacity:.65; transition:opacity .15s;}
+  .chart-wrap.loading::after{content:'กำลังโหลด…';
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:var(--muted); font-size:11px; font-weight:700; background:rgba(19,23,34,.35);
+    pointer-events:none; z-index:4; letter-spacing:.08em;}
+  /* LW chart overlay controls */
+  .lw-tradelist{border-top:1px solid var(--border);}
+  .lw-trade-head{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; padding:8px 10px; font-weight:600;}
+  .lw-trow{display:flex; align-items:center; gap:10px; padding:6px 10px; cursor:pointer; font-size:12px; border-top:1px solid var(--border);}
+  .lw-trow:hover{background:var(--panel);}
+  .lw-trow.sel{background:var(--panel); outline:1px solid var(--accent);}
+  .lw-trow .dir{width:40px; font-weight:700; font-family:var(--num);}
+  .lw-trow .lbl{width:40px; font-size:10px; font-weight:700; color:var(--ml);}
+  .lw-trow .sub{font-family:var(--num); color:var(--muted); flex:1;}
+  .lw-trow .tag{font-size:9px; padding:1px 5px; border-radius:3px; background:var(--panel2); color:var(--muted);}
+  .lw-trow .sr-del{background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px; line-height:1; padding:2px 6px;}
+  .lw-trow .sr-del:hover{color:var(--red);}
+  .lw-trade-head .sr-clear{background:rgba(120,123,134,.12); border:none; color:var(--muted); font-size:9px; text-transform:none; letter-spacing:.02em; padding:2px 8px; border-radius:6px; cursor:pointer; margin-left:8px; font-weight:600; float:right;}
+  .lw-trade-head .sr-clear:hover{color:#fff; background:rgba(239,83,80,.75);}
+  .lw-trow .tag.open{color:var(--green); background:rgba(38,166,154,.12);}
+  .lw-empty{padding:12px; color:var(--muted); font-size:12px;}
+  .eq-stats{font-size:10px; font-weight:600; color:var(--muted); font-family:var(--num); letter-spacing:.02em;}
+  .eq-stats b{color:var(--text); font-weight:700;}
+  .eq-stats .eq-up{color:var(--green);} .eq-stats .eq-dn{color:var(--red);}
+  .eq-empty{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:var(--muted); font-size:12px; background:rgba(19,23,34,.0); pointer-events:none; text-align:center; padding:0 16px;}
+  .chart-legendbar{
+    display:flex; align-items:center; gap:8px; padding:5px 9px; margin:8px 0 0;
+    background:var(--card); border:1px solid var(--border); border-radius:8px;
+    font-family:var(--num); font-size:10px; color:var(--muted);
+    overflow-x:auto; scrollbar-width:thin; flex-shrink:0;
+  }
+  .chart-legendbar .lb-ohlc{display:inline-flex; gap:9px; white-space:nowrap; font-size:10px; flex-shrink:0;}
+  .chart-legendbar .lb-ohlc b{color:var(--text); font-weight:700;}
+  .chart-legendbar .lb-ohlc .up b{color:var(--green);}
+  .chart-legendbar .lb-ohlc .dn b{color:var(--red);}
+  .chart-legendbar .lb-ohlc .muted b{color:var(--muted);}
+  .chart-legendbar .lb-spacer{flex:1; min-width:6px;}
+  .chart-legendbar #lbValues{display:inline-flex; gap:4px;}
+  .chart-legendbar.collapsed #lbValues{display:none;}
+  .chart-legendbar .lb-tools{display:inline-flex; gap:4px; flex-shrink:0;}
+  .lw-modehint{position:absolute; left:50%; top:10px; transform:translateX(-50%); z-index:5; pointer-events:none; background:rgba(41,98,255,.15); border:1px solid rgba(41,98,255,.5); color:#8fb0ff; font-size:11px; padding:5px 12px; border-radius:8px; font-family:monospace; white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,.3);}
+  #lwWrap{height:auto;}
+  .lw-pane{position:relative;}
+  .lw-pane-label{position:absolute; top:2px; left:8px; z-index:3; pointer-events:none; font-size:10px; color:var(--muted); background:rgba(19,23,34,.65); padding:1px 6px; border-radius:3px; font-family:var(--num);}
+  #candleChart{height:320px;}
+  #volChart{height:78px;}
+  #rsiChart{height:96px;}
+  #adxChart{height:96px;}
+  .lw-fallback-msg{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:12px; font-family:monospace; text-align:center; padding:20px;}
+  .chart-wrap.adding-sr #candleChart{outline:1px dashed rgba(41,98,255,.5); outline-offset:-2px; border-radius:6px;}
+  .chart-legendbar .lb-collapse{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;line-height:1;padding:2px 4px;flex-shrink:0;}
+  .chart-legendbar.collapsed .lb-collapse{transform:rotate(180deg);}
+  .lo-chip{
+    background:rgba(10,15,26,.72); border:1px solid var(--border); color:var(--text);
+    font-size:9.5px; font-weight:700; font-family:var(--num); padding:2px 7px; border-radius:6px;
+    display:inline-flex; gap:5px; align-items:center; cursor:pointer;
+  }
+  .lo-chip .sw{width:10px;height:2px;border-radius:2px;display:inline-block;}
+  .lo-chip .lbl{color:var(--muted);}
+  .lo-chip.off{opacity:.4; text-decoration:line-through;}
+  .lo-chip:hover{border-color:var(--purple);}
+
+  /* right side column */
+  .side-col{display:flex; flex-direction:column; gap:14px;}
+
+  /* status bar */
+  .statusbar{
+    display:flex; align-items:center; gap:14px; padding:5px 18px;
+    background:rgba(12,18,32,.9); border-top:1px solid var(--border); flex-shrink:0;
+    font-size:10.5px; color:var(--muted); font-family:var(--num);
+  }
+  .statusbar b{color:var(--text); font-weight:700;}
+  .statusbar .st-ok{color:var(--green); font-weight:800;}
+  .statusbar .st-bad{color:var(--red); font-weight:800;}
+  .st-sep{width:1px; height:12px; background:var(--border2);}
+
+  /* fullscreen */
+  .chart-panel:fullscreen{background:var(--bg); border:none; border-radius:0; padding:10px 14px; display:flex; flex-direction:column;}
+  .chart-panel:fullscreen .chart-wrap{flex:1;}
+  .chart-panel:fullscreen h3{flex-shrink:0;}
+
+  /* ═══ GAUGES ═══ */
+  .gauge{
+    background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:10px 12px 12px; margin-bottom:10px;
+  }
+  .gauge:last-child{margin-bottom:0;}
+  .gauge .ghead{display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;}
+  .gauge .gname{font-size:11px; font-weight:800; letter-spacing:.5px; color:var(--muted);}
+  .gsig{font-size:10px; font-weight:900; padding:3px 9px; border-radius:99px; letter-spacing:.5px;}
+  .gsig.CALL{background:rgba(38,166,154,.14); color:var(--green); border:1px solid rgba(38,166,154,.3);}
+  .gsig.PUT{background:rgba(239,83,80,.14); color:var(--red); border:1px solid rgba(239,83,80,.3);}
+  .gsig.NEUTRAL{background:rgba(116,128,156,.12); color:var(--muted); border:1px solid rgba(116,128,156,.25);}
+  .gauge-svg{display:flex; justify-content:center; margin:6px 0 2px;}
+  .gauge-svg svg{max-width:100%; height:auto;}
+  .gauge .gmeta{display:flex; justify-content:space-between; font-family:var(--num); font-size:10px; color:var(--dim); margin-top:4px;}
+
+  /* ═══ TABLES ═══ */
+  .tbl-wrap{overflow-x:auto; border:1px solid var(--border); border-radius:10px;}
+  table{width:100%; border-collapse:collapse; font-size:12px; font-variant-numeric:tabular-nums;}
+  th{
+    text-align:left; color:var(--muted); font-size:9.5px; text-transform:uppercase; letter-spacing:.08em;
+    padding:9px 12px; border-bottom:1px solid var(--border); white-space:nowrap;
+    position:sticky; top:0; background:var(--panel2); z-index:1;
+  }
+  td{padding:8px 12px; border-bottom:1px solid var(--grid); white-space:nowrap;}
+  tbody tr{transition:background .1s;}
+  tbody tr:hover{background:rgba(41,98,255,.045);}
+  tbody tr:last-child td{border-bottom:none;}
+  .pill{padding:2.5px 9px; border-radius:99px; font-size:10px; font-weight:800; letter-spacing:.3px;}
+  .pill.WIN{background:rgba(38,166,154,.14); color:var(--green);}
+  .pill.LOSE{background:rgba(239,83,80,.14); color:var(--red);}
+  .pill.PENDING{background:rgba(232,163,61,.14); color:var(--yellow);}
+  .dir-call{color:var(--green); font-weight:800;}
+  .dir-put{color:var(--red); font-weight:800;}
+  .empty{color:var(--dim); text-align:center; padding:26px; font-size:12px;}
+
+  /* ═══ SETUP GUIDE (คู่มือช่วยเทรด) ═══ */
+  .guide-card{background:linear-gradient(180deg,var(--panel),var(--card)); border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:12px; position:relative; overflow:hidden;}
+  .guide-card::before{content:''; position:absolute; inset:0 auto 0 0; width:3px;}
+  .guide-card.FIRE::before{background:var(--green);}
+  .guide-card.WATCH::before{background:var(--cyan);}
+  .guide-card.NONE::before{background:var(--dim);}
+  .guide-head{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px;}
+  .guide-tf{font-size:10px; font-weight:800; letter-spacing:.4px; color:var(--muted); text-transform:uppercase; line-height:1.6;}
+  .guide-tf b{color:var(--text); font-size:11.5px;}
+  .guide-score{font-family:var(--num); font-size:22px; font-weight:800; line-height:1;}
+  .guide-score.ok{color:var(--green);} .guide-score.wait{color:var(--yellow);} .guide-score.none{color:var(--dim);}
+  .guide-action{margin:8px 0 10px; padding:8px 11px; border-radius:9px; font-size:12px; font-weight:800; letter-spacing:.2px; line-height:1.4;}
+  .guide-action.FIRE{background:rgba(38,166,154,.12); color:var(--green); border:1px solid rgba(38,166,154,.4);}
+  .guide-action.WATCH{background:rgba(56,189,248,.1); color:var(--cyan); border:1px solid rgba(56,189,248,.35);}
+  .guide-action.NONE{background:rgba(116,128,156,.08); color:var(--muted); border:1px solid var(--border);}
+  .guide-steps{list-style:none; font-size:11.5px;}
+  .guide-steps li{display:flex; gap:9px; align-items:flex-start; padding:5px 0; border-bottom:1px solid rgba(19,28,48,.7);}
+  .guide-steps li:last-child{border-bottom:none;}
+  .gstep{display:flex; flex-direction:column; gap:3px; padding:8px 10px; border-radius:9px; background:rgba(12,18,32,.55); border:1px solid var(--border); font-size:11px; line-height:1.5;}
+  .gstep b{font-size:11.5px;}
+  .guide-ico{flex-shrink:0; width:19px; height:19px; border-radius:50%; display:grid; place-items:center; font-size:10.5px; font-weight:900; margin-top:1px; line-height:1;}
+  .guide-ico.pass{background:rgba(38,166,154,.16); color:var(--green);}
+  .guide-ico.part{background:rgba(232,163,61,.14); color:var(--yellow);}
+  .guide-ico.fail{background:rgba(239,83,80,.12); color:var(--red);}
+  .guide-steps .gname{font-weight:700; color:var(--text); flex-shrink:0; white-space:nowrap;}
+  .guide-steps .gnote{color:var(--dim); font-size:10.5px; line-height:1.45;}
+  .guide-prog{height:6px; border-radius:4px; background:var(--grid); overflow:hidden; margin:10px 0 12px;}
+  .guide-prog i{display:block; height:100%; border-radius:4px; transition:width .5s;}
+  .guide-prog.FIRE i{background:linear-gradient(90deg,var(--green),var(--cyan));}
+  .guide-prog.WATCH i{background:linear-gradient(90deg,var(--cyan),var(--blue));}
+  .guide-prog.NONE i{background:linear-gradient(90deg,var(--dim),var(--border2));}
+  .guide-note{margin-top:10px; padding:9px 11px; border-radius:9px; background:rgba(12,18,32,.6); border:1px dashed var(--border); font-size:11px; line-height:1.5;}
+  .guide-note.ready{color:var(--green); border-color:rgba(38,166,154,.35);}
+  .guide-note.wait{color:var(--dim);}
+
+  /* compact setup rows (accordion) */
+  .setup-row{border-bottom:1px solid var(--border); cursor:pointer; transition:background .12s;}
+  .setup-row:hover{background:rgba(41,98,255,.04);}
+  .setup-row-head{display:grid; grid-template-columns:80px 50px 1fr 45px; align-items:center; gap:6px; padding:8px 10px; font-size:11.5px;}
+  .setup-sym{font-weight:800; color:var(--text); letter-spacing:.3px;}
+  .setup-tier{font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; padding:2px 6px; border-radius:5px; text-align:center;}
+  .setup-tier.ok{background:rgba(38,166,154,.15); color:var(--green);}
+  .setup-tier.wait{background:rgba(232,163,61,.12); color:var(--yellow);}
+  .setup-tier.none{background:rgba(116,128,156,.08); color:var(--dim);}
+  .setup-dir{font-size:10.5px; font-weight:700;}
+  .setup-score{font-family:var(--num); font-weight:800; font-size:12px; text-align:right; color:var(--muted);}
+  .setup-row-detail{display:none; padding:0 10px 10px;}
+  .setup-row.expanded .setup-row-detail{display:block;}
+  .setup-row.expanded{background:rgba(12,18,32,.4);}
+  .tier{display:inline-block; font-size:9.5px; font-weight:900; padding:3px 9px; border-radius:99px; letter-spacing:.4px;}
+  .tier.FIRE{background:rgba(38,166,154,.16); color:var(--green); border:1px solid rgba(38,166,154,.5);}
+  .tier.WATCH{background:rgba(56,189,248,.13); color:var(--cyan); border:1px solid rgba(56,189,248,.45);}
+  .tier.NONE{background:rgba(116,128,156,.1); color:var(--muted); border:1px solid var(--border);}
+
+  .feed-row{
+    display:flex; align-items:center; gap:9px; padding:8px 10px; border-bottom:1px solid rgba(19,28,48,.7);
+    font-size:11.5px; font-variant-numeric:tabular-nums;
+  }
+  .feed-row:last-child{border-bottom:none;}
+  .feed-row .fdir{width:52px; text-align:center; font-weight:900; font-size:11px; border-radius:6px; padding:2px 0;}
+  .feed-row .fdir.CALL{background:rgba(38,166,154,.14); color:var(--green);}
+  .feed-row .fdir.PUT{background:rgba(239,83,80,.14); color:var(--red);}
+  .feed-row .ftime{color:var(--dim); font-family:var(--num); font-size:10.5px;}
+  .feed-row .fprice{font-family:var(--num); font-weight:700; margin-left:auto;}
+  .feed-row .fconf{font-family:var(--num); color:var(--muted); font-size:11px;}
+  .hi-badge{
+    display:inline-block; background:linear-gradient(135deg,#FF9800,#ff8a3d); color:#1a1305;
+    font-size:9px; font-weight:900; border-radius:10px; padding:1px 6px; margin-left:4px; vertical-align:1px;
+    font-family:var(--num); letter-spacing:.3px;
+  }
+
+  .open-trade-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;font-size:12px;}
+
+  /* ═══ MOBILE RESPONSIVE ═══ */
+  @media(max-width:1100px){
+    .topstat{display:none;}
+  }
+  @media(max-width:600px){
+    .open-trade-grid{grid-template-columns:repeat(3,1fr);gap:8px 6px;font-size:11px;}
+  }
+  @media(max-width:380px){
+    .open-trade-grid{grid-template-columns:repeat(2,1fr);}
+  }
+  @media(max-width:820px){
+    body{font-size:13px; overflow:auto;}
+    .topbar{flex-wrap:wrap; gap:8px; padding:8px 12px;}
+    .brand .ver{display:none;}
+    .pricebox{order:3; flex:1 1 100%; justify-content:center; padding:5px 10px;}
+    .pricebox .price{font-size:26px;}
+    .pricebox .chg{font-size:11px;}
+    .live-badge{margin-left:auto;}
+     .content{padding:12px 10px 30px;}
+    .kpi-row{grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:9px;}
+    .kpi{padding:11px 13px;}
+    .kpi .val{font-size:21px;}
+    .cols.l2,.cols.l3{grid-template-columns:1fr;}
+    .panel{padding:12px;}
+    .chart-wrap{height:280px;}
+    .statusbar{flex-wrap:wrap; gap:6px; padding:5px 12px; font-size:10px;}
+    .statusbar .st-sep{display:none;}
+    .tbl-wrap{font-size:11.5px;}
+    th,td{padding:7px 9px;}
+    .gauge .gname{font-size:10px;}
+    .chart-toolbar{justify-content:flex-start; gap:6px; margin-top:8px;}
+    .sym-select{flex:1 1 100%; font-size:12px; padding:7px 9px;}
+    .tf-btn{padding:6px 10px; font-size:11.5px;}
+  }
+  @media(max-width:480px){
+    .brand .name{font-size:12.5px;}
+    .logout{font-size:10.5px; padding:5px 9px;}
+    .live-badge{font-size:9px; padding:2px 7px;}
+    .topbar{gap:6px;}
+    .kpi .val{font-size:19px;}
+    .chart-wrap{height:240px;}
+    .guide-steps .gname{white-space:normal;}
+    .guide-action{font-size:11.5px;}
+  }
+
+  /* ═══ MOBILE: sidebar → bottom bar ═══ */
+  @media(max-width:768px){
+    .shell{grid-template-columns:1fr;}
+    .sidebar{
+      position:fixed; bottom:0; left:0; right:0; z-index:100;
+      border-right:none; border-top:1px solid var(--border);
+      padding:0; display:flex; background:var(--panel);
+    }
+    .nav-group{display:flex; margin-bottom:0; flex:1;}
+    .nav-group-label{display:none;}
+    .nav-item{
+      flex:1; justify-content:center; padding:10px 4px; font-size:11px;
+      border-left:none; border-top:2px solid transparent; text-align:center;
+    }
+    .nav-item.active{border-left-color:transparent; border-top-color:var(--accent);}
+    .nav-group+.nav-group{border-left:1px solid var(--border);}
+    .content{padding-bottom:60px;}
+  }
+
+  /* ═══════════ JOURNAL REDESIGN ═══════════ */
+  .j-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+  .j-title{font-size:16px;font-weight:800;display:flex;align-items:center;gap:10px;}
+  .j-title .jicon{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(135deg,var(--purple),var(--blue));font-size:15px;}
+  .j-actions{display:flex;gap:8px;}
+  .j-actions .btn{font-size:11px;padding:6px 12px;}
+
+  .j-settings{background:var(--panel);border:1px solid var(--border);border-radius:10px;margin-bottom:14px;overflow:hidden;}
+  .j-settings-head{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;cursor:pointer;user-select:none;}
+  .j-settings-head:hover{background:rgba(255,255,255,.02);}
+  .j-settings-head .jsl{font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.06em;text-transform:uppercase;}
+  .j-settings-head .jsa{color:var(--dim);font-size:11px;transition:transform .2s;}
+  .j-settings.open .jsa{transform:rotate(180deg);}
+  .j-settings-body{display:none;padding:0 14px 12px;flex-wrap:wrap;gap:12px;align-items:flex-end;}
+  .j-settings.open .j-settings-body{display:flex;}
+  .j-settings-body label{display:flex;flex-direction:column;gap:3px;font-size:10px;color:var(--muted);font-weight:700;}
+  .j-settings-body input{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;font-family:var(--num);font-size:13px;font-weight:700;padding:6px 9px;}
+  .j-settings-body input:focus{outline:none;border-color:var(--purple);}
+
+  .j-hero{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;}
+  .j-hero-card{background:linear-gradient(135deg,var(--panel),var(--card));border:1px solid var(--border);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden;}
+  .j-hero-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+  .j-hero-card.pnl::before{background:linear-gradient(90deg,var(--green),var(--cyan));}
+  .j-hero-card.wr::before{background:linear-gradient(90deg,var(--blue),var(--purple));}
+  .j-hero-card.bal::before{background:linear-gradient(90deg,var(--yellow),#ff8a3d);}
+  .j-hero-card .jh-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:4px;}
+  .j-hero-card .jh-val{font-family:var(--num);font-size:28px;font-weight:800;line-height:1.1;}
+  .j-hero-card .jh-sub{font-size:11px;color:var(--muted);margin-top:6px;}
+  .j-hero-card .jh-sub b{color:var(--text);}
+
+  .j-compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;}
+  .j-cmp-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px;}
+  .j-cmp-card h4{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+  .j-cmp-card h4 .dot{width:7px;height:7px;border-radius:50%;display:inline-block;}
+  .j-cmp-card h4 .dot.ml{background:var(--purple);}
+  .j-cmp-card h4 .dot.rb{background:var(--blue);}
+  .j-cmp-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .j-cmp-stat{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 10px;text-align:center;}
+  .j-cmp-stat .cs-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:700;}
+  .j-cmp-stat .cs-val{font-family:var(--num);font-size:16px;font-weight:800;margin-top:2px;}
+  .j-cmp-bar{height:4px;background:var(--grid);border-radius:3px;margin-top:10px;overflow:hidden;position:relative;}
+  .j-cmp-bar-fill{height:100%;border-radius:3px;transition:width .6s;}
+
+  .j-equity{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;}
+  .j-equity h3{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+
+  .j-section{background:var(--panel);border:1px solid var(--border);border-radius:12px;margin-bottom:14px;overflow:hidden;}
+  .j-section-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;user-select:none;}
+  .j-section-head:hover{background:rgba(255,255,255,.02);}
+  .j-section-head h3{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;display:flex;align-items:center;gap:6px;}
+  .j-section-head .j-arrow{color:var(--dim);font-size:11px;transition:transform .2s;}
+  .j-section.open .j-arrow{transform:rotate(180deg);}
+  .j-section-body{display:none;padding:0 14px 14px;}
+  .j-section.open .j-section-body{display:block;}
+
+  .j-period-tabs{display:flex;gap:4px;margin-bottom:10px;}
+  .j-ptab{background:var(--card);border:1px solid var(--border);color:var(--muted);font-size:10.5px;font-weight:700;padding:4px 10px;border-radius:6px;cursor:pointer;transition:.15s;}
+  .j-ptab:hover{color:var(--text);}
+  .j-ptab.active{background:var(--purple);color:#fff;border-color:var(--purple);}
+
+  @media(max-width:820px){
+    .j-hero{grid-template-columns:1fr;}
+    .j-compare{grid-template-columns:1fr;}
+    .j-cmp-stats{grid-template-columns:repeat(2,1fr);}
+  }
+
+  /* ═══ OVERVIEW BOTTOM ═══ */
+  .ov-status-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 14px;}
+  .ov-stat{display:flex;flex-direction:column;gap:2px;text-align:center;padding:4px 6px;}
+  .ov-stat-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;}
+  .ov-stat-val{font-family:var(--num);font-size:18px;font-weight:800;line-height:1.1;}
+  .ov-stat-val.purple{color:var(--purple);}
+  .ov-stat-sub{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ov-bottom{display:grid;grid-template-columns:1.6fr 1fr;gap:14px;margin-bottom:14px;}
+  @media(max-width:1000px){.ov-bottom{grid-template-columns:1fr;}}
+  .ov-equity-panel,.ov-feed-panel{margin-bottom:0;}
+
+</style>
+</head>
+<body>
+
+<!-- ═══════════ TOP BAR ═══════════ -->
+<div class="topbar">
+  <div class="brand">
+    <div class="logo">X</div>
+    <div>
+      <div class="name">XAUUSD<span> PRO</span> TERMINAL</div>
+      <div class="ver">ML + RULE-BASED MONITOR</div>
+    </div>
+  </div>
+  <div class="pricebox">
+    <span class="sym" id="symbolBadge">frxXAUUSD</span>
+    <span class="price" id="tickerPrice">–</span>
+    <span class="chg" id="tickerChg"></span>
+  </div>
+  <span class="live-badge"><span class="dot"></span>LIVE</span>
+  <div class="spacer"></div>
+  <div class="topstat">
+    <div class="ts">M1<br><b id="hM1">–</b></div>
+    <div class="ts">M5<br><b id="hM5">–</b></div>
+    <div class="ts">Session<br><b id="hSession">–</b></div>
+    <div class="ts">UTC<br><b id="hUtc">–</b></div>
+  </div>
+  <a class="logout" href="/logout">ออกจากระบบ</a>
+</div>
+
+<!-- ═══════════ SHELL ═══════════ -->
+<div class="shell">
+
+<!-- ═══════════ SIDEBAR ═══════════ -->
+<aside class="sidebar">
+  <div class="nav-group">
+    <div class="nav-group-label">มอนิเตอร์สด</div>
+    <div class="nav-item active" data-tab="overview">ภาพรวม</div>
+    <div class="nav-item" data-tab="ml">ML สัญญาณ</div>
+    <div class="nav-item" data-tab="setup">Rule-Based</div>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-label">รายงานย้อนหลัง</div>
+    <div class="nav-item" data-tab="journal">Journal / P&amp;L</div>
+    <div class="nav-item" data-tab="cfd">CFD Backtest</div>
+  </div>
+</aside>
+
+<!-- ═══════════ CONTENT ═══════════ -->
+<div class="content">
+
+  <!-- ─── OVERVIEW ─── -->
+  <section id="tab-overview">
+    <div class="terminal">
+      <!-- Watchlist sidebar -->
+      <div class="wlist">
+        <div class="wlist-head"><span class="ph"></span>Watchlist</div>
+        <div class="wl-scroll" id="watchlistRows"></div>
+      </div>
+
+      <!-- Main chart panel (TradingView style) -->
+      <div class="panel chart-panel" id="chartPanel">
+        <h3><span class="ph cyan"></span><span id="chartTitle">กราฟราคา</span></h3>
+        <div class="chart-toolbar">
+          <select id="chartSymbol" class="sym-select" title="เลือกสัญลักษณ์"></select>
+          <span class="tf-group" id="tfGroup">
+            <button class="tf-btn active" data-tf="1m">1m</button>
+            <button class="tf-btn" data-tf="5m">5m</button>
+            <button class="tf-btn" data-tf="15m">15m</button>
+            <button class="tf-btn" data-tf="30m">30m</button>
+            <button class="tf-btn" data-tf="1h">1h</button>
+            <button class="tf-btn" data-tf="4h">4h</button>
+          </span>
+          <span class="tf-group" id="zoomGroup" title="ลากเพื่อเลื่อน · ล้อเมาส์/สองนิ้วเพื่อซูม (มือถือ: pinch)">
+            <button class="tf-btn has-lbl" id="zoomReset" title="กลับมุมมองล่าสุด (fit)"><i class="ti ti-refresh"></i><span class="btn-lbl">กลับมุมมอง</span></button>
+            <button class="tf-btn has-lbl" id="addSrR" title="กดเพื่อเริ่มวางเส้นแนวรับ/ต้าน — คลิกบนกราฟเพื่อวาง"><i class="ti ti-layout-horizontal"></i><span class="btn-lbl">เพิ่ม S/R</span></button>
+            <button class="tf-btn has-lbl" id="btnDelSr" title="กดเพื่อเปิดโหมดลบ — คลิกที่เส้น S/R เพื่อลบเส้นนั้น"><i class="ti ti-eraser"></i><span class="btn-lbl">ลบ S/R</span></button>
+            <button class="tf-btn has-lbl" id="btnSrList" title="รายการเส้น S/R ที่วางไว้"><i class="ti ti-adjustments-horizontal"></i><span class="btn-lbl">S/R ลิสต์</span></button>
+            <button class="tf-btn has-lbl" id="btnFullscreen" title="ขยายกราฟเต็มจอ"><i class="ti ti-maximize"></i><span class="btn-lbl">เต็มจอ</span></button>
+            <button class="tf-btn has-lbl" id="btnTradeList" title="แสดง/ซ่อนรายการสัญญาณ"><i class="ti ti-list"></i><span class="btn-lbl">สัญญาณ</span></button>
+          </span>
+        </div>
+        <div class="chart-legendbar" id="chartLegendBar">
+          <span class="lb-ohlc" id="lbOhlc">—</span>
+          <span class="lb-spacer"></span>
+          <span id="lbValues" class="lb-values"></span>
+          <button class="lb-collapse" id="lbCollapse" title="ย่อ/ขยายค่า indicator"><i class="ti ti-chevron-down"></i></button>
+        </div>
+        <div class="chart-wrap" id="lwWrap">
+          <div class="lw-pane" id="lwPaneMain"><span class="lw-pane-label">ราคา</span><div id="candleChart"></div></div>
+          <div class="lw-pane" id="lwPaneVol"><span class="lw-pane-label">Volume</span><div id="volChart"></div></div>
+          <div class="lw-pane" id="lwPaneRsi"><span class="lw-pane-label">RSI (14)</span><div id="rsiChart"></div></div>
+          <div class="lw-pane" id="lwPaneAdx"><span class="lw-pane-label">ADX (14)</span><div id="adxChart"></div></div>
+          <div class="lw-modehint" id="lwModeHint" style="display:none;"></div>
+        </div>
+        <!-- trade list (คลิกเลือกเพื่อดู SL/TP เฉพาะรายการ) -->
+        <div class="lw-tradelist" id="lwTradeList" style="display:none; border-top:1px solid var(--border); max-height:220px; overflow-y:auto;">
+          <div class="lw-trade-head">คลิกแถวเพื่อดู Entry / SL / TP บนกราฟ (เห็นทีละรายการ)</div>
+          <div id="lwTradeRows"></div>
+        </div>
+        <div class="lw-tradelist" id="lwSrPanel" style="display:none; border-top:1px solid var(--border); max-height:150px; overflow-y:auto;">
+          <div class="lw-trade-head">เส้น S/R ที่วางเอง <button id="srClearAll" class="sr-clear" title="ลบเส้น S/R ทั้งหมด">ล้างทั้งหมด</button></div>
+          <div id="lwSrRows"></div>
+        </div>
+        <div class="ind-bar" id="chartIndBar">
+          <span class="ind-chip active" data-ind="ema">EMA 50/100/200</span>
+          <span class="ind-chip active" data-ind="bb">BB (20,2)</span>
+          <span class="ind-chip active" data-ind="sma5">SMA5</span>
+          <span class="ind-chip active" data-ind="rsi">RSI 14</span>
+          <span class="ind-chip active" data-ind="adx">ADX 14</span>
+          <span class="ind-chip active" data-ind="fractal">Fractal 15</span>
+          <span class="ind-chip" data-ind="vol">Volume</span>
+          <span class="ind-spacer"></span>
+          <span class="ind-hint" id="indHint">กดเพื่อเปิด/ปิดตัวชี้วัดบนกราฟ</span>
+        </div>
+        <div class="chart-legend">
+          <span><i style="background:#9C6FE0;"></i>EMA50</span>
+          <span><i style="background:#787B86;"></i>EMA100</span>
+          <span><i style="background:#FF9800;"></i>EMA200</span>
+          <span><i style="background:#2962FF;"></i>BB 20,2</span>
+          <span><i style="background:#26C6DA;"></i>SMA5</span>
+          <span><i style="background:#9C6FE0;"></i>RSI 14</span>
+          <span><i style="background:#FF9800;"></i>ADX</span>
+          <span><i style="background:#FF9800;"></i>Fractal สูง (ต้าน)</span>
+          <span><i style="background:#26A69A;"></i>Fractal ต่ำ (รับ)</span>
+          <span><i style="background:var(--green);"></i>ML (▲ CALL)</span>
+          <span><i style="background:var(--blue);"></i>Rule-base (▼ PUT)</span>
+        </div>
+      </div>
+
+      <!-- Right side column -->
+      <div class="side-col">
+        <div class="panel">
+          <h3><span class="ph green"></span>Probability Gauges</h3>
+          <div id="gaugePanel"></div>
+        </div>
+        <div class="panel">
+          <h3><span class="ph blue"></span>Setup — ทุกคู่เงิน</h3>
+          <div id="setupMini"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ov-status-bar">
+      <div class="ov-stat"><span class="ov-stat-lbl">ML Winrate</span><span class="ov-stat-val" id="ovMlWinrate">–</span><span class="ov-stat-sub" id="ovMlWinrateSub">รอสัญญาณ...</span></div>
+      <div class="ov-stat"><span class="ov-stat-lbl">ML Margin</span><span class="ov-stat-val" id="ovMlMargin">–</span><span class="ov-stat-sub" id="ovMlN">–</span></div>
+      <div class="ov-stat"><span class="ov-stat-lbl">Setup Winrate</span><span class="ov-stat-val" id="ovSetWinrate">–</span><span class="ov-stat-sub" id="ovSetWinrateSub">รอสัญญาณ...</span></div>
+      <div class="ov-stat"><span class="ov-stat-lbl">Setup Margin</span><span class="ov-stat-val" id="ovSetMargin">–</span><span class="ov-stat-sub" id="ovSetN">–</span></div>
+      <div class="ov-stat"><span class="ov-stat-lbl">Model M1</span><span class="ov-stat-val purple" id="ovModelM1">–</span><span class="ov-stat-sub" id="ovModelM1Sub">–</span></div>
+      <div class="ov-stat"><span class="ov-stat-lbl">Model M5</span><span class="ov-stat-val purple" id="ovModelM5">–</span><span class="ov-stat-sub" id="ovModelM5Sub">–</span></div>
+    </div>
+    <div class="ov-bottom">
+      <div class="panel ov-equity-panel">
+        <h3><span class="ph purple"></span>Equity Curve <span class="eq-stats" id="eqStatsOv"></span></h3>
+        <div style="position:relative;">
+          <div style="height:260px;"><div id="equityChart"></div></div>
+          <div class="eq-empty" id="eqEmptyOv" style="display:none;">ยังไม่มีข้อมูลเทรดที่จบแล้ว — รอสัญญาณ &amp; ปิดตำแหน่งก่อน</div>
+        </div>
+      </div>
+      <div class="panel ov-feed-panel">
+        <h3><span class="ph green"></span>สัญญาณล่าสุด</h3>
+        <div id="mlRecentFeed" style="max-height:310px;overflow-y:auto;"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── ML ─── -->
+  <section id="tab-ml" style="display:none;">
+    <div class="j-hero">
+      <div class="j-hero-card wr">
+        <div class="jh-lbl">ML Winrate</div>
+        <div class="jh-val" id="mlWr">–</div>
+        <div class="jh-sub" id="mlWrSub">–</div>
+      </div>
+      <div class="j-hero-card pnl">
+        <div class="jh-lbl">Resolved / Pending</div>
+        <div class="jh-val" id="mlN">–</div>
+        <div class="jh-sub" id="mlNsub">–</div>
+      </div>
+      <div class="j-hero-card bal">
+        <div class="jh-lbl">Confidence</div>
+        <div class="jh-val" id="mlCi" style="font-size:20px;">–</div>
+        <div class="jh-sub">BE <b id="mlBe">–</b> · Margin <b id="mlMargin">–</b></div>
+      </div>
+    </div>
+    <div class="j-compare" style="margin-bottom:14px;">
+      <div class="j-cmp-card">
+        <h4><span class="dot ml"></span>Hold 15 นาที (M1)</h4>
+        <div class="j-cmp-stats">
+          <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="mlWrM1">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">Trades</div><div class="cs-val" id="mlM1N">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">P&L</div><div class="cs-val" id="mlM1Pnl">–</div></div>
+        </div>
+      </div>
+      <div class="j-cmp-card">
+        <h4><span class="dot rb"></span>Hold 30 นาที (M5)</h4>
+        <div class="j-cmp-stats">
+          <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="mlWrM5">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">Trades</div><div class="cs-val" id="mlM5N">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">P&L</div><div class="cs-val" id="mlM5Pnl">–</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="guide-card">
+      <div class="gname">แนวทางสัญญาณ ML ที่ความมั่นใจสูง (conf ≥ 0.70)</div>
+      <div class="guide-steps" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">
+        <div class="gstep">
+          <b style="color:var(--yellow);">≥ 0.70 — HIGH</b>
+          <span>สัญญาณแรง · ใช้ <b>1/3 ของเงินเดิมพัน</b> · เข้าตามทิศทางสัญญาณ (CALL/PUT)</span>
+        </div>
+        <div class="gstep">
+          <b style="color:var(--green);">0.60 – 0.69</b>
+          <span>สัญญาณปานกลาง · รอจังหวะยืนยันจาก Rule-Based (แนวรับ/ต้าน) ก่อนเข้า</span>
+        </div>
+        <div class="gstep">
+          <b style="color:var(--muted);">&lt; 0.60</b>
+          <span>ความมั่นใจต่ำกว่าจุดคุ้มทุน — <b>ไม่ควรเปิดออเดอร์</b> รอสัญญาณถัดไป</span>
+        </div>
+      </div>
+      <div class="guide-note">จุดคุ้มทุนจริงดูจากค่า <b>Breakeven</b> ด้านบน — จะเปิดออเดอร์ได้เมื่อความมั่นใจ (Win Prob) สูงกว่า Breakeven เสมอ</div>
+    </div>
+    <div class="panel">
+      <h3><span class="ph green"></span>ประวัติสัญญาณ ML ทั้งหมด</h3>
+      <div class="tbl-wrap" style="max-height:480px;overflow-y:auto;">
+        <table id="mlFullTable">
+          <thead><tr><th>เวลา</th><th>TF</th><th>ทิศทาง</th><th>Entry</th><th>Exit</th><th>Win Prob</th><th>Thresh</th><th>Hold</th><th>Model</th><th>ผล</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div id="mlEmpty" class="empty" style="display:none;">ยังไม่มีสัญญาณ ML — รอ notifier.py ทำงาน</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── SETUP ─── -->
+  <section id="tab-setup" style="display:none;">
+    <div class="j-hero">
+      <div class="j-hero-card wr">
+        <div class="jh-lbl">Setup Winrate</div>
+        <div class="jh-val" id="setWr">–</div>
+        <div class="jh-sub" id="setWrSub">–</div>
+      </div>
+      <div class="j-hero-card pnl">
+        <div class="jh-lbl">Resolved / Pending</div>
+        <div class="jh-val" id="setN">–</div>
+        <div class="jh-sub" id="setNsub">–</div>
+      </div>
+      <div class="j-hero-card bal">
+        <div class="jh-lbl">Confidence</div>
+        <div class="jh-val" id="setCi" style="font-size:20px;">–</div>
+        <div class="jh-sub">BE <b id="setBe">–</b> · Margin <b id="setMargin">–</b></div>
+      </div>
+    </div>
+    <div class="j-compare" style="margin-bottom:14px;">
+      <div class="j-cmp-card">
+        <h4><span class="dot ml"></span>Hold 15 นาที (M1)</h4>
+        <div class="j-cmp-stats">
+          <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="setWrM1">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">Trades</div><div class="cs-val" id="setM1N">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">P&L</div><div class="cs-val" id="setM1Pnl">–</div></div>
+        </div>
+      </div>
+      <div class="j-cmp-card">
+        <h4><span class="dot rb"></span>Hold 30 นาที (M5)</h4>
+        <div class="j-cmp-stats">
+          <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="setWrM5">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">Trades</div><div class="cs-val" id="setM5N">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">P&L</div><div class="cs-val" id="setM5Pnl">–</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="cols l3">
+      <div class="panel"><h3><span class="ph blue"></span>Setup — M5</h3><div id="setupAllM5"></div></div>
+      <div class="panel"><h3><span class="ph blue"></span>Setup — M1</h3><div id="setupAllM1"></div></div>
+      <div class="panel">
+        <h3><span class="ph blue"></span>ประวัติสัญญาณ Rule-Based
+          <select id="setupSymFilter" style="background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:800;font-family:inherit;float:right;">
+            <option value="">ทั้งหมด</option>
+            <option value="frxXAUUSD">XAUUSD</option>
+            <option value="frxEURUSD">EURUSD</option>
+            <option value="frxGBPUSD">GBPUSD</option>
+            <option value="frxUSDJPY">USDJPY</option>
+            <option value="frxAUDUSD">AUDUSD</option>
+            <option value="frxUSDCAD">USDCAD</option>
+            <option value="frxUSDCHF">USDCHF</option>
+            <option value="frxNZDUSD">NZDUSD</option>
+          </select>
+        </h3>
+        <div class="tbl-wrap" style="max-height:420px;overflow-y:auto;">
+          <table id="setupTable">
+            <thead><tr><th>เวลา</th><th>คู่</th><th>TF</th><th>Imp</th><th>ทิศทาง</th><th>Entry</th><th>Exit</th><th>Score</th><th>Tier</th><th>ผ่าน</th><th>ผล</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div id="setEmpty" class="empty" style="display:none;">ยังไม่มีสัญญาณ — รอ setup_feed.py ทำงาน</div>
+        </div>
+      </div>
+
+      <!-- TICK TOUCH RESEARCH MONITOR -->
+      <div style="margin-top:20px;">
+        <h3><span class="ph purple"></span>Tick Touch Research
+          <span style="font-size:11px;color:var(--muted);font-weight:400;margin-left:8px;">เก็บข้อมูล 3 เคสแตะ EMA200 + checklist vote (ไม่ส่งสัญญาณจริง)</span>
+        </h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px;" id="ttCaseCards">
+          <div class="empty" style="grid-column:1/-1;">ยังไม่มีข้อมูล research</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div>
+            <h4 style="color:var(--cyan);font-size:12px;margin-bottom:6px;">🗳 Checklist Vote Weight (WR เมื่อ cond = true)</h4>
+            <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
+              <table id="ttCondTable" style="font-size:11px;">
+                <thead><tr><th>Condition</th><th>True</th><th>Win</th><th>WR</th><th>False WR</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <h4 style="color:var(--cyan);font-size:12px;margin-bottom:6px;">Recent Touches</h4>
+            <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
+              <table id="ttRecentTable" style="font-size:11px;">
+                <thead><tr><th>เวลา</th><th>คู่</th><th>Case</th><th>Dir</th><th>Entry</th><th>Exit</th><th>✓</th><th>ผล</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── JOURNAL REDESIGNED ─── -->
+  <section id="tab-journal" style="display:none;">
+    <div class="j-header">
+      <div class="j-title"><span class="jicon"></span>Journal & P&amp;L</div>
+      <div class="j-actions">
+        <button class="btn" id="btnExportJ" title="Export Excel">⬇ Export</button>
+      </div>
+    </div>
+
+    <div class="j-settings" id="jSettings">
+      <div class="j-settings-head" onclick="this.parentElement.classList.toggle('open')">
+        <span class="jsl">ตั้งค่าการเทรด + Export</span>
+        <span class="jsa">▾</span>
+      </div>
+      <div class="j-settings-body">
+        <label>ทุนเริ่มต้น<input type="number" id="setCapital" min="1" step="100"></label>
+        <label>ขนาดต่อไม้<input type="number" id="setStake" min="1" step="10"></label>
+        <label>สกุลเงิน<input type="text" id="setCurrency" maxlength="5" style="width:70px;"></label>
+        <button class="btn accent" id="btnSaveSettings">บันทึก</button>
+        <span id="settStatus" style="font-size:11px;color:var(--green);align-self:center;"></span>
+        <label style="margin-left:12px;">Export จากวัน<input type="date" id="expStart"></label>
+        <label>ถึงวัน<input type="date" id="expEnd"></label>
+        <button class="btn accent" id="btnExport">ดาวน์โหลด Excel</button>
+      </div>
+    </div>
+
+    <div class="j-hero">
+      <div class="j-hero-card pnl">
+        <div class="jh-lbl">Total P&amp;L</div>
+        <div class="jh-val" id="mPnlAll">–</div>
+        <div class="jh-sub" id="mPnlAllSub">–</div>
+      </div>
+      <div class="j-hero-card wr">
+        <div class="jh-lbl">Winrate</div>
+        <div class="jh-val" id="jWr">–</div>
+        <div class="jh-sub" id="jWrSub">–</div>
+      </div>
+      <div class="j-hero-card bal">
+        <div class="jh-lbl">💰 Option Balance</div>
+        <div class="jh-val" id="mBalance">–</div>
+        <div class="jh-sub" id="mBalanceSub">–</div>
+      </div>
+      <div class="j-hero-card bal" style="border-left:2px solid var(--cyan);">
+        <div class="jh-lbl">CFD Balance</div>
+        <div class="jh-val" id="mCfdBalance">–</div>
+        <div class="jh-sub" id="mCfdBalanceSub">–</div>
+      </div>
+    </div>
+
+    <div class="j-compare">
+      <div class="j-cmp-card">
+        <h4><span class="dot ml"></span>ML Model</h4>
+        <div class="j-cmp-stats">
+          <div class="j-cmp-stat"><div class="cs-lbl">Trades</div><div class="cs-val" id="jMlN">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="jMlWr">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">P&amp;L</div><div class="cs-val" id="mPnlMl">–</div></div>
+        </div>
+        <div class="j-cmp-bar"><div class="j-cmp-bar-fill" id="jMlBar" style="width:0%;background:var(--purple);"></div></div>
+        <div class="jh-sub" id="mRoiMl" style="margin-top:6px;">ROI –</div>
+      </div>
+      <div class="j-cmp-card">
+        <h4><span class="dot rb"></span>Rule-Based</h4>
+        <div class="j-cmp-stats">
+          <div class="j-cmp-stat"><div class="cs-lbl">Trades</div><div class="cs-val" id="jRbN">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="jRbWr">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">P&amp;L</div><div class="cs-val" id="mPnlSt">–</div></div>
+        </div>
+        <div class="j-cmp-bar"><div class="j-cmp-bar-fill" id="jRbBar" style="width:0%;background:var(--blue);"></div></div>
+        <div class="jh-sub" id="mRoiSt" style="margin-top:6px;">ROI –</div>
+      </div>
+    </div>
+
+    <div class="j-equity">
+      <h3>Equity Curve <span class="eq-stats" id="eqStatsFull"></span></h3>
+      <div style="position:relative;">
+        <div style="height:260px;"><div id="equityFullChart"></div></div>
+        <div class="eq-empty" id="eqEmptyFull" style="display:none;">ยังไม่มีข้อมูลเทรดที่จบแล้ว — รอสัญญาณ &amp; ปิดตำแหน่งก่อน</div>
+      </div>
+    </div>
+
+    <div class="j-section open" id="jSecDaily">
+      <div class="j-section-head" onclick="this.parentElement.classList.toggle('open')">
+        <h3>ผลรายวัน</h3><span class="j-arrow">▾</span>
+      </div>
+      <div class="j-section-body">
+        <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
+          <table id="dailyTable">
+            <thead><tr><th>วัน</th><th>Trades</th><th>Wins</th><th>Winrate</th><th>P&amp;L</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="j-section" id="jSecPeriod">
+      <div class="j-section-head" onclick="this.parentElement.classList.toggle('open')">
+        <h3>สรุป ML vs Rule-Based</h3><span class="j-arrow">▾</span>
+      </div>
+      <div class="j-section-body">
+        <div class="j-period-tabs" id="jPeriodTabs">
+          <button class="j-ptab active" data-period="daily">Daily</button>
+          <button class="j-ptab" data-period="weekly">Weekly</button>
+          <button class="j-ptab" data-period="monthly">Monthly</button>
+          <button class="j-ptab" data-period="yearly">Yearly</button>
+        </div>
+        <div class="tbl-wrap" style="max-height:300px;overflow-y:auto;">
+          <table id="periodTable">
+            <thead>
+              <tr>
+                <th>Period</th>
+                <th>Trades</th><th>WR</th><th>P&amp;L</th><th>ROI</th>
+                <th style="border-left:1px solid var(--border);">ML Trades</th><th>ML WR</th><th>ML P&amp;L</th>
+                <th style="border-left:1px solid var(--border);">RB Trades</th><th>RB WR</th><th>RB P&amp;L</th>
+                <th>Balance</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="j-section" id="jSecModel">
+      <div class="j-section-head" onclick="this.parentElement.classList.toggle('open')">
+        <h3>Model Registry</h3><span class="j-arrow">▾</span>
+      </div>
+      <div class="j-section-body">
+        <div class="tbl-wrap">
+          <table id="modelTable">
+            <thead><tr><th>Key</th><th>Version</th><th>Horizon</th><th>n_rows</th><th>AUC</th><th>Conf</th><th>Feature Set</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ CFD BACKTEST TAB ═══════════ -->
+  <section id="tab-cfd" style="display:none;">
+    <div class="j-col">
+      <!-- params bar -->
+      <div class="j-section open">
+        <div class="j-section-head" onclick="this.parentElement.classList.toggle('open')">
+          <h3>CFD Parameters</h3><span class="j-arrow">▾</span>
+        </div>
+        <div class="j-section-body" style="padding:12px;">
+          <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center; font-size:11px;">
+            <label>ทุน $<input id="cfdCapital" type="number" value="5000" min="100" max="100000" style="width:70px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <label>SL (pip) <input id="cfdSL" type="number" value="20" min="5" max="100" step="1" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <label>TP1 (pip) <input id="cfdTP1" type="number" value="40" min="10" max="200" step="1" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <label>TP2 (pip) <input id="cfdTP2" type="number" value="60" min="10" max="300" step="1" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <label>Spread <input id="cfdSpread" type="number" value="1.5" min="0" max="10" step="0.5" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <label>Risk % <input id="cfdRisk" type="number" value="1" min="0.1" max="10" step="0.1" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <select id="cfdSignalType" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 8px;font-size:11px;">
+              <option value="ALL">All Systems</option>
+              <option value="SETUP">Rule-Based Only</option>
+              <option value="ML">ML Only</option>
+            </select>
+            <button onclick="runCFDBacktest()" style="background:var(--yellow);color:#000;border:none;border-radius:4px;padding:4px 14px;font-size:11px;font-weight:700;cursor:pointer;">Run Backtest</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- summary cards -->
+      <div id="cfdSummary" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:14px;"></div>
+
+      <!-- ═══ CFD PAPER TRADING ═══ -->
+      <div class="j-section open" style="margin-top:14px;">
+        <div class="j-section-head" onclick="this.parentElement.classList.toggle('open')">
+          <h3>CFD Paper Trading (Real-time)</h3><span class="j-arrow">▾</span>
+        </div>
+        <div class="j-section-body" style="padding:12px;">
+          <div id="cfdPaperSummary" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px;"></div>
+          <div id="cfdOpenTrades" style="margin-top:12px;"></div>
+          <div class="tbl-wrap" style="margin-top:12px;">
+            <h4 style="color:var(--muted);font-size:11px;margin-bottom:6px;">Resolved Trades</h4>
+            <table id="cfdPaperTable">
+              <thead><tr>
+                <th>#</th><th>Time</th><th>System</th><th>Dir</th><th>Entry</th>
+                <th>SL</th><th>TP1</th><th>TP2</th><th>Result</th><th>Exit</th>
+                <th>Hold</th><th>P&L</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TP1 vs TP2 comparison -->
+      <div class="j-section" style="margin-top:14px;">
+        <div class="j-section-head" onclick="this.parentElement.classList.toggle('open')">
+          <h3>TP1 vs TP2 Comparison</h3><span class="j-arrow">▾</span>
+        </div>
+        <div class="j-section-body">
+          <div class="tbl-wrap">
+            <table id="cfdCompareTable">
+              <thead><tr>
+                <th>System</th><th>Direction</th>
+                <th colspan="3">TP1 (R:R 1:2)</th>
+                <th colspan="3">TP2 (R:R 1:3)</th>
+              </tr>
+              <tr>
+                <th></th><th></th>
+                <th>Trades</th><th>WR%</th><th>P&L</th>
+                <th>Trades</th><th>WR%</th><th>P&L</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- trade list -->
+      <div class="j-section" style="margin-top:14px;">
+        <div class="j-section-head" onclick="this.parentElement.classList.toggle('open')">
+          <h3>Trade List</h3><span class="j-arrow">▾</span>
+        </div>
+        <div class="j-section-body">
+          <div class="tbl-wrap">
+            <table id="cfdTradeTable">
+              <thead><tr>
+                <th>#</th><th>System</th><th>Dir</th><th>Entry</th>
+                <th>TP1</th><th>TP2</th><th>P&L (TP1)</th><th>P&L (TP2)</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /content -->
+</div><!-- /shell -->
+
+<!-- ═══════════ STATUS BAR ═══════════ -->
+<div class="statusbar">
+  <span class="st-ok" id="statusConn">● LIVE</span>
+  <span class="st-sep"></span>
+  <span>สัญลักษณ์: <b id="statusSym">–</b></span>
+  <span class="st-sep"></span>
+  <span>อัปเดตล่าสุด: <b id="statusTs">–</b></span>
+  <span class="st-sep"></span>
+  <span>Setup V8 · EMA200(M5) คือใจหลัก | กราฟ: EMA200(1m)</span>
+  <span class="spacer"></span>
+  <span id="statusNote"></span>
+</div>
+
+<script>
+const REFRESH_MS = 5000;
+
+// ── Web Notification: แจ้งเตือนเมื่อมีสัญญาณใหม่ ──
+let _lastSignalId = 0;
+let _notifGranted = false;
+
+function requestNotifPermission(){
+  if(!('Notification' in window)) return;
+  if(Notification.permission === 'granted'){ _notifGranted = true; return; }
+  if(Notification.permission !== 'denied'){
+    Notification.requestPermission().then(p => { _notifGranted = (p === 'granted'); });
+  }
+}
+
+function showToast(msg, type){
+  let c = document.getElementById('_toast');
+  if(!c){
+    c = document.createElement('div');
+    c.id = '_toast';
+    c.style.cssText = 'position:fixed;top:16px;right:16px;z-index:9999;max-width:340px;';
+    document.body.appendChild(c);
+  }
+  const d = document.createElement('div');
+  const bg = type === 'CALL' ? '#26A69A' : type === 'PUT' ? '#EF5350' : '#2962FF';
+  d.style.cssText = `background:${bg};color:#fff;padding:10px 14px;border-radius:8px;margin-bottom:8px;font-size:12px;font-family:monospace;box-shadow:0 2px 8px rgba(0,0,0,.3);opacity:0;transition:opacity .3s;`;
+  d.textContent = msg;
+  c.appendChild(d);
+  requestAnimationFrame(()=> d.style.opacity = '1');
+  setTimeout(()=> { d.style.opacity = '0'; setTimeout(()=> d.remove(), 400); }, 5000);
+}
+
+async function checkNewSignals(){
+  try {
+    const rows = await fetchJSON('/api/signals?limit=5');
+    if(!rows.length) return;
+    const latest = rows[0];
+    const id = latest.id || 0;
+    if(_lastSignalId === 0){ _lastSignalId = id; return; }
+    if(id > _lastSignalId){
+      _lastSignalId = id;
+      const src = latest.importance === 1 ? 'IMP1' : latest.importance === 2 ? 'IMP2' : 'RBF';
+      const sym = (latest.symbol||'XAUUSD').replace('frx','');
+      const msg = `${src} ${latest.direction} ${sym} @ ${latest.entry_price?.toFixed(2) || '–'} [${latest.tier||''}]`;
+      showToast(msg, latest.direction);
+      if(_notifGranted && Notification.permission === 'granted'){
+        new Notification('Signal Alert', { body: msg, icon: '/favicon.ico' });
+      }
+    }
+  } catch(e){}
+}
+
+/* ═══════ HELPERS ═══════ */
+function fmtTime(iso){ if(!iso) return '–'; return new Date(iso).toLocaleString('th-TH',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+function fmtHM(iso){ if(!iso) return '–'; return new Date(iso).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+// timeout บังคับ: ถ้า server ค้าง/ถูก reset จะ reject ใน 15 วิ แทนที่จะค้างตลอด
+// (เดิมไม่มี timeout → Promise.all ค้าง → ทุกอย่างที่รออยู่หลัง await เช่น watchlist ไม่เคยทำงาน)
+async function fetchJSON(url,timeoutMs=15000){
+  const ac=new AbortController();
+  const timer=setTimeout(()=>ac.abort(),timeoutMs);
+  try{
+    const res=await fetch(url,{signal:ac.signal,cache:'no-store'});
+    if(!res.ok) throw new Error(url+' → '+res.status);
+    return await res.json();
+  }catch(e){
+    if(e&&e.name==='AbortError') throw new Error(url+' → timeout '+timeoutMs+'ms');
+    throw e;
+  }finally{ clearTimeout(timer); }
+}
+function dirClass(d){ return d==='CALL'?'dir-call':(d==='PUT'?'dir-put':''); }
+function marginColor(m){ if(m==null||isNaN(m)) return 'muted'; if(m>1) return 'green'; if(m<-1) return 'red'; return 'yellow'; }
+function fmtMargin(m){ return m==null?'–':(m>0?'+':'')+m+'pp'; }
+
+/* ═══════ CANDLESTICK + VOLUME + EMA (pure canvas) ═══════ */
+function ema(vals, period){
+  const out=new Array(vals.length).fill(null);
+  if(!vals.length) return out;
+  const k=2/(period+1); let prev=vals[0];
+  for(let i=0;i<vals.length;i++){
+    prev=(i===0)?vals[0]:vals[i]*k+prev*(1-k);
+    out[i]=prev;
+  }
+  return out;
+}
+const chartView={count:300,end:-1}; // end=-1 = ล็อกกับแท่งล่าสุด; แก้ด้วย zoom/pan
+let lastCandles=[];
+let chartInd={bb:true,ema:true,sma5:true,rsi:true,adx:true,fractal:true,vol:false,grip:false};
+let chartGeom=null;     // geometry ล่าสุดจาก drawCandles (pxForData/py/ยอดบรรทัด) ไว้ใช้ crosshair
+let crosshair=null;     // {x, y} พิกัดเมาส์บน canvas; null = ไม่มี crosshair
+let chartCursor='default';
+
+// ── indicator helpers ──
+function sma(vals, period){
+  const out=new Array(vals.length).fill(null); let sum=0;
+  for(let i=0;i<vals.length;i++){
+    sum+=vals[i];
+    if(i>=period) sum-=vals[i-period];
+    if(i>=period-1) out[i]=sum/period;
+  }
+  return out;
+}
+function stdev(vals, period){
+  const out=new Array(vals.length).fill(null);
+  for(let i=period-1;i<vals.length;i++){
+    const slice=vals.slice(i-period+1,i+1);
+    const mean=slice.reduce((a,b)=>a+b,0)/period;
+    out[i]=Math.sqrt(slice.reduce((a,b)=>a+(b-mean)**2,0)/period);
+  }
+  return out;
+}
+function bollinger(closes, period=20, mult=2){
+  const mid=sma(closes,period), sd=stdev(closes,period);
+  return { mid, up:closes.map((_,i)=>mid[i]==null?null:mid[i]+mult*sd[i]), low:closes.map((_,i)=>mid[i]==null?null:mid[i]-mult*sd[i]) };
+}
+function rsi(closes, period=14){
+  const out=new Array(closes.length).fill(null);
+  let g=0,l=0;
+  for(let i=1;i<closes.length;i++){
+    const ch=closes[i]-closes[i-1];
+    if(i===period+1){
+      let ag=0,al=0;
+      for(let j=1;j<=period;j++){ const d=closes[j]-closes[j-1]; if(d>0)ag+=d; else al-=d; }
+      g=ag/period; l=al/period;
+    } else if(i>period+1){
+      g=(g*(period-1)+Math.max(ch,0))/period;
+      l=(l*(period-1)+Math.max(-ch,0))/period;
+    } else continue;
+    out[i]=l===0?100:100-100/(1+g/l);
+  }
+  return out;
+}
+function adx(h,l,c,period=14){
+  const n=h.length, tr=new Array(n).fill(0), pdm=new Array(n).fill(0), ndm=new Array(n).fill(0);
+  for(let i=1;i<n;i++){
+    tr[i]=Math.max(h[i]-l[i],Math.abs(h[i]-c[i-1]),Math.abs(l[i]-c[i-1]));
+    const up=h[i]-h[i-1], dn=l[i-1]-l[i];
+    pdm[i]=(up>dn&&up>0)?up:0; ndm[i]=(dn>up&&dn>0)?dn:0;
+  }
+  const atr=new Array(n).fill(null), sp=new Array(n).fill(null), sn=new Array(n).fill(null);
+  for(let i=period;i<n;i++){
+    if(i===period){ let at=0,ap=0,an=0;
+      for(let j=1;j<=period;j++){ at+=tr[j]; ap+=pdm[j]; an+=ndm[j]; }
+      atr[i]=at/period; sp[i]=ap/period; sn[i]=an/period;
+    } else {
+      atr[i]=(atr[i-1]*(period-1)+tr[i])/period;
+      sp[i]=(sp[i-1]*(period-1)+pdm[i])/period;
+      sn[i]=(sn[i-1]*(period-1)+ndm[i])/period;
+    }
+  }
+  const pdi=new Array(n).fill(null), ndi=new Array(n).fill(null), dx=new Array(n).fill(null);
+  for(let i=period;i<n;i++){
+    pdi[i]=atr[i]?100*sp[i]/atr[i]:0;
+    ndi[i]=atr[i]?100*sn[i]/atr[i]:0;
+    dx[i]=(pdi[i]+ndi[i])?100*Math.abs(pdi[i]-ndi[i])/(pdi[i]+ndi[i]):0;
+  }
+  const adxv=new Array(n).fill(null);
+  for(let i=2*period-1;i<n;i++){
+    if(i===2*period-1){ let acc=0; for(let j=period;j<=2*period-1;j++) acc+=dx[j]; adxv[i]=acc/period; }
+    else adxv[i]=(adxv[i-1]*(period-1)+dx[i])/period;
+  }
+  return {adx:adxv, pdi, ndi};
+}
+function fractal(nd, l=7, r=7){
+  // fractal: แท่งกลางต้องเป็นยอดสูง/ต่ำสุด โดยแท่งซ้าย l แท่งและขวา r แท่งต่ำ/สูงกว่า (ยอดแท่งที่ 8 ใน 15 แท่ง)
+  const out=[];
+  for(let i=l;i<nd.length-r;i++){
+    let isH=true,isL=true;
+    for(let j=i-l;j<=i+r;j++){ if(j===i) continue;
+      if(nd[j].h>=nd[i].h) isH=false;
+      if(nd[j].l<=nd[i].l) isL=false;
+    }
+    if(isH) out.push({i,v:nd[i].h,t:'H'});
+    else if(isL) out.push({i,v:nd[i].l,t:'L'});
+  }
+  return out;
+}
+
+function drawCandles(canvas, data){
+  if(!canvas||!canvas.getContext){ return; }
+  lastCandles=data;
+  // กราฟหลักถูกแทนด้วย lightweight-charts (drawLWChart) แล้ว ฟังก์ชันนี้คงไว้เป็น fallback/inert
+  {
+  const dpr=window.devicePixelRatio||1;
+  const rect=canvas.getBoundingClientRect();
+  canvas.width=rect.width*dpr; canvas.height=rect.height*dpr;
+  const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+  const W=rect.width, H=rect.height;
+  ctx.clearRect(0,0,W,H);
+  if(!data||data.length<2){
+    ctx.fillStyle='#787B86'; ctx.font='13px IBM Plex Sans'; ctx.fillText('รอข้อมูลราคา...',20,H/2); return;
+  }
+  // normalise: รองรับทั้ง /api/prices (open/high/low/close/ts) และ /api/candles (o/h/l/c/t)
+  const norm=d=>d.o!=null?{o:d.o,h:d.h,l:d.l,c:d.c,t:d.t,v:d.v||0}:{o:d.open,h:d.high,l:d.low,c:d.close,t:d.ts||d.t,v:d.volume||0};
+  const nd=data.map(norm);
+  const nAll=nd.length;
+  const closes=nd.map(d=>d.c);
+
+  // ── layout: price + (volume strip) + (RSI/ADX sub-panels) + time strip ──
+  const PANE_H=88;              // ความสูง sub-pane เท่ากันทั้ง RSI/ADX → สัดส่วนสมดุล
+  const PANE_MARGIN=13;         // padding แนวตั้ง 15% ของ pane กันเส้นชน/หลุดขอบกรอบ
+  const timeStrip=18;           // แถบเวลาแยกจากกรอบล่างสุด ไม่เบียด ADX
+  const subCount=(chartInd.rsi?1:0)+(chartInd.adx?1:0);
+  const subH=subCount*PANE_H, volH=chartInd.vol?30:0, padL=8, padT=10;
+  const priceH=H-subH-volH-timeStrip, plotH=priceH-padT;
+
+  // ── หน้าต่าง + ช่องว่างขวา (future gap เหมือนโบรกเกอร์) ──
+  const future=Math.max(3,Math.round(chartView.count*0.15));
+  const realSlots=Math.max(5,chartView.count-future);
+  let end=chartView.end; if(end<0||end>=nAll) end=nAll-1;
+  let start=end-realSlots+1; if(start<0) start=0;
+  const view=nd.slice(start,end+1);
+
+  let min=Infinity,max=-Infinity;
+  view.forEach(d=>{min=Math.min(min,d.l);max=Math.max(max,d.h);});
+  const range=(max-min)||1; min-=range*0.06; max+=range*0.06;
+  const dec=(max>1000||min>1000)?1:(max>100?2:(max>1?3:4));
+  // ── EMA200 ล่าสุด + ระยะ snap S/R (ขนาด pip ตาม symbol) ──
+  const emaArr=ema(closes,200);
+  lastEma200=null;
+  for(let i=nAll-1;i>=0;i--){ if(emaArr[i]!=null){lastEma200=emaArr[i];break;} }
+  srSnapDist=Math.pow(10,-dec)*SR_SNAP_PIPS;
+  ctx.font='9.5px IBM Plex Mono,monospace';
+  const labelW=(max.toFixed(dec)).length*6.2+2;
+  const padR=Math.max(50,labelW+14);
+  const plotW=W-padL-padR;
+  const step=plotW/(chartView.count-1), bw=Math.max(plotW/chartView.count*0.55,1);
+  const pxForData=i=>padL+(i-start)*step;
+  const py=v=>padT+(max-v)/(max-min)*plotH;
+  const drawLine=(arr,color,width,yFn)=>{ ctx.strokeStyle=color; ctx.lineWidth=width||1.2; ctx.beginPath(); let started=false;
+    for(let i=start;i<=end;i++){ const v=arr[i]; if(v==null) continue; const x=pxForData(i);
+      const y=(yFn||py)(v);
+      if(!started){ctx.moveTo(x,y);started=true;} else ctx.lineTo(x,y); }
+    ctx.stroke(); };
+  chartGeom={W,H,padL,padR,padT,plotH,start,end,step,min,max,dec,nd,pxForData,py};
+
+  // ── drawPane: ตัววาด sub-pane มาตรฐาน (RSI/ADX) ──
+  // ล็อคสเกล Y ที่ [min,max] + margin บน/ล่าง 15% → เส้นทุกเส้นมีระยะห่างจากขอบเสมอ
+  const GRID_SOFT='rgba(162,178,212,.10)';   // gridline โปร่ง สบายตา (โทน #1e222d)
+  const GRID_MAJ='rgba(162,178,212,.24)';    // gridline ระดับหลัก (50/40)
+  function drawPane(o){
+    const plotW=W-padL-padR;
+    const pTop=o.oy+PANE_MARGIN, pBot=o.oy+PANE_H-PANE_MARGIN, plot=pBot-pTop;
+    const yMap=v=>pBot-(v-o.min)/(o.max-o.min)*plot;   // mapper ที่มี padding ทั้ง 2 ด้าน
+    // พื้นหลัง + กรอบ
+    ctx.fillStyle='#10131A'; ctx.fillRect(padL,o.oy,plotW,PANE_H);
+    ctx.strokeStyle='rgba(255,255,255,.06)'; ctx.strokeRect(padL,o.oy,plotW,PANE_H);
+    // โซน (overbought/oversold) วาดก่อน gridline
+    (o.zones||[]).forEach(z=>{
+      const yA=yMap(Math.max(z.v0,z.v1)), yB=yMap(Math.min(z.v0,z.v1));
+      ctx.fillStyle=z.color; ctx.fillRect(padL,yA,plotW,yB-yA);
+    });
+    // gridline + สเกลขวา (ไม่มี text overlay รกหน้าจออีกต่อไป)
+    ctx.font='9.5px IBM Plex Mono,monospace';
+    o.guides.forEach(g=>{
+      const y=yMap(g.v);
+      ctx.strokeStyle=g.major?GRID_MAJ:GRID_SOFT;
+      ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle='#565B66'; ctx.textAlign='right'; ctx.fillText(g.v,W-6,y+3); ctx.textAlign='left';
+    });
+    // clip พื้นที่วาดจริง (กัน gradient/pill ล้นกรอบ)
+    ctx.save(); ctx.beginPath(); ctx.rect(padL,pTop,plotW,plot); ctx.clip();
+    // gradient fill ใต้เส้นชุดหลัก
+    const fa=o.fill.arr, fv=fa[fa.length-1];
+    if(fv!=null){
+      const y0=yMap(fv);
+      const grad=ctx.createLinearGradient(0,y0,0,pBot);
+      grad.addColorStop(0,o.fill.color); grad.addColorStop(1,o.fill.color.replace(/[\d.]*\)$/,'0)'));
+      ctx.fillStyle=grad;
+      ctx.beginPath(); let started=false;
+      for(let i=start;i<=end;i++){ const v=fa[i]; if(v==null) continue; const x=pxForData(i);
+        if(!started){ctx.moveTo(x,yMap(v));started=true;} else ctx.lineTo(x,yMap(v)); }
+      ctx.lineTo(pxForData(end),pBot); ctx.lineTo(pxForData(start),pBot); ctx.closePath(); ctx.fill();
+    }
+    // เส้น indicator (+DI/-DI/ADX หรือ RSI) — คงสีมาตรฐานเดิม
+    o.lines.forEach(l=>drawLine(l.arr,l.color,l.width,yMap));
+    ctx.restore();
+    // ค่าล่าสุดเป็น pill ด้านขวา
+    const pa=o.pill.arr, pv=pa[pa.length-1];
+    if(pv!=null){
+      const t=pv.toFixed(1), y=yMap(pv);
+      ctx.font='bold 10px IBM Plex Mono,monospace';
+      const tw=Math.min(ctx.measureText(t).width+12,padR-4);
+      ctx.fillStyle=o.pill.color; ctx.beginPath(); ctx.roundRect(W-tw-2,y-8,tw,16,3); ctx.fill();
+      ctx.fillStyle='#0A0C10'; ctx.textAlign='left'; ctx.fillText(t,W-tw+4,y+4); ctx.textAlign='left';
+    }
+  }
+
+  // ── Grip: เส้นประที่ราคากลมๆ ──
+  if(chartInd.grip){
+    const rough=range/7, mag=Math.pow(10,Math.floor(Math.log10(rough)));
+    const nv=rough/mag, gstep=(nv<1.5?1:nv<3.5?2:nv<7.5?5:10)*mag;
+    ctx.setLineDash([2,4]); ctx.strokeStyle='rgba(255,255,255,.07)'; ctx.lineWidth=1;
+    for(let v=Math.ceil(min/gstep)*gstep; v<=max; v+=gstep){
+      ctx.beginPath(); ctx.moveTo(padL,py(v)); ctx.lineTo(W-padR,py(v)); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+
+  // ── BB (20,2) ──
+  if(chartInd.bb){
+    const bb=bollinger(closes,20,2);
+    ctx.strokeStyle='rgba(140,160,200,.6)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+    [bb.up,bb.mid,bb.low].forEach(arr=>{ ctx.beginPath(); let st=false;
+      for(let i=start;i<=end;i++){ const v=arr[i]; if(v==null) continue; const x=pxForData(i);
+        if(!st){ctx.moveTo(x,py(v));st=true;} else ctx.lineTo(x,py(v)); }
+      ctx.stroke(); });
+    ctx.setLineDash([]);
+  }
+
+  // ── EMA 50/100/200 (แทน EMA20 เดิม → EMA100) ──
+  if(chartInd.ema){
+    drawLine(ema(closes,200),'rgba(243,168,70,.95)',1.6);
+    drawLine(ema(closes,100),'rgba(41,98,255,.9)',1.2);
+    drawLine(ema(closes,50),'rgba(41,98,255,.9)',1.2);
+  }
+
+  // ── SMA5 ──
+  if(chartInd.sma5) drawLine(sma(closes,5),'rgba(232,238,251,.9)',1);
+
+  // ── Fractal: จุดยอด (ยอดสูง/ต่ำล่าสุด → สร้างเส้น S/R อัตโนมัติใน srLevels) ──
+  if(chartInd.fractal){
+    const fr=fractal(nd,7,7).filter(p=>p.i>=start&&p.i<=end);
+    const lastH=fr.filter(p=>p.t==='H').pop(), lastL=fr.filter(p=>p.t==='L').pop();
+    upsertSr('fH', lastH?lastH.v:null, 'R', false);
+    upsertSr('fL', lastL?lastL.v:null, 'S', false);
+    fr.forEach(p=>{
+      const x=pxForData(p.i), y=py(p.v);
+      if(p.t==='H'){
+        ctx.fillStyle='#EF5350';
+        ctx.beginPath(); ctx.moveTo(x,y-7); ctx.lineTo(x-4,y); ctx.lineTo(x+4,y); ctx.closePath(); ctx.fill();
+      } else {
+        ctx.fillStyle='#26A69A';
+        ctx.beginPath(); ctx.moveTo(x,y+7); ctx.lineTo(x-4,y); ctx.lineTo(x+4,y); ctx.closePath(); ctx.fill();
+      }
+    });
+  }
+
+  // ── S/R lines: interactive (ลากปรับระดับ · เพิ่มเองได้ · snap/highlight โซน EMA200) ──
+  const srRects=[];   // ช่วง y ที่ label ครอบครอง → กันชน label ขวากับ grid/price tag
+  const srLabelY=y=>{
+    for(let off=0;off<=5;off++){ const yy=y-off*17;
+      if(yy-9>=padT&&!srRects.some(r=>yy-8<r[1]&&yy+8>r[0])){ srRects.push([yy-8,yy+8]); return yy; } }
+    for(let off=1;off<=5;off++){ const yy=y+off*17;
+      if(yy+9<=padT+plotH&&!srRects.some(r=>yy-8<r[1]&&yy+8>r[0])){ srRects.push([yy-8,yy+8]); return yy; } }
+    srRects.push([y-8,y+8]); return y;
+  };
+  if(srLevels.length){
+    ctx.font='bold 9px IBM Plex Mono,monospace';
+    srLevels.forEach(lv=>{
+      const y=py(lv.price);
+      if(y<padT-10||y>padT+plotH+10) return;
+      const nearEma=lastEma200!=null&&Math.abs(lv.price-lastEma200)<=srSnapDist;
+      const dragging=srDrag&&srDrag.id===lv.id;
+      const col=nearEma?'#FF9800':(lv.type==='R'?'#EF5350':'#26A69A');
+      const alpha=(nearEma||lv.manual||dragging)?'':'bb';
+      ctx.strokeStyle=col+alpha; ctx.lineWidth=dragging?1.6:1.1;
+      ctx.setLineDash(lv.manual||dragging?[6,4]:[2,4]);
+      ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
+      ctx.setLineDash([]);
+      // จุดจับลาก (ขวา)
+      ctx.fillStyle=col+alpha; ctx.beginPath(); ctx.arc(W-padR-5,y,3,0,7); ctx.fill();
+      // label ราคา (ขวา) — จัดไม่ให้ซ้อนกับ label อื่น/price tag
+      const ty=srLabelY(y);
+      const txt=(lv.type==='R'?'R ':'S ')+lv.price.toFixed(dec);
+      const tw=Math.min(ctx.measureText(txt).width+8,padR-4);
+      ctx.fillStyle=col+(alpha||''); ctx.beginPath(); ctx.roundRect(W-padR-tw-2,ty-7,tw,14,3); ctx.fill();
+      ctx.fillStyle='#0A0C10'; ctx.textAlign='left'; ctx.fillText(txt,W-padR-tw+2,ty+4); ctx.textAlign='left';
+      // เตือน: อยู่ในโซน EMA200 (ห่างไม่เกิน 5 pips)
+      if(nearEma){
+        ctx.strokeStyle='rgba(247,184,71,.5)'; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
+        ctx.fillStyle='#FF9800'; ctx.font='bold 8.5px IBM Plex Mono,monospace';
+        const btxt='EMA200';
+        const btw=ctx.measureText(btxt).width+8;
+        ctx.beginPath(); ctx.roundRect(padL+2,Math.max(y-13,padT+2),btw,12,3); ctx.fill();
+        ctx.fillStyle='#0A0C10'; ctx.textAlign='left'; ctx.fillText(btxt,padL+6,Math.max(y-13,padT+2)+9); ctx.textAlign='left';
+        ctx.font='bold 9px IBM Plex Mono,monospace';
+      }
+    });
+  }
+
+  // ── grid + price labels (right axis) — ข้าม label ที่ชนกับ label S/R ──
+  ctx.strokeStyle='#1C2029'; ctx.fillStyle='#565B66'; ctx.font='9.5px IBM Plex Mono,monospace';
+  const GRID=5;
+  for(let i=0;i<=GRID;i++){
+    const y=padT+plotH*i/GRID;
+    ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
+    if(srRects.some(r=>y-8<r[1]&&y+8>r[0])) continue;
+    ctx.textAlign='right'; ctx.fillText((max-(max-min)*i/GRID).toFixed(dec),W-6,y+3);
+  }
+  ctx.textAlign='left';
+
+  // ── candles ──
+  view.forEach((d,i)=>{
+    const x=pxForData(i+start), up=d.c>=d.o;
+    ctx.strokeStyle=up?'#26A69A':'#EF5350'; ctx.fillStyle=up?'#26A69A':'#EF5350';
+    ctx.beginPath(); ctx.moveTo(x,py(d.h)); ctx.lineTo(x,py(d.l)); ctx.stroke();
+    const yO=py(d.o),yC=py(d.c),top=Math.min(yO,yC),hgt=Math.max(Math.abs(yO-yC),1);
+    ctx.fillRect(x-bw/2,top,bw,hgt);
+  });
+
+  // ── Signal markers: แสดงจุดเข้าชัดเจน พร้อม vertical line + entry price line ──
+  if(window._signalMarkers){
+    const tsMap={};
+    view.forEach((d,i)=>{ tsMap[d.t]=i; });
+
+    // วาด markers ทีหลังสุด (ทับกราฟทั้งหมด)
+    window._signalMarkers.forEach(m=>{
+      if(!m.ts||!m.price||!m.direction) return;
+      let idx=-1;
+      for(const [t,i] of Object.entries(tsMap)){
+        if(Math.abs(new Date(t)-new Date(m.ts))<300000){ idx=parseInt(i); break; }
+      }
+      if(idx<0) return;
+      const dataIdx=idx+start;
+      const x=pxForData(dataIdx), y=py(m.price);
+      const candle=view[idx];
+      if(!candle) return;
+      const candleBottom=py(candle.l), candleTop=py(candle.h);
+      const isCall=m.direction==='CALL';
+
+      // ผลลัพธ์
+      const isWin=m.result==='WIN'||m.result==='TP1'||m.result==='TP2';
+      const isLose=m.result==='LOSE'||m.result==='SL';
+      const isOpen=m.result==='PENDING';
+
+      // สีตามผล — ทุกระบบใช้สีเดียวกัน
+      const color=isWin?'#26A69A':isLose?'#EF5350':'#FF9800';
+
+      // ชื่อระบบ
+      const sysLabel=m.type==='ML'?'ML':m.importance===1?'IMP1':m.importance===2?'IMP2':'RBF';
+
+      // ── 1. Vertical line จาก marker ลงมาที่แท่งเทียน ──
+      const vLineTop=isCall?y+14:candleTop-4;
+      const vLineBot=isCall?candleBottom+4:y-14;
+      ctx.strokeStyle=color; ctx.lineWidth=1.5; ctx.globalAlpha=0.5;
+      ctx.setLineDash([2,2]);
+      ctx.beginPath(); ctx.moveTo(x,vLineTop); ctx.lineTo(x,vLineBot); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha=1;
+
+      // ── 2. Entry price horizontal line ──
+      ctx.strokeStyle=color; ctx.lineWidth=1; ctx.globalAlpha=0.35;
+      ctx.setLineDash([6,3]);
+      ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha=1;
+
+      // ── 3. Triangle ใหญ่ ──
+      const triH=10, triW=7;
+      ctx.fillStyle=color;
+      if(isCall){
+        // CALL = ขีลูกศรขึ้น วางใต้แท่ง
+        const ty=candleBottom+6;
+        ctx.beginPath(); ctx.moveTo(x,ty+triH); ctx.lineTo(x-triW,ty); ctx.lineTo(x+triW,ty); ctx.closePath(); ctx.fill();
+        // ลูกศรเส้น
+        ctx.strokeStyle=color; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(x,ty+triH); ctx.lineTo(x,ty-4); ctx.stroke();
+      } else {
+        // PUT = ลูกศรชี้ลง วางเหนือแท่ง
+        const ty=candleTop-6;
+        ctx.beginPath(); ctx.moveTo(x,ty-triH); ctx.lineTo(x-triW,ty); ctx.lineTo(x+triW,ty); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle=color; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(x,ty-triH); ctx.lineTo(x,ty+4); ctx.stroke();
+      }
+
+      // ── 4. ป้ายข้อมูล: [DIR] @price (SYS) [RESULT] ──
+      const dec2=m.price>=100?2:m.price>=10?1:3;
+      const priceStr=m.price.toFixed(dec2);
+      const dirText=isCall?'▲ CALL':'▼ PUT';
+      const resultText=isWin?'WIN':isLose?'LOSE':'OPEN';
+      const fullLabel=dirText+' @'+priceStr+' ['+sysLabel+'] '+resultText;
+
+      ctx.font='bold 9px IBM Plex Mono,monospace'; ctx.textAlign='center';
+      const lw=ctx.measureText(fullLabel).width+10;
+      const ly=isCall?candleBottom+24:candleTop-24;
+      const lyClamped=Math.min(Math.max(ly,20),H-20);
+
+      // background pill
+      ctx.fillStyle='rgba(10,12,16,.88)';
+      ctx.beginPath(); ctx.roundRect(x-lw/2,lyClamped-8,lw,16,4); ctx.fill();
+      ctx.strokeStyle=color; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.roundRect(x-lw/2,lyClamped-8,lw,16,4); ctx.stroke();
+
+      // text — split color
+      const dirColor=isCall?'#26A69A':'#EF5350';
+      const parts=[{t:dirText,c:dirColor},{t:' @'+priceStr,c:'#EDEFF3'},{t:' ['+sysLabel+']',c:'#838B9C'},{t:' '+resultText,c:color}];
+      let tx=x-lw/2+5;
+      ctx.textAlign='left'; ctx.font='bold 9px IBM Plex Mono,monospace';
+      parts.forEach(p=>{
+        ctx.fillStyle=p.c; ctx.fillText(p.t,tx,lyClamped+3); tx+=ctx.measureText(p.t).width;
+      });
+      ctx.textAlign='center';
+    });
+
+    // ── CFD SL/TP levels (วาดทีหลัง ทับทุกอย่าง) ──
+    window._signalMarkers.forEach(m=>{
+      if(!m.cfd||!m.ts||!m.price||!m.direction) return;
+      let idx=-1;
+      for(const [t,i] of Object.entries(tsMap)){
+        if(Math.abs(new Date(t)-new Date(m.ts))<300000){ idx=parseInt(i); break; }
+      }
+      if(idx<0) return;
+      const x=pxForData(idx+start);
+      const lineLen=Math.min(50,(W-padR-padL)/4);
+      const xEnd=x+lineLen;
+      ctx.globalAlpha=0.7;
+      if(m.cfd.sl){
+        const ySL=py(m.cfd.sl);
+        ctx.strokeStyle='#EF5350'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+        ctx.beginPath(); ctx.moveTo(padL,ySL); ctx.lineTo(xEnd,ySL); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle='rgba(10,12,16,.85)'; ctx.font='bold 8px IBM Plex Mono,monospace';
+        const slText='SL '+m.cfd.sl.toFixed(2);
+        const slW=ctx.measureText(slText).width+6;
+        ctx.fillRect(xEnd+3,ySL-7,slW,12);
+        ctx.fillStyle='#EF5350'; ctx.fillText(slText,xEnd+6,ySL+3);
+      }
+      if(m.cfd.tp1){
+        const yTP1=py(m.cfd.tp1);
+        ctx.strokeStyle='#FF9800'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+        ctx.beginPath(); ctx.moveTo(padL,yTP1); ctx.lineTo(xEnd,yTP1); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle='rgba(10,12,16,.85)'; ctx.font='bold 8px IBM Plex Mono,monospace';
+        const tp1Text='TP1 '+m.cfd.tp1.toFixed(2);
+        const tp1W=ctx.measureText(tp1Text).width+6;
+        ctx.fillRect(xEnd+3,yTP1-7,tp1W,12);
+        ctx.fillStyle='#FF9800'; ctx.fillText(tp1Text,xEnd+6,yTP1+3);
+      }
+      if(m.cfd.tp2){
+        const yTP2=py(m.cfd.tp2);
+        ctx.strokeStyle='#26A69A'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+        ctx.beginPath(); ctx.moveTo(padL,yTP2); ctx.lineTo(xEnd,yTP2); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle='rgba(10,12,16,.85)'; ctx.font='bold 8px IBM Plex Mono,monospace';
+        const tp2Text='TP2 '+m.cfd.tp2.toFixed(2);
+        const tp2W=ctx.measureText(tp2Text).width+6;
+        ctx.fillRect(xEnd+3,yTP2-7,tp2W,12);
+        ctx.fillStyle='#26A69A'; ctx.fillText(tp2Text,xEnd+6,yTP2+3);
+      }
+      ctx.globalAlpha=1;
+    });
+  }
+
+  // ── last price: เส้น + tag pill ──
+  const lp=view[view.length-1].c, lc=lp>=view[view.length-1].o?'#26A69A':'#EF5350';
+  ctx.strokeStyle=lc; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(padL,py(lp)); ctx.lineTo(W-padR,py(lp)); ctx.stroke(); ctx.setLineDash([]);
+  const tag=lp.toFixed(dec);
+  ctx.font='bold 10px IBM Plex Mono,monospace';
+  const tw=Math.min(ctx.measureText(tag).width+12,padR-4);
+  let ty=Math.min(Math.max(py(lp)-8,6),H-24);
+  // กันชนกับ label S/R ฝั่งขวา → ขยับขึ้นไม่ให้ซ้อน
+  if(srRects.length&&srRects.some(r=>ty-8<r[1]&&ty+16>r[0])) ty=Math.min(Math.max(py(lp)-22,6),H-24);
+  ctx.fillStyle=lc; ctx.beginPath(); ctx.roundRect(W-tw-2,ty,tw,16,3); ctx.fill();
+  ctx.fillStyle='#0A0C10'; ctx.textAlign='left'; ctx.fillText(tag,W-tw+4,ty+12); ctx.textAlign='left';
+
+  // ── volume strip ──
+  let volTop=priceH;
+  if(chartInd.vol){
+    const vh=volH-4, vmax=Math.max(...view.map(d=>d.v),1);
+    ctx.fillStyle='#10131A'; ctx.fillRect(0,volTop,W,volH);
+    ctx.fillStyle='#565B66'; ctx.font='9.5px IBM Plex Mono,monospace'; ctx.textAlign='left';
+    ctx.fillText('VOL',padL+2,volTop+10);
+    view.forEach((d,i)=>{
+      const x=pxForData(i+start), hh=d.v/vmax*(vh-6);
+      ctx.fillStyle=(d.c>=d.o)?'rgba(38,166,154,.25)':'rgba(239,83,80,.25)';
+      ctx.fillRect(x-bw/2,volTop+vh-2-hh,bw,hh);
+    });
+    volTop+=volH;
+  }
+
+  // ── RSI/ADX sub-panes (ใช้ drawPane ร่วมกัน: สเกลล็อค + margin กันเส้นหลุดขอบ) ──
+  let oy=volTop;
+  if(chartInd.rsi){
+    const rv=rsi(closes,14);
+    drawPane({
+      oy,
+      min:0, max:100,                       // สเกล RSI คงที่ 0–100
+      guides:[{v:0},{v:30},{v:50,major:true},{v:70},{v:100}],
+      zones:[{v0:70,v1:100,color:'rgba(239,83,80,.08)'},
+             {v0:0,v1:30,color:'rgba(38,166,154,.08)'}],
+      fill:{arr:rv, color:'rgba(247,184,71,.30)'},
+      lines:[{arr:rv, color:'#FF9800', width:1.2}],
+      pill:{arr:rv, color:'#FF9800'}
+    });
+    oy+=PANE_H;
+  }
+  if(chartInd.adx){
+    const aa=adx(nd.map(d=>d.h),nd.map(d=>d.l),closes,14);
+    // ล็อคสเกล ADX: ขั้นต่ำ 0–80, ขยายปัดขึ้นเป็นสิบถ้าข้อมูลจริงเกิน → เส้นไม่หลุดขอบบน
+    let aMax=0;
+    for(let i=start;i<=end;i++) aMax=Math.max(aMax,aa.pdi[i]||0,aa.ndi[i]||0,aa.adx[i]||0);
+    aMax=Math.max(80,Math.ceil(aMax/10)*10);
+    drawPane({
+      oy,
+      min:0, max:aMax,
+      guides:[{v:0},{v:20},{v:40,major:true},{v:60},{v:80}],
+      zones:[{v0:0,v1:20,color:'rgba(38,166,154,.07)'}],
+      fill:{arr:aa.adx, color:'rgba(247,184,71,.22)'},
+      lines:[{arr:aa.pdi, color:'rgba(38,166,154,.75)', width:1.2},
+             {arr:aa.ndi, color:'rgba(239,83,80,.75)', width:1.2},
+             {arr:aa.adx, color:'#FF9800', width:1.2}],
+      pill:{arr:aa.adx, color:'#FF9800'}
+    });
+  }
+
+  // ── time strip: แยกจากกรอบล่างสุดด้วยเส้นคั่น ไม่เบียดขอบ ADX ──
+  ctx.strokeStyle='rgba(255,255,255,.06)';
+  ctx.beginPath(); ctx.moveTo(padL,H-timeStrip); ctx.lineTo(W-padR,H-timeStrip); ctx.stroke();
+  ctx.fillStyle='#565B66'; ctx.font='9.5px IBM Plex Mono,monospace';
+  ctx.textAlign='left';
+  ctx.fillText(view[0].t?fmtHM(view[0].t):'',padL,H-6);
+  ctx.fillText(view[view.length-1].t?fmtHM(view[view.length-1].t):'',Math.min(pxForData(end),W-padR-70),H-6);
+  ctx.textAlign='right';
+  ctx.fillStyle='rgba(74,87,117,.8)';
+  ctx.fillText(realSlots>=nAll?'ALL':realSlots+' แท่ง',W-6,H-6);
+  ctx.textAlign='left';
+
+  // ── crosshair (เหมือน TradingView: กากบาท + OHLC box + ไฮไลต์แท่ง) ──
+  let legendIdx=nd.length-1;
+  if(crosshair){
+    const cx=crosshair.x, cy=crosshair.y;
+    if(cx>=padL&&cx<=W-padR&&cy>=padT&&cy<=padT+plotH){
+      const cbar=Math.round((cx-padL)/step)+start;
+      const bi=Math.max(start,Math.min(end,cbar));
+      legendIdx=bi;
+      const d=nd[bi];
+      if(d){
+        const bx=pxForData(bi), by=py(d.c);
+        // ไฮไลต์แท่งที่ hover
+        ctx.fillStyle='rgba(41,98,255,.10)';
+        ctx.fillRect(bx-bw/2,padT,bw,plotH);
+        // เส้นกากบาท
+        ctx.strokeStyle='rgba(232,238,251,.35)'; ctx.lineWidth=1;
+        ctx.setLineDash([3,3]);
+        ctx.beginPath(); ctx.moveTo(cx,padT); ctx.lineTo(cx,padT+plotH); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(padL,cy); ctx.lineTo(W-padR,cy); ctx.stroke();
+        ctx.setLineDash([]);
+        // ราคาที่ hover: pill ฝั่งขวา
+        const hp=max-(cy-padT)/plotH*(max-min);
+        ctx.font='bold 10px IBM Plex Mono,monospace';
+        const ht=hp.toFixed(dec);
+        const htw=Math.min(ctx.measureText(ht).width+12,padR-4);
+        ctx.fillStyle='rgba(26,36,64,.9)'; ctx.beginPath(); ctx.roundRect(W-htw-2,cy-8,htw,16,3); ctx.fill();
+        ctx.fillStyle='#EDEFF3'; ctx.textAlign='left'; ctx.fillText(ht,W-htw+4,cy+4); ctx.textAlign='left';
+        // เวลาที่ hover: pill ฝั่งล่าง
+        const tt=d.t?fmtHM(d.t):'';
+        if(tt){
+          ctx.font='bold 9px IBM Plex Mono,monospace';
+          const ttw=ctx.measureText(tt).width+12;
+          const tx=Math.min(Math.max(bx-ttw/2,padL),W-padR-ttw);
+          ctx.fillStyle='rgba(26,36,64,.9)'; ctx.beginPath(); ctx.roundRect(tx,H-18,ttw,14,3); ctx.fill();
+          ctx.fillStyle='#EDEFF3'; ctx.textAlign='left'; ctx.fillText(tt,tx+6,H-8); ctx.textAlign='left';
+        }
+        // OHLC box (มุมซ้ายบน เหมือน TradingView)
+        const bx2=padL+8, by2=padT+8;
+        ctx.fillStyle='rgba(10,15,26,.82)';
+        ctx.beginPath(); ctx.roundRect(bx2,by2,88,74,6); ctx.fill();
+        ctx.strokeStyle='rgba(38,50,89,.8)'; ctx.strokeRect(bx2+.5,by2+.5,87,73);
+        ctx.font='bold 9px IBM Plex Mono,monospace';
+        ctx.fillStyle='#838B9C'; ctx.textAlign='left';
+        ctx.fillText(d.t?fmtTime(d.t):'',bx2+7,by2+12);
+        const up=d.c>=d.o;
+        [['O',d.o,up],['H',d.h,up],['L',d.l,up],['C',d.c,up]].forEach((r,i)=>{
+          const yy=by2+28+i*11;
+          ctx.fillStyle='#838B9C'; ctx.fillText(r[0],bx2+7,yy);
+          ctx.fillStyle=r[2]?'#26A69A':'#EF5350';
+          ctx.fillText(r[1].toFixed(dec),bx2+26,yy);
+        });
+      }
+    }
+  }
+
+  // ── legend overlay: ค่าล่าสุดของ indicator (อัปเดตทุก redraw) ──
+  updateLegendOverlay(nd, legendIdx);
+  }
+}
+function updateLegendOverlay(nd, idx){
+  const bar=document.getElementById('chartLegendBar'); if(!bar) return;
+  const closes=nd.map(d=>d.c);
+  const at=Math.max(0,Math.min((idx==null?nd.length-1:idx),nd.length-1));
+  const d=nd[at];
+  const dec=(nd[nd.length-1]&&nd[nd.length-1].c>1000)?1:(nd[nd.length-1]&&nd[nd.length-1].c>100?2:3);
+  const f=v=>v==null||isNaN(v)?'–':v.toFixed(dec);
+  // OHLC (ไม่บังแท่งเทียน — อยู่คนละบรรทัด)
+  const ohlc=document.getElementById('lbOhlc');
+  if(ohlc&&d){
+    const up=d.c>=d.o;
+    ohlc.innerHTML=
+      `<span>O <b>${f(d.o)}</b></span>`+
+      `<span>H <b>${f(d.h)}</b></span>`+
+      `<span>L <b>${f(d.l)}</b></span>`+
+      `<span class="${up?'up':'dn'}">C <b>${f(d.c)}</b></span>`+
+      `<span class="muted">Δ ${f(d.c-d.o)}</span>`;
+  }
+  // ค่าล่าสุดของ indicator (คลิกที่ chip = สลับปิด/เปิด เหมือนเดิม)
+  const chips=[];
+  const chip=(key,label,color,val,extra)=>{
+    if(!chartInd[key]) return;
+    chips.push(`<span class="lo-chip" data-ind="${key}" title="คลิกปิด/เปิด">`+
+      `<span class="sw" style="background:${color}"></span>`+
+      `<span class="lbl">${label}</span> <b>${f(val)}</b>${extra||''}</span>`);
+  };
+  if(chartInd.ema){
+    const e50=ema(closes,50)[at], e100=ema(closes,100)[at], e200=ema(closes,200)[at];
+    chip('ema','EMA50','#38e1c4',e50);
+    chip('ema','EMA100','#a78bfa',e100);
+    chip('ema','EMA200','#f3a846',e200);
+  }
+  if(chartInd.sma5){ const s5=sma(closes,5)[at]; chip('sma5','SMA5','#EDEFF3',s5); }
+  if(chartInd.bb){ const b=bollinger(closes,20,2); chip('bb','BB', '#8ca0c8', b.up[at], ' / '+f(b.low[at])); }
+  if(chartInd.rsi){ const rv=rsi(closes,14)[at]; chip('rsi','RSI14','#FF9800',rv); }
+  if(chartInd.adx){ const a=adx(nd.map(d=>d.h),nd.map(d=>d.l),closes,14); chip('adx','ADX','#FF9800',a.adx[at], ' +'+f(a.pdi[at])+' −'+f(a.ndi[at])); }
+  document.getElementById('lbValues').innerHTML=chips.join('');
+}
+function zoomChartAt(factor, frac){
+  if(!lastCandles.length) return;
+  const nAll=lastCandles.length;
+  const future=Math.max(3,Math.round(chartView.count*0.15));
+  const realSlots=Math.max(5,chartView.count-future);
+  let end=(chartView.end<0||chartView.end>=nAll)?nAll-1:chartView.end;
+  const start=Math.max(0,end-realSlots+1);
+  // แท่งที่อยู่ใต้ cursor: map ผ่าน px เดียวกับ pxForData (ใช้ count-1)
+  const anchor=Math.min(end,start+Math.round(frac*(chartView.count-1)));
+  const newCount=Math.min(300,Math.max(30,Math.round(chartView.count*factor)));
+  const newFuture=Math.max(3,Math.round(newCount*0.15));
+  const newReal=Math.max(5,newCount-newFuture);
+  // ยึด anchor ไว้ที่ pixel เดิม: ใช้ (newCount-1) ให้ตรง pxForData → cursor นิ่ง ไม่ไถล
+  let newStart=Math.round(anchor-frac*(newCount-1));
+  newStart=Math.max(0,Math.min(newStart,nAll-newCount));
+  chartView.count=newCount;
+  chartView.end=newStart+newReal-1;
+  drawCandles(document.getElementById('candleChart'),lastCandles);
+}
+function panChart(deltaIdx){
+  if(!lastCandles.length) return;
+  const nAll=lastCandles.length;
+  const future=Math.max(3,Math.round(chartView.count*0.15));
+  const realSlots=Math.max(5,chartView.count-future);
+  let end=(chartView.end<0||chartView.end>=nAll)?nAll-1:chartView.end;
+  end=Math.min(nAll-1,Math.max(realSlots-1,end+deltaIdx));
+  chartView.end=end;
+  drawCandles(document.getElementById('candleChart'),lastCandles);
+}
+function resetChartView(){
+  chartView.count=300; chartView.end=-1;
+  if(lastCandles.length) drawCandles(document.getElementById('candleChart'),lastCandles);
+}
+
+/* ═══════ INTERACTIVE SUPPORT/RESISTANCE ═══════ */
+const SR_SNAP_PIPS=5;   // ลาก S/R เข้าใกล้ EMA200 ไม่เกินกี่ pips → snap + เตือน
+let srLevels=[];        // [{id, price, type:'R'|'S', manual:boolean}]
+let srPinned={};        // auto-line ที่ user ลากแล้ว → fractal ไม่เขียนทับ
+let srSeq=0;            // ตัวนับ id สำหรับเส้นที่สร้างเอง
+let srDrag=null;        // {id} ขณะลากเส้น
+let srSnapDist=0;       // = SR_SNAP_PIPS * 10^-dec (ขนาด pip ตาม symbol)
+let lastEma200=null;    // EMA200 ล่าสุด ใช้ตอนลาก snap
+
+function upsertSr(id, price, type, manual){
+  const lv=srLevels.find(l=>l.id===id);
+  if(lv){ if(!srPinned[id]&&price!=null) lv.price=price; }
+  else if(price!=null) srLevels.push({id, price, type, manual});
+}
+function hitSrAt(x,y){
+  if(!chartGeom||!srLevels.length) return null;
+  const {padL,padR,padT,plotH,py,W}=chartGeom;
+  if(x<padL||x>W-padR||y<padT||y>padT+plotH) return null;
+  let best=null,bd=6;
+  for(const lv of srLevels){
+    const d=Math.abs(y-py(lv.price));
+    if(d<bd){bd=d;best=lv;}
+  }
+  return best;
+}
+function addSrLine(type){
+  if(!lastCandles.length) return;
+  const last=lastCandles[lastCandles.length-1];
+  srLevels.push({id:'m'+(++srSeq), price:last.c, type, manual:true});
+  drawCandles(document.getElementById('candleChart'),lastCandles);
+}
+
+/* ═══════ SVG SEMICIRCLE GAUGE ═══════ */
+function arcPath(cx,cy,r,a0,a1){
+  const x0=cx+r*Math.cos(a0),y0=cy+r*Math.sin(a0);
+  const x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1);
+  const large=Math.abs(a1-a0)>Math.PI?1:0;
+  return `M${x0},${y0} A${r},${r} 0 ${large} 1 ${x1},${y1}`;
+}
+function gaugeSVG(g){
+  if(!g) return `<div class="gauge"><div class="ghead"><span class="gname">TF</span><span class="gsig NEUTRAL">–</span></div><div class="empty" style="padding:8px;">รอข้อมูล</div></div>`;
+  const up=g.prob_up*100, dn=g.prob_down*100;
+  const cx=110, cy=72, r=58, w=13;
+  const a0=Math.PI, aEnd=2*Math.PI;
+  const upEnd=a0+(aEnd-a0)*Math.min(up,100)/100;
+  const sigClass=g.signal==='CALL'?'CALL':(g.signal==='PUT'?'PUT':'NEUTRAL');
+  return `<div class="gauge">
+    <div class="ghead"><span class="gname">XAUUSD · TF ${g.timeframe||'–'} — WIN PROBABILITY</span><span class="gsig ${sigClass}">${g.signal||'–'}</span></div>
+    <div class="gauge-svg">
+      <svg width="220" height="96" viewBox="0 0 220 96">
+        <path d="${arcPath(cx,cy,r,a0,aEnd)}" stroke="#1C2029" stroke-width="${w}" fill="none" stroke-linecap="round"/>
+        <path d="${arcPath(cx,cy,r,a0,upEnd)}" stroke="#26A69A" stroke-width="${w}" fill="none" stroke-linecap="round"/>
+        <path d="${arcPath(cx,cy,r,upEnd,aEnd)}" stroke="#EF5350" stroke-width="${w}" fill="none" stroke-linecap="round"/>
+        <text x="110" y="84" text-anchor="middle" font-size="20" font-weight="800" font-family="IBM Plex Mono,monospace" fill="#EDEFF3">${g.signal==='NEUTRAL'?'NEUTRAL':(g.confidence*100).toFixed(0)+'%'}</text>
+      </svg>
+    </div>
+    <div class="gmeta">
+      <span style="color:var(--green);">▲ CALL ${up.toFixed(1)}%</span>
+      <span>Thresh ${(g.env_threshold!=null?g.env_threshold:g.threshold_used)*100|0}%</span>
+      <span style="color:var(--red);">▼ PUT ${dn.toFixed(1)}%</span>
+    </div>
+  </div>`;
+}
+
+/* ═══════ TABS ═══════ */
+document.querySelectorAll('.nav-item').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.content section').forEach(s=>s.style.display='none');
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).style.display='block';
+    window.dispatchEvent(new Event('resize'));
+  });
+});
+
+/* ═══════ RENDER ═══════ */
+function renderStat(el,val,cls){ if(!el) return; el.textContent=val; el.className='val'+(cls?' '+cls:''); }
+function elText(id,v){ const el=document.getElementById(id); if(el) el.textContent=v; return el; }
+function elTextCls(id,v,cls){ const el=elText(id,v); if(el) el.className=cls; return el; }
+
+async function refreshOverview(){
+  try{
+    const ml=await fetchJSON('/api/ml/stats');
+    renderStat(document.getElementById('ovMlWinrate'),ml.n_resolved?ml.winrate+'%':'–',ml.n_resolved?'cyan':'muted');
+    elText('ovMlWinrateSub',ml.n_resolved?`CI [${ml.ci_low}% – ${ml.ci_high}%]`:'รอสัญญาณ...');
+    elText('ovMlMargin',ml.n_resolved?fmtMargin(ml.margin):'–');
+    elText('ovMlN',`${ml.n_resolved} W/L = ${ml.wins}/${ml.losses}`);
+  }catch(e){}
+  try{
+    const st=await fetchJSON('/api/stats');
+    renderStat(document.getElementById('ovSetWinrate'),st.n_resolved?st.winrate+'%':'–',st.n_resolved?'blue':'muted');
+    elText('ovSetWinrateSub',st.n_resolved?`CI [${st.ci_low}% – ${st.ci_high}%]`:'รอสัญญาณ...');
+    elText('ovSetMargin',st.n_resolved?fmtMargin(st.margin):'–');
+    elText('ovSetN',`${st.n_resolved} W/L = ${st.wins}/${st.losses}`);
+  }catch(e){}
+  try{
+    const j=await fetchJSON('/api/journal/stats');
+    elTextCls('ovPnl',j.total_pnl==null?'–':((j.total_pnl>0?'+':'')+j.total_pnl.toFixed(2)),
+      'val '+(j.total_pnl>0?'green':(j.total_pnl<0?'red':'muted')));
+    elText('ovPnlSub',`${j.n} trades · ชนะ ${j.wins} / แพ้ ${j.losses}`);
+    let set0={};
+    let cfdData={points:[]};
+    try{
+      set0=await fetchJSON('/api/journal/settings')||{};
+      const cp=await fetchJSON('/api/cfd/paper')||{};
+      cfdData={points:(cp.trades||[]).filter(t=>t.exit_time), base:5000};
+    }catch(e){}
+    drawEquity({
+      opt:{points:j.equity||[], capital:set0.capital||0, stake:set0.stake||1, cur:set0.currency||'THB'},
+      cfd:cfdData,
+    });
+  }catch(e){}
+  try{
+    const reg=await fetchJSON('/api/models');
+    const m1=reg.find(r=>r.model_key==='M1'), m5=reg.find(r=>r.model_key==='M5');
+    if(m1){ elTextCls('ovModelM1',m1.version,'val purple'); elText('ovModelM1Sub',`AUC ${m1.auc_test} · conf ${m1.chosen_conf}`); }
+    if(m5){ elTextCls('ovModelM5',m5.version,'val purple'); elText('ovModelM5Sub',`AUC ${m5.auc_test} · conf ${m5.chosen_conf}`); }
+  }catch(e){}
+}
+
+function _eqTS(t){
+  if(t==null) return 0;
+  if(typeof t==='number') return Math.floor(t);
+  const s=String(t);
+  const a=Math.floor(new Date(s.replace(' ','T')+'Z').getTime()/1000);
+  return (Number.isFinite(a)&&a>0)?a:Math.floor(new Date(s.replace(' ','T')).getTime()/1000);
+}
+
+function _uniqueTimesAsc(pts){
+  // lightweight-charts ต้องการแกนเวลาเป็นลำดับเพิ่มขึ้นแบบไม่ซ้ำ
+  // เทรดที่จบในวินาทีเดียวกัน (burst) → time ซ้ำกัน → กราฟ crash "Value is null"
+  let last=0;
+  return pts.map(p=>{ const t=p.time; const time=t>last?t:last+1; last=time; return {time, value:p.value}; });
+}
+
+function _buildEqData(opt, cfd){
+  const optPts=_uniqueTimesAsc(((opt&&opt.points)||[]).map(p=>({
+    time:_eqTS(p.t),
+    value:Math.round((opt.capital||0)+((p.equity||0)*(opt.stake||1))),
+  })).filter(d=>d.time>0));
+  let cum=0;
+  const cfdPts=_uniqueTimesAsc(((cfd&&cfd.points)||[]).map(p=>{
+    cum+=(p.pnl||0);
+    return {time:_eqTS(p.exit_time||p.t), value:Math.round((cfd.base||0)+cum)};
+  }).filter(d=>d.time>0));
+  const optN=optPts.length, cfdN=cfdPts.length;
+  const optCapitalBase=(opt&&opt.capital)||0, cfdBase=(cfd&&cfd.base)||0;
+  const cfdPnl=cfdN?cfdPts[cfdPts.length-1].value-cfdBase:0;
+  const optPnl=optN?optPts[optPts.length-1].value-optCapitalBase:0;
+  return {optPts, cfdPts, optN, cfdN, optPnl, cfdPnl, optCapitalBase, cfdBase};
+}
+
+let lwEqChart=null, lwEqSeries=null, lwEqSeries2=null, lwEqBaseLine=null, lwEqBaseLine2=null;
+function drawEquity(payload){
+  const el=document.getElementById('equityChart'); if(!el) return;
+  const b=_buildEqData(payload&&payload.opt, payload&&payload.cfd);
+  const cur=(payload&&payload.opt&&payload.opt.cur)||'THB';
+  const statsEl=document.getElementById('eqStatsOv');
+  const emptyEl=document.getElementById('eqEmptyOv');
+  if(!window.LightweightCharts) return;
+  if(!lwEqChart){
+    lwEqChart=LightweightCharts.createChart(el,{
+      height:el.clientHeight||260, width:el.clientWidth||300,
+      layout:{background:{color:'transparent'},textColor:'#787B86',fontFamily:'IBM Plex Mono, monospace'},
+      grid:{vertLines:{color:'#1E222D'},horzLines:{color:'#1E222D'}},
+      rightPriceScale:{borderColor:'#2A2E39'},
+      timeScale:{borderColor:'#2A2E39',rightOffset:2},
+    });
+    window.addEventListener('resize',()=>{ if(lwEqChart&&el.clientWidth>0) lwEqChart.applyOptions({width:el.clientWidth}); });
+  }
+  const fmt=p=>Number(p).toLocaleString('th-TH',{maximumFractionDigits:0});
+  if(b.cfdN && !lwEqSeries){
+    lwEqSeries=lwEqChart.addAreaSeries({
+      lineColor:'#26A69A', topColor:'rgba(38,166,154,0.28)', bottomColor:'rgba(38,166,154,0.02)',
+      lineWidth:2, priceLineVisible:false, lastValueVisible:false,
+      priceFormat:{type:'custom',formatter:p=>'$'+fmt(p)},
+    });
+    lwEqBaseLine=lwEqSeries.createPriceLine({price:b.cfdBase||0,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,title:'CFD ทุน'});
+  }
+  if(b.optN && !lwEqSeries2){
+    lwEqSeries2=lwEqChart.addAreaSeries({
+      lineColor:'#2962FF', topColor:'rgba(41,98,255,0.20)', bottomColor:'rgba(41,98,255,0.02)',
+      lineWidth:2, priceLineVisible:false, lastValueVisible:false,
+      priceFormat:{type:'custom',formatter:p=>fmt(p)+' '+cur},
+    });
+    lwEqBaseLine2=lwEqSeries2.createPriceLine({price:b.optCapitalBase||0,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,title:'Option ทุน'});
+  }
+  if(lwEqSeries) lwEqSeries.setData(b.cfdPts);
+  if(lwEqSeries2) lwEqSeries2.setData(b.optPts);
+  if(lwEqBaseLine) lwEqBaseLine.applyOptions({price:b.cfdBase||0});
+  if(lwEqBaseLine2) lwEqBaseLine2.applyOptions({price:b.optCapitalBase||0});
+  lwEqChart.applyOptions({width:el.clientWidth||300,height:el.clientHeight||260});
+  if(b.optN+b.cfdN>0) lwEqChart.timeScale().fitContent();
+  if(emptyEl) emptyEl.style.display=(b.optN+b.cfdN)>0?'none':'block';
+  if(statsEl){
+    const chips=[];
+    if(b.cfdN) chips.push(`CFD <b>$${fmt((b.cfdBase||0)+b.cfdPnl)}</b> <span class="eq-${b.cfdPnl>=0?'up':'dn'}">(${b.cfdPnl>=0?'+':''}${fmt(b.cfdPnl)})</span> · ${b.cfdN} เทรด`);
+    if(b.optN) chips.push(`Option <b>${fmt(b.optCapitalBase+b.optPnl)} ${cur}</b> <span class="eq-${b.optPnl>=0?'up':'dn'}">(${b.optPnl>=0?'+':''}${fmt(b.optPnl)})</span> · ${b.optN} เทรด`);
+    if(!chips.length) chips.push('รอข้อมูลเทรดที่จบแล้ว');
+    statsEl.innerHTML=chips.join('<span style="color:var(--border)"> | </span>');
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// lightweight-charts (TradingView) candlestick chart
+// ═══════════════════════════════════════════════════════
+let lwChart=null, lwCandle=null, lwVol=null;
+let lwEma50=null,lwEma100=null,lwEma200=null;
+let lwBbU=null,lwBbM=null,lwBbL=null,lwSma5=null;
+let lwRsi=null,lwAdx=null,lwPdi=null,lwNdi=null;
+let lwVolC=null,lwRsiC=null,lwAdxC=null,_lwCharts=[];   // multi-pane: instance แยกของ Volume/RSI/ADX
+let lwSrLines=[];
+let lwActiveLines=[];
+let lwAddingSr=false;
+let lwTradeData=[];
+let _lwFitKey='';   // จำ TF+symbol → fitContent เฉพาะตอนเปลี่ยน
+let _lwLastSig=null; // จำแท่งท้ายสุด+สัญญาณ → ข้าม redraw ซ้ำตอน refresh
+let _lwPrevCount=0;  // จำจำนวนแท่งก่อนหน้า → กันข้อมูลหายชั่วคราวทำให้กราฟหดเหลือ 1-2 แท่ง
+
+function _candleTime(d){
+  if(d.t==null) return 0;
+  if(typeof d.t==='number') return Math.floor(d.t);
+  if(typeof d.t==='string'){
+    const s=d.t.trim().replace(' ','T');
+    // มี timezone ติดมาแล้ว (Z หรือ +HH:MM / ±HHMM) → parse ได้ตรงๆ
+    let v;
+    if(/[Zz]$/.test(s)||/[+-]\d{2}:?\d{2}$/.test(s)) v=Math.floor(new Date(s).getTime()/1000);
+    else v=Math.floor(new Date(s+'Z').getTime()/1000); // ไม่มี tz → ถือเป็น UTC
+    return Number.isFinite(v)?v:0;
+  }
+  return 0;
+}
+
+function initLWChart(){
+  if(!window.LightweightCharts) return null;
+  if(lwChart) return;
+  const baseOpts={
+    layout:{background:{color:'transparent'},textColor:'#787B86',fontFamily:'IBM Plex Mono, monospace'},
+    grid:{vertLines:{color:'#1E222D'},horzLines:{color:'#1E222D'}},
+    crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
+    rightPriceScale:{borderColor:'#2A2E39'},
+    timeScale:{borderColor:'#2A2E39',timeVisible:true,secondsVisible:false,rightOffset:1,barSpacing:7},
+    localization:{locale:'th-TH'},
+  };
+  // ── pane ราคาหลัก (ซ่อนแกนเวลา — แกนเวลาจะอยู่ที่แถบ ADX ล่างสุด) ──
+  const el=document.getElementById('candleChart'); if(!el) return;
+  lwChart=LightweightCharts.createChart(el,{...baseOpts,width:el.clientWidth||300,height:el.clientHeight||320,timeScale:{...baseOpts.timeScale,visible:false}});
+  lwCandle=lwChart.addCandlestickSeries({
+    upColor:'#26A69A',downColor:'#EF5350',borderVisible:false,
+    wickUpColor:'#26A69A',wickDownColor:'#EF5350',
+    priceFormat:{type:'custom',formatter:p=>p},
+  });
+  bindLWChart();          // ← เรียกทันทีหลังมี lwChart/lwCandle (ก่อน indicator อื่น) — S/R click ใช้ได้เสมอ
+  try{
+    lwEma50=lwChart.addLineSeries({color:'#9C6FE0',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+    lwEma100=lwChart.addLineSeries({color:'#787B86',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+    lwEma200=lwChart.addLineSeries({color:'#FF9800',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+  }catch(e){ console.error('ema setup fail',e); }
+  try{
+    lwBbU=lwChart.addLineSeries({color:'rgba(41,98,255,.45)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,lineStyle:LightweightCharts.LineStyle.Dotted});
+    lwBbM=lwChart.addLineSeries({color:'#2962FF',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+    lwBbL=lwChart.addLineSeries({color:'rgba(41,98,255,.45)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,lineStyle:LightweightCharts.LineStyle.Dotted});
+  }catch(e){ console.error('bb setup fail',e); }
+  try{ lwSma5=lwChart.addLineSeries({color:'#26C6DA',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false}); }catch(e){ console.error('sma5 setup fail',e); }
+  // ── pane Volume — instance แยก (ไม่ทับราคา 100%) ──
+  try{
+    const vEl=document.getElementById('volChart');
+    if(vEl){
+      lwVolC=LightweightCharts.createChart(vEl,{...baseOpts,width:vEl.clientWidth||300,height:vEl.clientHeight||80,timeScale:{...baseOpts.timeScale,visible:false}});
+      lwVol=lwVolC.addHistogramSeries({priceFormat:{type:'volume'}});
+    }
+  }catch(e){ console.error('volume pane fail',e); }
+  // ── pane RSI — instance แยก มีเส้น 70/30 ของตัวเอง ──
+  try{
+    const rEl=document.getElementById('rsiChart');
+    if(rEl){
+      lwRsiC=LightweightCharts.createChart(rEl,{...baseOpts,width:rEl.clientWidth||300,height:rEl.clientHeight||96,timeScale:{...baseOpts.timeScale,visible:false}});
+      lwRsi=lwRsiC.addLineSeries({color:'#9C6FE0',lineWidth:1,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false,priceFormat:{type:'custom',formatter:v=>v==null?'–':v.toFixed(1)}});
+      lwRsi.createPriceLine({price:70,color:'rgba(120,123,134,.45)',lineStyle:LightweightCharts.LineStyle.Dotted,title:'70'});
+      lwRsi.createPriceLine({price:30,color:'rgba(120,123,134,.45)',lineStyle:LightweightCharts.LineStyle.Dotted,title:'30'});
+    }
+  }catch(e){ console.error('rsi pane fail',e); }
+  // ── pane ADX — instance แยก มีแกนเวลาแถวล่างสุด + เส้น 20 ──
+  try{
+    const aEl=document.getElementById('adxChart');
+    if(aEl){
+      lwAdxC=LightweightCharts.createChart(aEl,{...baseOpts,width:aEl.clientWidth||300,height:aEl.clientHeight||96,timeScale:{...baseOpts.timeScale,visible:true,timeVisible:true}});
+      lwAdx=lwAdxC.addLineSeries({color:'#FF9800',lineWidth:1,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false,priceFormat:{type:'custom',formatter:v=>v==null?'–':v.toFixed(1)}});
+      lwPdi=lwAdxC.addLineSeries({color:'#26A69A',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+      lwNdi=lwAdxC.addLineSeries({color:'#EF5350',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+      lwAdx.createPriceLine({price:20,color:'rgba(120,123,134,.5)',lineStyle:LightweightCharts.LineStyle.Dotted,title:'20'});
+    }
+  }catch(e){ console.error('adx pane fail',e); }
+  _lwSyncPanes();   // pan/zoom ของทุกแถบขยับตามกัน
+  _lwOHLClegend();
+}
+
+// ── sync pan/zoom ข้ามทุกแถบ (ตามแพทเทิร์นใน multi-pane-chart-demo.html) ──
+function _lwSyncPanes(){
+  _lwCharts=[lwChart,lwVolC,lwRsiC,lwAdxC].filter(Boolean);
+  let syncing=false;
+  _lwCharts.forEach(c=>{
+    c.timeScale().subscribeVisibleLogicalRangeChange(range=>{
+      if(syncing||!range) return;
+      syncing=true;
+      _lwCharts.forEach(o=>{ if(o!==c) o.timeScale().setVisibleLogicalRange(range); });
+      syncing=false;
+    });
+  });
+}
+
+function refreshLWResize(){
+  const map={'candleChart':lwChart,'volChart':lwVolC,'rsiChart':lwRsiC,'adxChart':lwAdxC};
+  for(const id in map){
+    const el=document.getElementById(id); const c=map[id];
+    if(c&&el&&el.clientWidth>0) c.applyOptions({width:el.clientWidth,height:el.clientHeight||460});
+  }
+}
+
+function _normLW(prices){
+  return prices.map(d=>({
+    time:_candleTime(d),
+    open:d.o!=null?d.o:d.open,
+    high:d.h!=null?d.h:d.high,
+    low:d.l!=null?d.l:d.low,
+    close:d.c!=null?d.c:d.close,
+    volume:d.v!=null?d.v:d.volume||0,
+  })).filter(d=>d.time>0&&d.open!=null);
+}
+
+function _emaArr(arr,n,key){
+  const out=[]; let prev=null; const k=2/(n+1);
+  for(const d of arr){
+    const v=d.close;
+    if(prev==null) prev=v; else prev=v*k+prev*(1-k);
+    out.push({time:d.time,value:prev});
+  }
+  return out;
+}
+
+function _smaArr(arr,n){
+  const out=[]; let sum=0;
+  for(let i=0;i<arr.length;i++){
+    sum+=arr[i].close;
+    if(i>=n) sum-=arr[i-n].close;
+    if(i>=n-1) out.push({time:arr[i].time,value:sum/n});
+  }
+  return out;
+}
+
+function _bbArr(arr,n,k){
+  const u=[],m=[],l=[]; let sum=0,sum2=0;
+  for(let i=0;i<arr.length;i++){
+    const c=arr[i].close; sum+=c; sum2+=c*c;
+    if(i>=n){ const oc=arr[i-n].close; sum-=oc; sum2-=oc*oc; }
+    if(i>=n-1){
+      const mean=sum/n, variance=Math.max(0,sum2/n-mean*mean), sd=Math.sqrt(variance);
+      m.push({time:arr[i].time,value:mean});
+      u.push({time:arr[i].time,value:mean+k*sd});
+      l.push({time:arr[i].time,value:mean-k*sd});
+    }
+  }
+  return {u,m,l};
+}
+
+// TF → วินาทีต่อแท่ง (สำหรับ snap marker ให้ตรงกับเวลาเปิดแท่งเทียน)
+const _TF_SECONDS={'1m':60,'5m':300,'15m':900,'30m':1800,'1h':3600,'4h':14400};
+
+function drawLWChart(prices,markers,tf){
+  if(!window.LightweightCharts){ return; }
+  lastCandles=prices||[];  // sync ไว้ → ปุ่ม toggle indicator (#chartIndBar) redraw ได้ทันทีโดยไม่ต้องรอ refresh รอบหน้า
+  const bars=_normLW(prices);
+  if(!bars.length) return;
+  initLWChart();
+  const needInit=!lwCandle;
+  const sym=document.getElementById('chartSymbol')?.value||'';
+  const fitKey=tf+'|'+sym;
+  const isNewView=fitKey!==_lwFitKey;
+  if(isNewView) _lwFitKey=fitKey;
+  // ข้ามงานซ้ำถ้าแท่งท้ายสุด (เวลา+close)+สัญญาณ+การตั้งค่า indicator ไม่เปลี่ยน → ลดกระตุกตอน refresh ทุก 5 วิ
+  const last=bars[bars.length-1];
+  const indKey=[chartInd.vol,chartInd.ema,chartInd.bb,chartInd.sma5,chartInd.rsi,chartInd.adx,chartInd.fractal].join('');
+  if(!needInit&&!isNewView&&_lwLastSig&&_lwLastSig.t===last.time&&_lwLastSig.c===last.close&&_lwLastSig.sig===JSON.stringify(markers||[])&&_lwLastSig.ind===indKey){
+    return;
+  }
+  // กัน "ข้อมูลหายชั่วคราว" (Deriv ตอบไม่ครบ) ทำให้กราฟที่วาดดีแล้วหดเหลือ 1-2 แท่ง
+  if(!needInit&&!isNewView&&_lwPrevCount>100&&bars.length<30&&bars.length<_lwPrevCount/3){
+    const vEl=document.getElementById('lbValues');
+    if(vEl) vEl.innerHTML='<span class="v-m">ข้อมูลแท่งไม่ครบ ('+bars.length+' แท่ง) — กรุณารอ refresh ถัดไป</span>';
+    return;
+  }
+  _lwLastSig={t:last.time,c:last.close,sig:JSON.stringify(markers||[]),tf:tf||'',ind:indKey};
+  _lwPrevCount=bars.length;
+  _lwLastBar=bars[bars.length-1];
+  _lwLastPrev=bars.length>1?bars[bars.length-2].close:null;
+  _renderLWDefaultLegend();
+  if(lwCandle) lwCandle.setData(bars);
+  if(lwVol){ if(chartInd.vol) lwVol.setData(bars.map(b=>({time:b.time,value:b.volume,color:b.close>=b.open?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'}))); else lwVol.setData([]); }
+  if(chartInd.ema){ if(lwEma50&&lwEma100&&lwEma200){ lwEma50.setData(_emaArr(bars,50)); lwEma100.setData(_emaArr(bars,100)); lwEma200.setData(_emaArr(bars,200)); } }
+  else { if(lwEma50)lwEma50.setData([]); if(lwEma100)lwEma100.setData([]); if(lwEma200)lwEma200.setData([]); }
+  const bbOn=chartInd.bb&&bars.length>=20;
+  if(bbOn&&lwBbU&&lwBbM&&lwBbL){ const bb=_bbArr(bars,20,2); lwBbU.setData(bb.u); lwBbM.setData(bb.m); lwBbL.setData(bb.l); }
+  else { if(lwBbU)lwBbU.setData([]); if(lwBbM)lwBbM.setData([]); if(lwBbL)lwBbL.setData([]); }
+  if(chartInd.sma5&&bars.length>=5&&lwSma5){ lwSma5.setData(_smaArr(bars,5)); }
+  else { if(lwSma5) lwSma5.setData([]); }
+  // ── RSI (pane แยก #rsiChart) ──
+  window.__lastRsi=window.__lastAdx=window.__lastPdi=window.__lastNdi=null;
+  const closesArr=bars.map(b=>b.close);
+  if(chartInd.rsi&&bars.length>=16&&lwRsi){
+    const rv=rsi(closesArr,14);
+    const rdt=bars.map((b,i)=>({time:b.time,value:rv[i]})).filter(d=>d.value!=null);
+    lwRsi.setData(rdt); window.__lastRsi=rdt.length?rdt[rdt.length-1].value:null;
+  } else { if(lwRsi) lwRsi.setData([]); }
+  // ── ADX (pane แยก #adxChart แถวนี้เป็นแถวล่างสุด → มีแกนเวลา) ──
+  if(chartInd.adx&&bars.length>=28&&lwAdx){
+    const aa=adx(bars.map(b=>b.high),bars.map(b=>b.low),closesArr,14);
+    const adt=bars.map((b,i)=>({time:b.time,value:aa.adx[i]})).filter(d=>d.value!=null);
+    const pdt=bars.map((b,i)=>({time:b.time,value:aa.pdi[i]})).filter(d=>d.value!=null);
+    const ndt=bars.map((b,i)=>({time:b.time,value:aa.ndi[i]})).filter(d=>d.value!=null);
+    lwAdx.setData(adt); lwPdi.setData(pdt); lwNdi.setData(ndt);
+    window.__lastAdx=adt.length?adt[adt.length-1].value:null;
+    window.__lastPdi=pdt.length?pdt[pdt.length-1].value:null;
+    window.__lastNdi=ndt.length?ndt[ndt.length-1].value:null;
+  } else { if(lwAdx){ lwAdx.setData([]); lwPdi.setData([]); lwNdi.setData([]); } }
+  _renderLWDefaultLegend();   // ← เรียกซ้ำหลังได้ค่า RSI/ADX ล่าสุด → legend แสดงทันที
+
+  // ── Markers: shape=ทิศทาง, color=ระบบ — สัญญาณเกิดกลางแท่ง → snap ลงไปที่แท่งที่เปิดก่อนหน้า
+  const activeTf=document.querySelector('#tfGroup .tf-btn.active')?.dataset.tf||tf||'1m';
+  const intSec=_TF_SECONDS[String(activeTf)]||300;
+  const tsSet=new Set(bars.map(b=>b.time));
+  const barTimes=[...tsSet].sort((a,b)=>a-b);
+  const snapToBar=ts=>{
+    const t=_candleTime(ts); if(!t) return null;
+    const slot=Math.floor(t/intSec)*intSec;
+    let cand=tsSet.has(slot)?slot:null;
+    // เผื่อ series เริ่มไม่ตรง 0 → หาแท่งที่เปิดในหน้าต่างเดียวกับสัญญาณ
+    for(const bt of barTimes){
+      if(bt>=slot&&bt<slot+intSec){ cand=bt; break; }
+    }
+    return cand;
+  };
+  const sigMarkerList=(markers||[]).filter(m=>m&&m.ts&&m.price!=null&&m.direction).map(m=>{
+    const barTime=snapToBar(m); if(barTime==null) return null;
+    const color=m.type==='ML'?'#9C6FE0':'#2962FF';
+    const sysLabel=m.type==='ML'?'ML':m.importance===1?'IMP1':m.importance===2?'IMP2':'RBF';
+    return {
+      time:barTime,
+      position:m.direction==='CALL'?'belowBar':'aboveBar',
+      color,
+      shape:m.direction==='CALL'?'arrowUp':'arrowDown',
+      text:sysLabel+' '+m.direction,
+    };
+  }).filter(Boolean);
+  // ── Fractal 15: จุดสูง=ส้ม(แนวต้าน) · จุดต่ำ=เขียว(แนวรับ) — ไม่ซ้ำกับสัญญาณ ──
+  let fractalMarkers=[];
+  if(chartInd.fractal&&bars.length>=16){
+    const nd=bars.map((b,i)=>({o:b.open,h:b.high,l:b.low,c:b.close,i}));
+    fractalMarkers=fractal(nd,7,7).map(p=>({
+      time:bars[p.i].time,
+      position:p.t==='H'?'aboveBar':'belowBar',
+      color:p.t==='H'?'#FF9800':'#26A69A',   // High=ส้ม / Low=เขียว — ใช้สีที่มีอยู่แล้วในระบบ
+      shape:p.t==='H'?'arrowDown':'arrowUp',
+      text:'',
+    }));
+  }
+  const markerList=[...sigMarkerList,...fractalMarkers].sort((a,b)=>a.time-b.time);
+  if(lwCandle) lwCandle.setMarkers(markerList);
+  // fitContent เฉพาะครั้งแรก / เปลี่ยน TF / เปลี่ยน symbol — ไม่รบกวน zoom/pan ที่ผู้ใช้ตั้งไว้
+  if(isNewView) lwChart.timeScale().fitContent();
+
+  // ── trade list + auto-select open ──
+  lwTradeData=(markers||[]).filter(m=>m&&m.ts&&m.price!=null&&m.direction);
+  _renderLWMarkers(markers);
+  _buildLWData(markers);
+  _autoSelectOpen(markers);
+}
+
+// ── LW legend bar: OHLC ของแท่งที่ crosshair ชี้ + ค่า indicator เทียบสีที่เปิดอยู่ ──
+let _lwLastBar=null,_lwLastPrev=null;
+function _renderLWDefaultLegend(){
+  const el=document.getElementById('lbValues'); if(!el) return;
+  const b=_lwLastBar; if(!b){ el.innerHTML=''; return; }
+  const pct=_lwLastPrev!=null?(b.close-_lwLastPrev)/_lwLastPrev*100:0;
+  const cls=!isNaN(b.close)&&b.close>=b.open&&!isNaN(b.open)?'v-u':'v-d';
+  el.innerHTML=`<span class="v-m">ราคา</span> <b class="${cls}">${b.close}</b> <span class="v-m">·</span> <span class="${cls}">${pct>=0?'+':''}${pct.toFixed(2)}%</span> <span class="v-m">·</span> <span class="v-m">${b.time?new Date(b.time*1000).toLocaleTimeString('th-TH'):''}</span>`+
+    (window.__lastRsi!=null?` <span class="v-m">·</span> <span class="v-m" style="color:#9C6FE0;">RSI</span> <b>${Number(window.__lastRsi).toFixed(1)}</b>`:'')+
+    (window.__lastAdx!=null?` <span class="v-m">·</span> <span class="v-m" style="color:#FF9800;">ADX</span> <b>${Number(window.__lastAdx).toFixed(1)}</b>`:'');
+}
+function _lwOHLClegend(){
+  const el=document.getElementById('lbOhlc'); if(!el) return;
+  if(!lwCandle) return;
+  lwChart.subscribeCrosshairMove(param=>{
+    if(!param||!param.time||!param.point||!param.seriesData){ _renderLWDefaultLegend(); return; }
+    const d=param.seriesData.get(lwCandle);
+    if(!d){ el.innerHTML='—'; _renderLWDefaultLegend(); return; }
+    const up=d.close!=null&&d.open!=null&&d.close>=d.open;
+    const cls=up?'up':'dn';
+    el.innerHTML=`O <b class="${cls}">${d.open}</b> H <b class="${cls}">${d.high}</b> L <b class="${cls}">${d.low}</b> C <b class="${cls}">${d.close}</b>`;
+    const vEl=document.getElementById('lbValues');
+    if(vEl){
+      const parts=[];
+      const push=(s,series)=>{
+        if(!series) return;
+        const v=param.seriesData.get(series);
+        if(v&&v.value!=null) parts.push(`<span class="v-m">${s}</span> <b>${v.value}</b>`);
+      };
+      push('EMA50',lwEma50); push('BB',lwBbM); push('SMA5',lwSma5);
+      if(parts.length) vEl.innerHTML=parts.join('');
+      else _renderLWDefaultLegend();
+    }
+  });
+}
+
+// ── trade list (คลิกเพื่อดู SL/TP เฉพาะรายการ) ──
+function _buildLWData(markers){
+  const rowsEl=document.getElementById('lwTradeRows'); if(!rowsEl) return;
+  lwTradeData=markers||[];
+  const items=lwTradeData.map((m,rowIdx)=>{
+    let entry=m.price!=null?Number(m.price):null;
+    let sl=null,tp1=null,tp2=null,res=m.result||(m.cfd&&m.cfd.cfd_result);
+    if(m.cfd){ if(entry==null) entry=m.cfd.effective_entry; sl=m.cfd.sl; tp1=m.cfd.tp1; tp2=m.cfd.tp2; }
+    if(m.cfd&&m.cfd.cfd_result===null&&res==='PENDING') entry=m.cfd.effective_entry||entry;
+    return {rowIdx,ts:m.ts,entry,sl,tp1,tp2,result:m.type==='ML'?'ML':(m.importance===1?'IMP1':m.importance===2?'IMP2':'RBF'),direction:m.direction,res,
+            price:m.price,open:res==='PENDING'};
+  }).filter(t=>t.ts);
+  rowsEl.innerHTML=items.map(t=>{
+    const ent=(t.entry!=null?Number(t.entry).toFixed(2):'–');
+    const cls=t.open?'lw-trow open':'lw-trow';
+    const sc=t.direction==='CALL'?'up':'down';
+    return `<div class="${cls}" data-t="${(t.ts||'').replace ? String(t.ts) : t.ts}">
+      <span class="dir" style="color:${t.direction==='CALL'?'#26A69A':'#EF5350'}">${t.direction}</span>
+      <span class="lbl">${t.result}</span>
+      <span class="sub">${ent}</span>${t.open?'<span class="tag open">OPEN</span>':(t.res?'<span class="tag">'+t.res+'</span>':'<span class="tag"></span>')}
+    </div>`;
+  }).join('') || '<div class="lw-empty">ยังไม่มี trade</div>';
+  rowsEl.querySelectorAll('.lw-trow').forEach(row=>{
+    row.addEventListener('click',()=>{
+      document.querySelectorAll('.lw-trow').forEach(r=>r.classList.remove('sel'));
+      row.classList.add('sel');
+      const t=lwTradeData.find(x=>String(x.ts)===row.dataset.t);
+      _showTrade(t);
+    });
+  });
+}
+
+function _showTrade(t){
+  if(!t||!lwCandle){ return; }
+  _clearPriceLines();
+  const add=(p,color,style,title)=>{
+    if(p==null) return;
+    try{ const ln=lwCandle.createPriceLine({price:Number(p),color,lineWidth:1,lineStyle:style,title,axisLabelVisible:true}); _selLines.push(ln); }catch(e){}
+  };
+  add(t.entry,'#D1D4DC',LightweightCharts.LineStyle.Solid,'ENTRY');
+  add(t.sl,'#EF5350',LightweightCharts.LineStyle.Dashed,'SL');
+  add(t.tp1,'#FF9800',LightweightCharts.LineStyle.Dashed,'TP1');
+  add(t.tp2,'#26A69A',LightweightCharts.LineStyle.Dashed,'TP2');
+}
+
+function _autoSelectOpen(markers){
+  const rowsEl=document.getElementById('lwTradeRows'); if(!rowsEl) return;
+  const openMarker=(markers||[]).find(m=>(m.result==='PENDING')||(m.cfd&&m.cfd.cfd_result==='PENDING'));
+  let target=null;
+  if(openMarker){
+    const row=rowsEl.querySelector(`.lw-trow[data-t="${String(openMarker.ts)}"]`);
+    if(row){ target=row; }
+  }
+  if(!target){ target=rowsEl.querySelector('.lw-trow'); }
+  if(target){
+    target.classList.add('sel');
+    _showTrade(lwTradeData.find(x=>String(x.ts)===target.dataset.t));
+  }
+}
+
+// ── S/R line ที่ผู้ใช้เพิ่มเอง ──
+let _selLines=[];   // เส้น SL/TP ของ trade ที่เลือก
+let _userSr=[];     // เส้น S/R ที่ผู้ใช้เพิ่ม
+let _addingSr=false;
+let _deletingSr=false;   // ← ต้องประกาศ! เดิมอ้างแต่ไม่เคย let — bindLWChart() เรียก _updSrHint() อ่านค่าตรงนี้แล้วระเบิด ReferenceError ก่อนสร้าง sub-pane
+let _addingTimer=null;
+
+function _clearPriceLines(){
+  if(!lwCandle) return;
+  try{ _selLines.forEach(u=>lwCandle.removePriceLine(u)); _selLines=[]; }catch(e){}
+}
+function _renderLWMarkers(markers){
+  // สงวนไว้ (S/R handled ใน bindLWChart)
+}
+
+function _renderSrRows(){
+  const rowsEl=document.getElementById('lwSrRows'); if(!rowsEl) return;
+  rowsEl.innerHTML=_userSr.map((ln,i)=>{
+    const price=(ln.price()!=null)?Number(ln.price()).toFixed(ln.price()>1000?1:2):'–';
+    return `<div class="lw-trow" data-sr="${i}">
+      <span class="dir" style="width:auto;color:#787B86;font-weight:400">S/R</span>
+      <span class="sub">${price}</span>
+      <button class="sr-del" data-sri="${i}" title="ลบเส้นนี้"><i class="ti ti-trash"></i></button>
+    </div>`;
+  }).join('') || '<div class="lw-empty">ยังไม่มีเส้น S/R</div>';
+  rowsEl.querySelectorAll('.sr-del').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.stopPropagation();
+      const i=Number(btn.dataset.sri);
+      try{ if(lwCandle&&lwCandle.removePriceLine) lwCandle.removePriceLine(_userSr[i]); }catch(err){}
+      _userSr.splice(i,1);
+      _renderSrRows();
+    });
+  });
+}
+
+// ── helper โหมด S/R (ใช้ทั้งจาก toolbar และ subscribeClick) ──
+function _updSrHint(){
+  const h=document.getElementById('lwModeHint'); if(!h) return;
+  h.textContent=_addingSr?'โหมดวางเส้น S/R — คลิกกราฟเพื่อวางเส้นแนวนอน':
+                  _deletingSr?'โหมดลบเส้น S/R — คลิกใกล้เส้นที่จะลบ':'';
+  h.style.display=(_addingSr||_deletingSr)?'block':'none';
+}
+function _setSrModeCls(){
+  const w=document.getElementById('lwWrap'); if(!w) return;
+  w.classList.toggle('adding-sr',!!_addingSr);
+}
+// ── เก็บเกี่ยวคลิกที่ปุ่มทั้งหมดด้วย event delegation (ไม่พึ่ง chart init — ปุ่มต้องใช้ได้เสมอ) ──
+function bindChartToolbar(){
+  if(window.__ctBound) return; window.__ctBound=true;
+  document.addEventListener('click',e=>{
+    const btn=e.target && e.target.closest ? e.target.closest('.chart-toolbar button, #lwSrPanel .sr-clear') : null;
+    if(!btn) return;
+    const id=btn.id;
+    if(id==='addSrR'){
+      _addingSr=btn.classList.toggle('active');
+      if(_addingSr){ _deletingSr=false; const db=document.getElementById('btnDelSr'); if(db) db.classList.remove('active'); }
+      else _setSrModeCls();
+      _setSrModeCls();
+      const cc=document.getElementById('candleChart'); if(cc) cc.style.cursor=_addingSr?'crosshair':'default';
+      _updSrHint();
+      return;
+    }
+    if(id==='btnDelSr'){
+      _deletingSr=btn.classList.toggle('active');
+      if(_deletingSr){ _addingSr=false; const ab=document.getElementById('addSrR'); if(ab) ab.classList.remove('active'); _setSrModeCls(); }
+      const cc=document.getElementById('candleChart'); if(cc) cc.style.cursor=_deletingSr?'pointer':'default';
+      _updSrHint();
+      return;
+    }
+    if(id==='btnSrList'){
+      const sp=document.getElementById('lwSrPanel');
+      if(sp){ sp.style.display=sp.style.display==='none'?'block':'none'; if(sp.style.display==='block') _renderSrRows(); }
+      return;
+    }
+    if(id==='srClearAll'){
+      if(!lwCandle){ showToast('กราฟยังโหลดไม่เสร็จ'); return; }
+      _userSr.forEach(ln=>{ try{ lwCandle.removePriceLine(ln); }catch(e){} });
+      _userSr=[];
+      _renderSrRows();
+      _updSrHint();
+      return;
+    }
+    if(id==='zoomReset'){
+      if(lwChart) lwChart.timeScale().fitContent();
+      else showToast('กราฟยังโหลดไม่เสร็จ');
+      return;
+    }
+    if(id==='btnFullscreen'){
+      const p=document.getElementById('chartPanel');
+      if(document.fullscreenElement){ document.exitFullscreen(); return; }   // ← อยู่ในโหมดเต็มจอแล้ว → ออกแทน
+      if(p&&p.requestFullscreen){
+        const wrap=document.getElementById('lwWrap'); const prev=wrap&&wrap.style.height;
+        if(wrap) wrap.style.height='calc(100vh - 130px)';
+        p.requestFullscreen().then(()=>{ setTimeout(v=>refreshLWResize(),80); }).catch(()=>{ if(wrap&&prev) wrap.style.height=prev; });
+      }
+      return;
+    }
+    if(id==='btnTradeList'){
+      const tl=document.getElementById('lwTradeList');
+      if(tl){ const show=tl.style.display==='none'; tl.style.display=show?'block':'none'; if(show) tl.scrollIntoView({block:'nearest',behavior:'smooth'}); }
+      return;
+    }
+  });
+  document.addEventListener('fullscreenchange',()=>{
+    const fsBtn=document.getElementById('btnFullscreen');
+    const fsIcon=fsBtn?.querySelector('i'); const fsLbl=fsBtn?.querySelector('.btn-lbl');
+    if(document.fullscreenElement){
+      if(fsIcon) fsIcon.className='ti ti-minimize'; if(fsLbl) fsLbl.textContent='ย่อจอ';
+    }else{
+      if(fsIcon) fsIcon.className='ti ti-maximize'; if(fsLbl) fsLbl.textContent='เต็มจอ';
+      const wrap=document.getElementById('lwWrap'); if(wrap) wrap.style.height='';
+      refreshLWResize();
+    }
+  });
+}
+
+// ── bind LW chart controls (เฉพาะการคลิกวาง/ลบเส้นบนกราฟ) ──
+function bindLWChart(){
+  if(!lwChart) return;
+  _setSrModeCls(); _updSrHint();
+  // click เพื่อวาง / ลบ S/R
+  lwChart.subscribeClick(param=>{
+    if(!param.point || !lwCandle) return;
+    if(_addingSr){
+      const p=lwCandle.coordinateToPrice(param.point.y);
+      if(p==null) return;
+      try{
+        const ln=lwCandle.createPriceLine({price:p,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,title:'S/R'});
+        _userSr.push(ln);
+      }catch(e){}
+      _addingSr=false;
+      const b=document.getElementById('addSrR'); if(b) b.classList.remove('active');
+      _setSrModeCls();
+      const cc=document.getElementById('candleChart'); if(cc) cc.style.cursor='default';
+      _updSrHint();
+      const sp=document.getElementById('lwSrPanel');
+      if(sp&&sp.style.display==='block') _renderSrRows();
+      showToast('เพิ่มเส้น S/R ราคา '+p.toFixed(2));
+      return;
+    }
+    if(_deletingSr){
+      const p=lwCandle.coordinateToPrice(param.point.y);
+      if(p==null) return;
+      let bi=-1,bd=Infinity;
+      _userSr.forEach((ln,i)=>{ const lp=ln.price(); if(lp!=null){ const d=Math.abs(lp-p); if(d<bd){bd=d;bi=i;} } });
+      if(bi>=0 && bd<=Math.max(p*0.005,0.5)){ // ต้องคลิกห่างจากเส้นไม่เกิน ~0.5% หรือ 0.5 USD
+        try{ lwCandle.removePriceLine(_userSr[bi]); }catch(e){}
+        _userSr.splice(bi,1);
+        showToast('ลบเส้น S/R แล้ว');
+      } else showToast('ไม่พบเส้น S/R ใกล้จุดนี้ — คลิกให้ใกล้เส้นมากขึ้น');
+      _deletingSr=false;
+      const db=document.getElementById('btnDelSr'); if(db) db.classList.remove('active');
+      const cc=document.getElementById('candleChart'); if(cc) cc.style.cursor='default';
+      _updSrHint();
+      const sp=document.getElementById('lwSrPanel');
+      if(sp&&sp.style.display==='block') _renderSrRows();
+      return;
+    }
+  });
+}
+
+
+async function refreshPrice(showLoading=false){
+  try{
+    const tf=document.querySelector('#tfGroup .tf-btn.active')?.dataset.tf||'1m';
+    let sym='';
+    const symSel=document.getElementById('chartSymbol');
+    if(symSel&&symSel.value) sym=symSel.value;
+    if(!sym){ try{ const s=await fetchJSON('/api/symbol'); if(s&&s.symbol){sym=s.symbol;}}catch(e){} }
+    if(!sym) sym='frxXAUUSD';
+    const badge=document.getElementById('symbolBadge'); if(badge) badge.textContent=sym;
+    const wrap=document.getElementById('lwWrap');
+    if(showLoading && wrap) wrap.classList.add('loading');   // ← แสดง loading เฉพาะตอนผู้ใช้กดเปลี่ยน TF/symbol เอง
+    // fetch candles + markers พร้อมกัน → เปลี่ยน TF เร็วขึ้น
+    const [[prices,markers]]=await Promise.all([
+      Promise.all([
+        (async()=>{
+          let p=await fetchJSON('/api/candles?tf='+tf+'&count=300&symbol='+encodeURIComponent(sym));
+          // กรณี Deriv ตอบข้อมูลไม่ครบ → ลองยิง count ใหญ่ขึ้นอีกครั้งกันกราฟเหลือ 1-2 แท่ง
+          if(Array.isArray(p)&&p.length<30) p=await fetchJSON('/api/candles?tf='+tf+'&count=1000&symbol='+encodeURIComponent(sym));
+          return p;
+        })(),
+        fetchJSON('/api/signals/markers?symbol='+encodeURIComponent(sym)+'&limit=50').catch(()=>window._signalMarkers||[])
+      ])
+    ]);
+    if(wrap) wrap.classList.remove('loading');
+    if(!prices||!prices.length) return;
+    if(Array.isArray(markers)) window._signalMarkers=markers;
+    drawLWChart(prices,markers,tf);
+    const last=prices[prices.length-1], prev=prices[prices.length-2];
+    const chg=prev?last.c-prev.c:0;
+    const chgPct=prev?chg/prev.c*100:0;
+    const pe=document.getElementById('tickerPrice');
+    pe.textContent=last.c.toFixed(2);
+    pe.className='price '+(chg>=0?'up':'down');
+    const ce=document.getElementById('tickerChg');
+    ce.textContent=`${chg>=0?'+':''}${chg.toFixed(2)} (${chgPct>=0?'+':''}${chgPct.toFixed(2)}%)`;
+    ce.className='chg '+(chg>=0?'up':'down');
+    // status bar
+    const sSym=document.getElementById('statusSym'); if(sSym) sSym.textContent=sym;
+    const sTs=document.getElementById('statusTs'); if(sTs) sTs.textContent=new Date().toLocaleTimeString('th-TH');
+    const sConn=document.getElementById('statusConn'); if(sConn){ sConn.textContent='● LIVE'; sConn.className='st-ok'; }
+    const tTitle=document.getElementById('chartTitle');
+    if(tTitle){ const meta=symbolList.find(s=>s.symbol===sym); tTitle.textContent=(meta?meta.label+' — ':'')+'Candlestick'; }
+  }catch(e){
+    const sConn=document.getElementById('statusConn');
+    if(sConn){ sConn.textContent='● OFFLINE'; sConn.className='st-bad'; }
+  }
+}
+
+const WL_SYMBOLS=[
+  {symbol:'frxXAUUSD',label:'XAUUSD · ทองคำ'},
+  {symbol:'frxEURUSD',label:'EURUSD'},
+  {symbol:'frxGBPUSD',label:'GBPUSD'},
+  {symbol:'frxUSDJPY',label:'USDJPY'},
+  {symbol:'frxAUDUSD',label:'AUDUSD'},
+  {symbol:'frxUSDCAD',label:'USDCAD'},
+  {symbol:'frxUSDCHF',label:'USDCHF'},
+  {symbol:'frxNZDUSD',label:'NZDUSD'},
+];
+let symbolList=WL_SYMBOLS;
+let _symbolsLoaded=true;
+async function loadSymbols(){
+  try{
+    const list=await fetchJSON('/api/symbols');
+    if(Array.isArray(list)&&list.length) symbolList=list;
+  }catch(e){}
+  _symbolsLoaded=true;
+  const sel=document.getElementById('chartSymbol');
+  if(sel){
+    let cur='frxXAUUSD';
+    try{ const s=await fetchJSON('/api/symbol'); if(s&&s.symbol) cur=s.symbol; }catch(e){}
+    sel.innerHTML=symbolList.map(s=>`<option value="${s.symbol}" ${s.symbol===cur?'selected':''}>${s.label}</option>`).join('');
+    sel.addEventListener('change',()=>refreshPrice(true));   // ← user action → โชว์ loading
+  }
+  renderWatchlist();
+}
+
+const _wlCache={};
+function renderWatchlist(){
+  const rowsEl=document.getElementById('watchlistRows'); if(!rowsEl) return;
+  const cur=document.getElementById('chartSymbol')?.value||'frxXAUUSD';
+  const short=s=>s.replace(/^frx/,'').replace(/_/g,'');
+  rowsEl.innerHTML=symbolList.map(s=>{
+    const c=_wlCache[s.symbol];
+    const price=c?c.price:null;
+    const chgPct=c?c.chgPct:null;
+    const cls=chgPct==null?'flat':(chgPct>=0?'up':'down');
+    const active=s.symbol===cur?'active':'';
+    return `<div class="wl-row ${active}" data-symbol="${s.symbol}">
+      <span><span class="wl-name">${short(s.symbol)}</span><span class="wl-kind">${s.label||''}</span></span>
+      <span class="wl-price">${price!=null?price.toFixed(price>=1000?1:(price>=100?2:3)):'–'}</span>
+      <span class="wl-chg ${cls}">${chgPct!=null?(chgPct>=0?'+':'')+chgPct.toFixed(2)+'%':''}</span>
+    </div>`;
+  }).join('');
+  rowsEl.querySelectorAll('.wl-row').forEach(row=>{
+    row.addEventListener('click',()=>{
+      const sel=document.getElementById('chartSymbol'); if(sel) sel.value=row.dataset.symbol;
+      rowsEl.querySelectorAll('.wl-row').forEach(r=>r.classList.toggle('active',r===row));
+      refreshPrice(true);   // ← user action → โชว์ loading
+    });
+  });
+}
+async function refreshWatchlist(){
+  renderWatchlist();
+  // 1 request ต่อรอบ (เดิมยิง /api/candles 8 ครั้ง = 8 requests ทุก 5 วิ → VPS 1 vCPU ค้าง)
+  try{
+    const list=symbolList.map(s=>s.symbol).join(',');
+    const rows=await fetchJSON('/api/watchlist?symbols='+encodeURIComponent(list));
+    if(Array.isArray(rows)) for(const r of rows){
+      if(!r||!r.symbol||r.price==null) continue;
+      _wlCache[r.symbol]={price:r.price,chgPct:r.chgPct};
+    }
+  }catch(e){ /* ค้างไว้ที่ราคาเดิม ดีกว่าหายทั้งหมด */ }
+  renderWatchlist();
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  bindChartToolbar();           // ปุ่มทั้งหมดทำงานทันที แม้ chart ยังไม่โหลด
+  loadSymbols();
+  document.getElementById('tfGroup')?.addEventListener('click',e=>{
+    const btn=e.target.closest('.tf-btn'); if(!btn) return;
+    document.querySelectorAll('#tfGroup .tf-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    lwChart&&lwChart.timeScale().fitContent();
+    refreshPrice(true);   // ← user action → โชว์ loading
+  });
+  document.getElementById('chartLegendBar')?.addEventListener('click',e=>{
+    const chip=e.target.closest('.lo-chip'); if(!chip) return;
+    const key=chip.dataset.ind;
+    chartInd[key]=!chartInd[key];
+    chip.classList.toggle('off',!chartInd[key]);
+    const bar=document.querySelector('#chartIndBar .ind-chip[data-ind="'+key+'"]');
+    if(bar) bar.classList.toggle('active',chartInd[key]);
+  });
+  document.getElementById('lbCollapse')?.addEventListener('click',()=>{
+    document.getElementById('chartLegendBar')?.classList.toggle('collapsed');
+  });
+  document.getElementById('chartIndBar')?.addEventListener('click',e=>{
+    const chip=e.target.closest('.ind-chip'); if(!chip) return;
+    chip.classList.toggle('active');
+    chartInd[chip.dataset.ind]=chip.classList.contains('active');
+    if(lastCandles.length) drawLWChart(lastCandles,window._signalMarkers||[]);
+  });
+  window.addEventListener('resize',()=>{ refreshLWResize(); });
+  const _chartPanelEl=document.getElementById('chartPanel');
+  if(_chartPanelEl && window.ResizeObserver){
+    new ResizeObserver(()=>refreshLWResize()).observe(_chartPanelEl);
+  }
+});
+
+async function refreshGauges(){
+  try{
+    const latest=await fetchJSON('/api/ml/latest');
+    const panel=document.getElementById('gaugePanel');
+    const m1=latest['M1'], m5=latest['M5'];
+    panel.innerHTML=gaugeSVG(m1?{...m1,timeframe:'M1'}:null)+gaugeSVG(m5?{...m5,timeframe:'M5'}:null);
+  }catch(e){}
+}
+
+async function refreshHeaderSignals(){
+  try{
+    const latest=await fetchJSON('/api/ml/latest');
+    const sigEl=(id,g)=>{ const el=document.getElementById(id);
+      if(!g) el.textContent='–';
+      else {
+        const c=(g.confidence||0)*100;
+        const col=g.signal==='CALL'?'var(--green)':(g.signal==='PUT'?'var(--red)':'var(--muted)');
+        const hi=(g.confidence||0)>0.7?` <span class="hi-badge">★${Math.round(c)}%</span>`:'';
+        el.innerHTML=`<span style="color:${col}">${g.signal} ${Math.round(c)}%</span>${hi}`;
+      }
+    };
+    sigEl('hM1',latest['M1']); sigEl('hM5',latest['M5']);
+  }catch(e){}
+}
+
+function feedRow(r){
+  const hi=(r.confidence!=null&&r.confidence>0.7)?' <span class="hi-badge">HIGH</span>':'';
+  return `<div class="feed-row">
+    <span class="fdir ${r.direction||''}">${r.direction||'–'}</span>
+    <span class="ftime">${fmtHM(r.signal_time)}</span>
+    <span class="fprice">${r.entry_price!=null?r.entry_price.toFixed(2):'–'}</span>
+    <span class="fconf">${r.confidence!=null?(r.confidence*100).toFixed(1)+'%':'–'}${hi}</span>
+    <span class="pill ${r.result}">${r.result}</span>
+  </div>`;
+}
+
+async function refreshMlTab(){
+  try{
+    const s=await fetchJSON('/api/ml/stats');
+    renderStat(document.getElementById('mlWr'),s.n_resolved?s.winrate+'%':'–',s.n_resolved?'cyan':'muted');
+    document.getElementById('mlWrSub').textContent=s.n_resolved?`[${s.ci_low}% – ${s.ci_high}%] (${s.wins}/${s.n_resolved})`:'';
+    document.getElementById('mlN').textContent=`${s.n_resolved} / ${s.n_pending}`;
+    document.getElementById('mlNsub').textContent=`ชนะ ${s.wins} / แพ้ ${s.losses}`;
+    document.getElementById('mlBe').textContent=s.breakeven+'%';
+    document.getElementById('mlMargin').textContent=s.n_resolved?fmtMargin(s.margin):'–';
+    document.getElementById('mlCi').textContent=s.n_resolved?`[${s.ci_low}%, ${s.ci_high}%]`:'–';
+    const byTf=await fetchJSON('/api/ml/stats/by_timeframe');
+    const t1=byTf['M1']||{}, t5=byTf['M5']||{};
+    const setWin=(id,v)=>{const el=document.getElementById(id);
+      if(v&&v.n_resolved){el.textContent=v.winrate+'%';} else {el.textContent='–';}};
+    setWin('mlWrM1',t1); setWin('mlWrM5',t5);
+    const setN=(id,v)=>{const el=document.getElementById(id);if(el) el.textContent=v&&v.n_resolved?v.n_resolved:'–';};
+    setN('mlM1N',t1); setN('mlM5N',t5);
+    const cur=moneyReport?.settings?.currency||'THB';
+    const setPnl=(id,v)=>{const el=document.getElementById(id);
+      if(!el)return;
+      if(v&&v.n_resolved&&v.pnl_money!=null){el.textContent=(v.pnl_money>0?'+':'')+Number(v.pnl_money).toLocaleString('th-TH',{maximumFractionDigits:0})+' '+cur;}
+      else el.textContent='–';};
+    setPnl('mlM1Pnl',t1); setPnl('mlM5Pnl',t5);
+  }catch(e){}
+  try{
+    const rows=await fetchJSON('/api/ml/signals?limit=100');
+    const body=document.querySelector('#mlFullTable tbody');
+    const empty=document.getElementById('mlEmpty');
+    if(!rows.length){body.innerHTML='';empty.style.display='block';return;}
+    empty.style.display='none';
+    body.innerHTML=rows.map(r=>`<tr>
+      <td>${fmtTime(r.signal_time)}</td>
+      <td><b>${r.timeframe||'M1'}</b></td>
+      <td class="${dirClass(r.direction)}">${r.direction||'–'}</td>
+      <td class="mono">${r.entry_price!=null?r.entry_price.toFixed(2):'–'}</td>
+      <td class="mono">${r.exit_price!=null?r.exit_price.toFixed(2):'–'}</td>
+      <td class="mono">${r.confidence!=null?(r.confidence*100).toFixed(1)+'%':'–'}</td>
+      <td class="mono">${r.threshold_used!=null?(r.threshold_used*100).toFixed(0)+'%':'–'}</td>
+      <td class="mono">${r.horizon_min}m</td>
+      <td style="font-size:10px;color:var(--muted)">${r.model_version||'–'}${r.confidence!=null&&r.confidence>0.7?' <span class="hi-badge">HIGH</span>':''}</td>
+      <td><span class="pill ${r.result}">${r.result}</span></td>
+    </tr>`).join('');
+  }catch(e){}
+  try{
+    const rows=await fetchJSON('/api/ml/signals?limit=8');
+    document.getElementById('mlRecentFeed').innerHTML=rows.length?rows.map(feedRow).join(''):'<div class="empty">ยังไม่มีสัญญาณ</div>';
+  }catch(e){}
+}
+
+async function refreshSetupTab(){
+  try{
+    const s=await fetchJSON('/api/stats');
+    renderStat(document.getElementById('setWr'),s.n_resolved?s.winrate+'%':'–',s.n_resolved?'blue':'muted');
+    document.getElementById('setWrSub').textContent=s.n_resolved?`[${s.ci_low}% – ${s.ci_high}%] (${s.wins}/${s.n_resolved})`:'';
+    document.getElementById('setN').textContent=`${s.n_resolved} / ${s.n_pending}`;
+    document.getElementById('setNsub').textContent=`ชนะ ${s.wins} / แพ้ ${s.losses}`;
+    document.getElementById('setBe').textContent=s.breakeven+'%';
+    document.getElementById('setMargin').textContent=s.n_resolved?fmtMargin(s.margin):'–';
+    document.getElementById('setCi').textContent=s.n_resolved?`[${s.ci_low}%, ${s.ci_high}%]`:'–';
+    const byTf=await fetchJSON('/api/stats/by_timeframe');
+    const t1=byTf['M1']||{}, t5=byTf['M5']||{};
+    const setWin=(id,v)=>{const el=document.getElementById(id);
+      if(v&&v.n_resolved){el.textContent=v.winrate+'%';} else {el.textContent='–';}};
+    setWin('setWrM1',t1); setWin('setWrM5',t5);
+    const setN=(id,v)=>{const el=document.getElementById(id);if(el) el.textContent=v&&v.n_resolved?v.n_resolved:'–';};
+    setN('setM1N',t1); setN('setM5N',t5);
+    const cur=moneyReport?.settings?.currency||'THB';
+    const setPnl=(id,v)=>{const el=document.getElementById(id);
+      if(!el)return;
+      if(v&&v.n_resolved&&v.pnl_money!=null){el.textContent=(v.pnl_money>0?'+':'')+Number(v.pnl_money).toLocaleString('th-TH',{maximumFractionDigits:0})+' '+cur;}
+      else el.textContent='–';};
+    setPnl('setM1Pnl',t1); setPnl('setM5Pnl',t5);
+  }catch(e){}
+  try{
+    const sym=document.getElementById('setupSymFilter').value;
+    const rows=await fetchJSON('/api/signals?limit=100'+(sym?'&symbol='+encodeURIComponent(sym):''));
+    const body=document.querySelector('#setupTable tbody');
+    const empty=document.getElementById('setEmpty');
+    if(!rows.length){body.innerHTML='';empty.style.display='block';return;}
+    empty.style.display='none';
+    body.innerHTML=rows.map(r=>{
+      const impLabel=r.importance===1?'IMP1':r.importance===2?'IMP2':'';
+      const impColor=r.importance===1?'var(--red)':r.importance===2?'var(--yellow)':'var(--muted)';
+      return `<tr>
+      <td>${fmtTime(r.signal_time)}</td>
+      <td><b>${(r.symbol||'frxXAUUSD').replace('frx','')}</b></td>
+      <td><b>${r.timeframe||'M1'}</b></td>
+      <td style="color:${impColor};font-weight:700;font-size:11px;">${impLabel||'–'}</td>
+      <td class="${dirClass(r.direction)}">${r.direction}</td>
+      <td class="mono">${r.entry_price!=null?r.entry_price.toFixed(5):'–'}</td>
+      <td class="mono">${r.exit_price!=null?r.exit_price.toFixed(5):'–'}</td>
+      <td class="mono">${r.score!=null?r.score.toFixed(1)+'/'+(r.total||'–'):'–'}</td>
+      <td><span class="tier ${r.tier||'NONE'}">${TIER_ACTION[r.tier]?r.tier:'–'}</span></td>
+      <td class="mono">${r.details?Object.values(r.details).filter(d=>d.frac!=null?d.frac>=0.999:d.ok).length+'/11':'–'}</td>
+      <td><span class="pill ${r.result}">${r.result}</span></td>
+    </tr>`;}).join('');
+  }catch(e){}
+  await refreshTickTouchResearch();
+}
+
+const TT_CASE_COLORS={'TICK_TOUCH':'var(--cyan)','WICK_BOUNCE':'var(--yellow)','BREAKOUT':'var(--green)'};
+const TT_COND_NAMES={
+  'c1_fractal_sr':'1. Fractal S/R','c2_bb_break':'2. BB Break','c3_rsi_ob_os':'3. RSI OVB/OVS',
+  'c4_rsi_div':'4. RSI Divergence','c5_adx':'5. ADX > 20','c6_pa':'6. PA Confirmation',
+  'c7_fractal_trend':'7. Fractal Trend','c8_grip':'8. Grip','c9_bb_width':'9. BB Width',
+  'c10_mtf':'10. MTF Trend','c11_ema_slope':'11. EMA Slope',
+};
+
+async function refreshTickTouchResearch(){
+  try{
+    const s=await fetchJSON('/api/ticktouch/stats');
+    // Case cards
+    const cards=document.getElementById('ttCaseCards');
+    if(cards){
+      const cases=Object.entries(s.by_case||{});
+      cards.innerHTML=cases.length?cases.map(([k,v])=>`
+        <div style="background:var(--bg);border:1px solid ${TT_CASE_COLORS[k]||'var(--border)'};border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:11px;color:var(--muted);">${TT_CASE_COLORS[k]?k:'–'}</div>
+          <div style="font-size:20px;font-weight:800;color:${v.wr>=60?'var(--green)':(v.wr>=50?'var(--yellow)':'var(--red)')};">${v.wr}%</div>
+          <div style="font-size:11px;color:var(--muted);">${v.wins}W / ${v.losses}L (${v.n})</div>
+        </div>`).join('')+'<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;"><div style="font-size:11px;color:var(--muted);">TOTAL</div><div style="font-size:20px;font-weight:800;">'+(s.wr||0)+'%</div><div style="font-size:11px;color:var(--muted);">'+s.wins+'W ('+s.resolved+') · ⏳'+s.pending+'</div></div>'
+        :'<div class="empty" style="grid-column:1/-1;">ยังไม่มีข้อมูล research — รอราคาแตะ EMA200</div>';
+    }
+    // Condition vote table
+    const condBody=document.querySelector('#ttCondTable tbody');
+    if(condBody){
+      const conds=Object.entries(s.by_condition||{})
+        .sort((a,b)=>(b[1].wr_when_true||0)-(a[1].wr_when_true||0));
+      condBody.innerHTML=conds.length?conds.map(([k,v])=>`
+        <tr>
+          <td>${TT_COND_NAMES[k]||k}</td>
+          <td>${v.true_n}</td>
+          <td>${v.true_wins}</td>
+          <td><b style="color:${v.wr_when_true>=60?'var(--green)':(v.wr_when_true>=50?'var(--yellow)':'var(--red)')}">${v.wr_when_true}%</b></td>
+          <td style="color:var(--muted);">${v.false_n?v.wr_when_false+'%':'–'}</td>
+        </tr>`).join(''):'<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:14px;">รอข้อมูล resolved</td></tr>';
+    }
+    // Recent touches
+    const recBody=document.querySelector('#ttRecentTable tbody');
+    if(recBody){
+      const rec=s.recent||[];
+      recBody.innerHTML=rec.length?rec.map(r=>`
+        <tr>
+          <td>${fmtTime(r.signal_time)}</td>
+          <td>${(r.symbol||'').replace('frx','')}</td>
+          <td style="color:${TT_CASE_COLORS[r.touch_case]||'inherit'};">${(r.touch_case||'').replace('_TOUCH','').replace('_',' ')}</td>
+          <td class="${dirClass(r.direction)}">${r.direction}</td>
+          <td class="mono">${r.entry_price?.toFixed(2)}</td>
+          <td class="mono">${r.exit_price!=null?r.exit_price.toFixed(2):'–'}</td>
+          <td class="mono">${r.passed_count}/10</td>
+          <td><span class="pill ${r.result}">${r.result}</span></td>
+        </tr>`).join(''):'<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px;">ยังไม่มีเหตุการณ์แตะ</td></tr>';
+    }
+  }catch(e){}
+}
+
+const SETUP_STEPS=[
+  ['c1_fractal_sr','1. Fractal 15 S/R'],
+  ['c2_bb_break','2. BB Break'],
+  ['c3_rsi_ob_os','3. RSI OVB/OVS'],
+  ['c4_rsi_div','4. RSI Divergence'],
+  ['c5_adx','5. ADX > 20'],
+  ['c6_pa','6. PA Confirmation'],
+  ['c7_fractal_trend','7. Fractal Trend'],
+  ['c8_grip','8. Grip'],
+  ['c9_bb_width','9. BB Width'],
+  ['c10_mtf','10. MTF Trend'],
+];
+const BIAS_TXT={
+  'BULLISH_TREND':'▲ CALL',
+  'BEARISH_TREND':'▼ PUT',
+};
+const TIER_ACTION={
+  'FIRE':'🔥 Ready',
+  'WATCH':'⏳ Waiting',
+  'NONE':'–',
+};
+const IMPORTANCE_TXT={
+  1:'🚨 EMA200 Touch',
+  2:'⏳ EMA100 Cross',
+};
+const _symShort=s=>(s||'').replace(/^frx/,'').replace(/_/g,'');
+function renderSetupCard(s){
+  if(!s) return `<div class="guide-card NONE"><div class="guide-head"><span class="guide-tf">Setup</span></div><div class="guide-action NONE">ยังไม่มีข้อมูล</div></div>`;
+  const max=(s.max_score||s.total||10);
+  const details=s.details||{};
+  const condLog=s.conditions_log||{};
+  const source=Object.keys(condLog).length>0?condLog:details;
+  const known=SETUP_STEPS.map(x=>x[0]);
+  const steps=[];
+  SETUP_STEPS.forEach(([key,label])=>{
+    const d=source[key]||details[key]; if(!d) return;
+    const frac=d.frac!=null?d.frac:(d.ok?1:(d.pass!=null?(d.pass?1:0):0));
+    const cls=frac>=0.999?'pass':(frac>0?'part':'fail');
+    const ico=frac>=0.999?'✓':(frac>0?'◐':'✕');
+    steps.push(`<li><span class="guide-ico ${cls}">${ico}</span><span class="gname">${label}</span><span class="gnote">${d.note||''}</span></li>`);
+  });
+  const tier=s.tier||'NONE';
+  const bias=s.bias||'';
+  const biasTxt=BIAS_TXT[bias]||'NEUTRAL';
+  const imp=s.importance||0;
+  const condPassed=s.conditions_passed||0;
+  const condTotal=s.conditions_total||10;
+  const sym=s.symbol||'';
+  const scorePct=Math.round((condPassed/Math.max(condTotal,1))*100);
+  const scoreCls=tier==='FIRE'?'ok':(tier==='WATCH'?'wait':'none');
+  return `<div class="guide-card ${tier}">
+    <div class="guide-head">
+      <span class="guide-tf">${_symShort(sym)||'XAUUSD'} · ${s.timeframe||'M5'}</span>
+      <span class="guide-score ${scoreCls}">${condPassed}/${condTotal}</span>
+    </div>
+    <div class="guide-action ${tier}">${TIER_ACTION[tier]||'–'} <span class="${dirClass(s.direction)}">${biasTxt}</span>${imp?` · ${IMPORTANCE_TXT[imp]}`:''}</div>
+    <ul class="guide-steps">${steps.join('')}</ul>
+    ${s.entry_trigger_note?`<div class="guide-note ${tier==='FIRE'?'ready':'wait'}">${s.entry_trigger_note}</div>`:''}
+  </div>`;
+}
+function renderSetupCompact(s){
+  if(!s) return '';
+  const tier=s.tier||'NONE';
+  const bias=s.bias||'';
+  const imp=s.importance||0;
+  const condPassed=s.conditions_passed||0;
+  const condTotal=s.conditions_total||10;
+  const sym=s.symbol||'';
+  const biasTxt=BIAS_TXT[bias]||'–';
+  const tierCls=tier==='FIRE'?'ok':(tier==='WATCH'?'wait':'none');
+  return `<div class="setup-row" data-sym="${sym}" onclick="this.classList.toggle('expanded')">
+    <div class="setup-row-head">
+      <span class="setup-sym">${_symShort(sym)}</span>
+      <span class="setup-tier ${tierCls}">${tier}</span>
+      <span class="setup-dir ${dirClass(s.direction)}">${biasTxt}</span>
+      <span class="setup-score">${condPassed}/${condTotal}</span>
+    </div>
+    <div class="setup-row-detail">${renderSetupCard(s)}</div>
+  </div>`;
+}
+
+function _getExpandedSetup(){
+  const s=new Set();
+  document.querySelectorAll('.setup-row.expanded').forEach(r=>{ if(r.dataset.sym) s.add(r.dataset.sym); });
+  return s;
+}
+function _restoreExpandedSetup(container,expanded){
+  container.querySelectorAll('.setup-row').forEach(r=>{ if(expanded.has(r.dataset.sym)) r.classList.add('expanded'); });
+}
+async function refreshSetupMini(){
+  try{
+    const all=await fetchJSON('/api/setup/latest-all');
+    const container=document.getElementById('setupMini');
+    if(!container) return;
+    const expanded=_getExpandedSetup();
+    const order=['frxXAUUSD','frxEURUSD','frxGBPUSD','frxUSDJPY','frxAUDUSD','frxUSDCAD','frxUSDCHF','frxNZDUSD','R_100'];
+    const sorted=Object.keys(all).sort((a,b)=>order.indexOf(a)-order.indexOf(b));
+    const rows=[];
+    for(const sym of sorted){
+      const tfs=all[sym];
+      const s=tfs['M5']||tfs['M1'];
+      if(s) rows.push(renderSetupCompact({...s,symbol:sym}));
+    }
+    container.innerHTML=rows.length?rows.join(''):`<div class="empty" style="padding:16px;">รอ setup_feed.py ทำงาน</div>`;
+    _restoreExpandedSetup(container,expanded);
+  }catch(e){}
+}
+
+async function refreshSetupAll(){
+  try{
+    const all=await fetchJSON('/api/setup/latest-all');
+    const m1El=document.getElementById('setupAllM1');
+    const m5El=document.getElementById('setupAllM5');
+    if(!m1El||!m5El) return;
+    const expanded1=_getExpandedSetup(), expanded5=_getExpandedSetup();
+    const order=['frxXAUUSD','frxEURUSD','frxGBPUSD','frxUSDJPY','frxAUDUSD','frxUSDCAD','frxUSDCHF','frxNZDUSD','R_100'];
+    const sorted=Object.keys(all).sort((a,b)=>order.indexOf(a)-order.indexOf(b));
+    const m1Cards=[], m5Cards=[];
+    for(const sym of sorted){
+      const tfs=all[sym];
+      if(tfs['M5']) m5Cards.push(renderSetupCompact({...tfs['M5'],symbol:sym}));
+      if(tfs['M1']) m1Cards.push(renderSetupCompact({...tfs['M1'],symbol:sym}));
+    }
+    m1El.innerHTML=m1Cards.length?m1Cards.join(''):`<div class="empty" style="padding:16px;">รอข้อมูล</div>`;
+    m5El.innerHTML=m5Cards.length?m5Cards.join(''):`<div class="empty" style="padding:16px;">รอข้อมูล</div>`;
+    _restoreExpandedSetup(m1El,expanded1);
+    _restoreExpandedSetup(m5El,expanded5);
+  }catch(e){}
+}
+
+async function refreshJournalTab(){
+  try{
+    const j=await fetchJSON('/api/journal/stats');
+    const wr = j.winrate || 0;
+    renderStat(document.getElementById('jWr'), wr+'%', j.n?'green':'muted');
+    document.getElementById('jWrSub').textContent = j.n
+      ? `${j.wins}W / ${j.losses}L · ${j.daily.length} วัน · CI [${j.ci_low}%–${j.ci_high}%]`
+      : 'ยังไม่มีผล';
+    let set0={};
+    let cfdData={points:[]};
+    try{
+      set0=await fetchJSON('/api/journal/settings')||{};
+      const cp=await fetchJSON('/api/cfd/paper')||{};
+      cfdData={points:(cp.trades||[]).filter(t=>t.exit_time), base:5000};
+    }catch(e){}
+    drawEquityFull({
+      opt:{points:j.equity||[], capital:set0.capital||0, stake:set0.stake||1, cur:set0.currency||'THB'},
+      cfd:cfdData,
+    });
+    const daily=j.daily||[];
+    document.querySelector('#dailyTable tbody').innerHTML=daily.map(d=>`
+      <tr><td>${d.day}</td><td class="mono">${d.n}</td><td class="mono">${d.wins}</td><td class="mono">${d.winrate}%</td>
+      <td class="mono ${d.pnl>0?'dir-call':'dir-put'}">${(d.pnl>0?'+':'')+d.pnl.toFixed(2)}</td></tr>`).join('')
+      || '<tr><td colspan="5" class="empty">ยังไม่มีข้อมูล</td></tr>';
+  }catch(e){}
+  try{
+    const models=await fetchJSON('/api/models');
+    document.querySelector('#modelTable tbody').innerHTML=models.map(m=>`
+      <tr>
+        <td><b>${m.model_key}</b></td>
+        <td>${m.version}</td>
+        <td class="mono">${m.horizon}</td>
+        <td class="mono">${m.n_rows||'–'}</td>
+        <td class="mono">${m.auc_test!=null?m.auc_test:'–'}</td>
+        <td class="mono">${m.chosen_conf!=null?m.chosen_conf:'–'}</td>
+        <td style="font-size:10px;color:var(--muted)">${m.feature_set||'–'}</td>
+      </tr>`).join('') || '<tr><td colspan="7" class="empty">ยังไม่มีโมเดลที่ลงทะเบียน</td></tr>';
+  }catch(e){}
+}
+
+let moneyReport=null;
+function setKpi(id,val,cls){const el=document.getElementById(id); if(!el)return; el.textContent=val; el.className='val '+(cls||'muted');}
+function fmtMoney(v,cur){ return (v>0?'+':'')+Number(v).toLocaleString('th-TH',{maximumFractionDigits:2})+' '+cur; }
+
+async function refreshJournalMoney(){
+  try{
+    const r=await fetchJSON('/api/journal/report');
+    moneyReport=r;
+    const cur=r.settings.currency||'THB';
+    const active=document.activeElement;
+    if(active!==document.getElementById('setCapital')) document.getElementById('setCapital').value=r.settings.capital;
+    if(active!==document.getElementById('setStake')) document.getElementById('setStake').value=r.settings.stake;
+    if(active!==document.getElementById('setCurrency')) document.getElementById('setCurrency').value=cur;
+    const A=r.summary.ALL, ML=r.summary.ML, ST=r.summary.SETUP;
+    setKpi('mPnlAll',fmtMoney(A.pnl_money,cur),A.pnl_money>0?'green':(A.pnl_money<0?'red':'muted'));
+    document.getElementById('mPnlAllSub').textContent=`${A.n} trades · ${A.wins}W / ${A.losses}L · ROI ${A.roi}%`;
+    setKpi('mPnlMl',fmtMoney(ML.pnl_money,cur),ML.pnl_money>0?'green':(ML.pnl_money<0?'red':'muted'));
+    document.getElementById('jMlN').textContent=ML.n;
+    document.getElementById('jMlWr').textContent=ML.n?ML.winrate+'%':'–';
+    document.getElementById('mRoiMl').textContent=`ROI ${ML.roi}%`;
+    const mlBar=document.getElementById('jMlBar');
+    if(mlBar) mlBar.style.width=Math.min(ML.winrate||0,100)+'%';
+    setKpi('mPnlSt',fmtMoney(ST.pnl_money,cur),ST.pnl_money>0?'green':(ST.pnl_money<0?'red':'muted'));
+    document.getElementById('jRbN').textContent=ST.n;
+    document.getElementById('jRbWr').textContent=ST.n?ST.winrate+'%':'–';
+    document.getElementById('mRoiSt').textContent=`ROI ${ST.roi}%`;
+    const rbBar=document.getElementById('jRbBar');
+    if(rbBar) rbBar.style.width=Math.min(ST.winrate||0,100)+'%';
+    const bal=r.daily.length?r.daily[r.daily.length-1].balance:r.settings.capital;
+    document.getElementById('mBalance').textContent=Number(bal).toLocaleString('th-TH',{maximumFractionDigits:2})+' '+cur;
+    document.getElementById('mBalanceSub').textContent='ทุน '+Number(r.settings.capital).toLocaleString('th-TH')+' '+cur;
+    // CFD Balance
+    const cfd=r.cfd_summary||{};
+    const cfdBal=cfd.balance!=null?cfd.balance:cfd.capital||5000;
+    const cfdPnl=cfd.pnl_money||0;
+    const cfdEl=document.getElementById('mCfdBalance');
+    if(cfdEl){
+      cfdEl.textContent=Number(cfdBal).toLocaleString('th-TH',{maximumFractionDigits:2})+' '+cur;
+      cfdEl.style.color=cfdPnl>0?'var(--green)':(cfdPnl<0?'var(--red)':'var(--text)');
+    }
+    const cfdSubEl=document.getElementById('mCfdBalanceSub');
+    if(cfdSubEl) cfdSubEl.textContent='ทุน '+Number(cfd.capital||5000).toLocaleString('th-TH')+' '+cur+' · P&L '+(cfdPnl>=0?'+':'')+Number(cfdPnl).toLocaleString('th-TH',{maximumFractionDigits:2});
+    renderPeriodTable();
+  }catch(e){}
+}
+
+function renderPeriodTable(){
+  if(!moneyReport) return;
+  const activeTab = document.querySelector('.j-ptab.active');
+  const kind = activeTab ? activeTab.dataset.period : 'daily';
+  const rows=moneyReport[kind]||[];
+  const cur=moneyReport.settings.currency||'THB';
+  const pnl=(v)=>`${v>0?'+':''}${Number(v).toLocaleString('th-TH',{maximumFractionDigits:2})} ${cur}`;
+  const body=document.querySelector('#periodTable tbody');
+  body.innerHTML=rows.slice().reverse().map(d=>`
+    <tr>
+      <td class="mono"><b>${d.period}</b></td>
+      <td class="mono">${d.ALL.n}</td><td class="mono ${d.ALL.winrate>=50?'dir-call':'dir-put'}">${d.ALL.n?d.ALL.winrate+'%':'–'}</td>
+      <td class="mono ${d.ALL.pnl_money>0?'dir-call':(d.ALL.pnl_money<0?'dir-put':'')}">${d.ALL.n?pnl(d.ALL.pnl_money):'–'}</td>
+      <td class="mono">${d.ALL.n?d.ALL.roi+'%':'–'}</td>
+      <td class="mono">${d.ML.n}</td><td class="mono">${d.ML.n?d.ML.winrate+'%':'–'}</td>
+      <td class="mono ${d.ML.pnl_money>0?'dir-call':(d.ML.pnl_money<0?'dir-put':'')}">${d.ML.n?pnl(d.ML.pnl_money):'–'}</td>
+      <td class="mono">${d.SETUP.n}</td><td class="mono">${d.SETUP.n?d.SETUP.winrate+'%':'–'}</td>
+      <td class="mono ${d.SETUP.pnl_money>0?'dir-call':(d.SETUP.pnl_money<0?'dir-put':'')}">${d.SETUP.n?pnl(d.SETUP.pnl_money):'–'}</td>
+      <td class="mono">${Number(d.balance).toLocaleString('th-TH',{maximumFractionDigits:2})}</td>
+    </tr>`).join('') || '<tr><td colspan="12" class="empty">ยังไม่มีข้อมูล</td></tr>';
+}
+
+let lwEqFullChart=null, lwEqFullSeries=null, lwEqFullSeries2=null, lwEqFullBase=null, lwEqFullBase2=null;
+function drawEquityFull(payload){
+  const el=document.getElementById('equityFullChart'); if(!el) return;
+  const b=_buildEqData(payload&&payload.opt, payload&&payload.cfd);
+  const cur=(payload&&payload.opt&&payload.opt.cur)||'THB';
+  const fmt=p=>Number(p).toLocaleString('th-TH',{maximumFractionDigits:0});
+  const emptyEl=document.getElementById('eqEmptyFull');
+  const statsEl=document.getElementById('eqStatsFull');
+  const hasData=b.optN+b.cfdN>0;
+  if(emptyEl) emptyEl.style.display=hasData?'none':'block';
+  if(!window.LightweightCharts) return;
+  if(!lwEqFullChart){
+    lwEqFullChart=LightweightCharts.createChart(el,{
+      height:el.clientHeight||260, width:el.clientWidth||300,
+      layout:{background:{color:'transparent'},textColor:'#787B86',fontFamily:'IBM Plex Mono, monospace'},
+      grid:{vertLines:{color:'#1E222D'},horzLines:{color:'#1E222D'}},
+      rightPriceScale:{borderColor:'#2A2E39'},
+      timeScale:{borderColor:'#2A2E39',rightOffset:2},
+    });
+    window.addEventListener('resize',()=>{ if(lwEqFullChart&&el.clientWidth>0) lwEqFullChart.applyOptions({width:el.clientWidth}); });
+  }
+  if(b.cfdN && !lwEqFullSeries){
+    lwEqFullSeries=lwEqFullChart.addAreaSeries({
+      lineColor:'#26A69A', topColor:'rgba(38,166,154,0.28)', bottomColor:'rgba(38,166,154,0.02)',
+      lineWidth:2, priceLineVisible:false, lastValueVisible:false,
+      priceFormat:{type:'custom',formatter:p=>'$'+fmt(p)},
+    });
+    lwEqFullBase=lwEqFullSeries.createPriceLine({price:b.cfdBase||0,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,title:'CFD ทุน'});
+  }
+  if(b.optN && !lwEqFullSeries2){
+    lwEqFullSeries2=lwEqFullChart.addAreaSeries({
+      lineColor:'#2962FF', topColor:'rgba(41,98,255,0.20)', bottomColor:'rgba(41,98,255,0.02)',
+      lineWidth:2, priceLineVisible:false, lastValueVisible:false,
+      priceFormat:{type:'custom',formatter:p=>fmt(p)+' '+cur},
+    });
+    lwEqFullBase2=lwEqFullSeries2.createPriceLine({price:b.optCapitalBase||0,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,title:'Option ทุน'});
+  }
+  if(lwEqFullSeries) lwEqFullSeries.setData(b.cfdPts);
+  if(lwEqFullSeries2) lwEqFullSeries2.setData(b.optPts);
+  if(lwEqFullBase) lwEqFullBase.applyOptions({price:b.cfdBase||0});
+  if(lwEqFullBase2) lwEqFullBase2.applyOptions({price:b.optCapitalBase||0});
+  lwEqFullChart.applyOptions({width:el.clientWidth||300,height:el.clientHeight||260});
+  if(hasData) lwEqFullChart.timeScale().fitContent();
+  if(statsEl){
+    const chips=[];
+    if(b.cfdN) chips.push(`CFD <b>$${fmt((b.cfdBase||0)+b.cfdPnl)}</b> <span class="eq-${b.cfdPnl>=0?'up':'dn'}">(${b.cfdPnl>=0?'+':''}${fmt(b.cfdPnl)})</span> · ${b.cfdN} เทรด`);
+    if(b.optN) chips.push(`Option <b>${fmt((b.optCapitalBase||0)+b.optPnl)} ${cur}</b> <span class="eq-${b.optPnl>=0?'up':'dn'}">(${b.optPnl>=0?'+':''}${fmt(b.optPnl)})</span> · ${b.optN} เทรด`);
+    if(!chips.length) chips.push('รอข้อมูลเทรดที่จบแล้ว');
+    statsEl.innerHTML=chips.join('<span style="color:var(--border)"> | </span>');
+  }
+}
+
+function updateClock(){
+  document.getElementById('hUtc').textContent=new Date().toISOString().substring(11,19);
+  const h=new Date().getUTCHours();
+  document.getElementById('hSession').textContent=h>=12&&h<21?'NY':(h>=7&&h<16?'London':(h>=0&&h<8?'Asia':'อื่นๆ'));
+}
+
+document.getElementById('setupSymFilter')?.addEventListener('change',()=>refreshSetupTab());
+document.querySelectorAll('.j-ptab').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.j-ptab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    renderPeriodTable();
+  });
+});
+document.getElementById('btnSaveSettings').addEventListener('click', async ()=>{
+  const st=document.getElementById('settStatus');
+  try{
+    const res=await fetch('/api/journal/settings',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        capital:parseFloat(document.getElementById('setCapital').value),
+        stake:parseFloat(document.getElementById('setStake').value),
+        currency:document.getElementById('setCurrency').value,
+      })});
+    if(res.ok){ st.textContent='บันทึกแล้ว ✓'; await refreshJournalMoney(); }
+    else st.textContent='บันทึกไม่สำเร็จ — ตรวจข้อมูล';
+  }catch(e){ st.textContent='บันทึกไม่สำเร็จ — connection error'; }
+  setTimeout(()=>st.textContent='',3000);
+});
+document.getElementById('btnExportJ')?.addEventListener('click', ()=>{
+  document.getElementById('jSettings').classList.add('open');
+  window.scrollTo({top:0,behavior:'smooth'});
+});
+document.getElementById('btnExport').addEventListener('click', ()=>{
+  const s=document.getElementById('expStart').value, e=document.getElementById('expEnd').value;
+  const q=new URLSearchParams();
+  if(s) q.set('start',s);
+  if(e) q.set('end',e);
+  const qs=q.toString();
+  window.location.href='/api/journal/export'+(qs?'?'+qs:'');
+});
+
+async function runCFDBacktest(){
+  const cap=document.getElementById('cfdCapital').value;
+  const sl=document.getElementById('cfdSL').value;
+  const tp1=document.getElementById('cfdTP1').value;
+  const tp2=document.getElementById('cfdTP2').value;
+  const spread=document.getElementById('cfdSpread').value;
+  const risk=document.getElementById('cfdRisk').value/100;
+  const stype=document.getElementById('cfdSignalType').value;
+  const q=new URLSearchParams({capital:cap,sl_pips:sl,tp1_pips:tp1,tp2_pips:tp2,
+    spread_pips:spread,risk_pct:risk,signal_type:stype});
+  try{
+    const s=document.getElementById('cfdSummary');
+    s.innerHTML='<div style="color:var(--muted);font-size:11px;">กำลังคำนวณ...</div>';
+    const data=await fetchJSON('/api/cfd/backtest?'+q);
+    renderCFDSummary(data);
+    renderCFDCompare(data);
+    renderCFDTrades(data);
+  }catch(e){
+    document.getElementById('cfdSummary').innerHTML='<div style="color:var(--red);">Error: '+e.message+'</div>';
+  }
+}
+function renderCFDSummary(d){
+  const el=document.getElementById('cfdSummary');
+  const p=d.params;
+  const items=[
+    {label:'Signals',val:d.total,color:'var(--text)'},
+    {label:'Lot Size',val:p.lot_size,color:'var(--cyan)'},
+    {label:'Risk/Trade',val:'$'+p.risk_per_trade,color:'var(--yellow)'},
+    {label:'TP1 WR',val:d.tp1.wr+'%',color:d.tp1.wr>=54.95?'var(--green)':'var(--red)'},
+    {label:'TP1 P&L',val:'$'+d.tp1.pnl.toFixed(2),color:d.tp1.pnl>=0?'var(--green)':'var(--red)'},
+    {label:'TP2 WR',val:d.tp2.wr+'%',color:d.tp2.wr>=40?'var(--green)':'var(--red)'},
+    {label:'TP2 P&L',val:'$'+d.tp2.pnl.toFixed(2),color:d.tp2.pnl>=0?'var(--green)':'var(--red)'},
+  ];
+  el.innerHTML=items.map(i=>`<div class="j-card"><div class="j-card-label">${i.label}</div><div class="val" style="color:${i.color};font-size:16px;font-weight:800;">${i.val}</div></div>`).join('');
+}
+function renderCFDCompare(d){
+  const tbody=document.querySelector('#cfdCompareTable tbody');
+  let html='';
+  const all=['SETUP','ML'];
+  for(const sys of all){
+    const sd=d.by_type[sys]; if(!sd) continue;
+    for(const dir of ['CALL','PUT']){
+      const key=sys+'_'+dir;
+      const td=d.by_type_dir[key]; if(!td) continue;
+      const t1=td.tp1,t2=td.tp2;
+      html+=`<tr>
+        <td>${sys}</td><td class="${dir==='CALL'?'dir-call':'dir-put'}">${dir}</td>
+        <td>${t1.total}</td><td style="color:${t1.wr>=54.95?'var(--green)':'var(--red)'}">${t1.wr}%</td>
+        <td style="color:${t1.pnl>=0?'var(--green)':'var(--red)'}">$${t1.pnl.toFixed(2)}</td>
+        <td>${t2.total}</td><td style="color:${t2.wr>=40?'var(--green)':'var(--red)'}">${t2.wr}%</td>
+        <td style="color:${t2.pnl>=0?'var(--green)':'var(--red)'}">$${t2.pnl.toFixed(2)}</td>
+      </tr>`;
+    }
+  }
+  // total rows
+  html+=`<tr style="border-top:2px solid var(--border);font-weight:700;">
+    <td colspan="2">TOTAL</td>
+    <td>${d.tp1.total}</td><td style="color:${d.tp1.wr>=54.95?'var(--green)':'var(--red)'}">${d.tp1.wr}%</td>
+    <td style="color:${d.tp1.pnl>=0?'var(--green)':'var(--red)'}">$${d.tp1.pnl.toFixed(2)}</td>
+    <td>${d.tp2.total}</td><td style="color:${d.tp2.wr>=40?'var(--green)':'var(--red)'}">${d.tp2.wr}%</td>
+    <td style="color:${d.tp2.pnl>=0?'var(--green)':'var(--red)'}">$${d.tp2.pnl.toFixed(2)}</td>
+  </tr>`;
+  tbody.innerHTML=html;
+}
+function renderCFDTrades(d){
+  const tbody=document.querySelector('#cfdTradeTable tbody');
+  const trades=d.trades.slice(-100).reverse();
+  tbody.innerHTML=trades.map((t,i)=>`<tr>
+    <td>${t.id}</td><td>${t.sys}</td>
+    <td class="${t.dir==='CALL'?'dir-call':'dir-put'}">${t.dir}</td>
+    <td>${t.entry}</td>
+    <td style="color:${t.tp1==='WIN'?'var(--green)':'var(--red)'}">${t.tp1}</td>
+    <td style="color:${t.tp2==='WIN'?'var(--green)':'var(--red)'}">${t.tp2}</td>
+    <td style="color:${t.pnl1>=0?'var(--green)':'var(--red)'}">$${t.pnl1.toFixed(2)}</td>
+    <td style="color:${t.pnl2>=0?'var(--green)':'var(--red)'}">$${t.pnl2.toFixed(2)}</td>
+  </tr>`).join('');
+}
+
+async function refreshCFDPaper(){
+  try{
+    const d=await fetchJSON('/api/cfd/paper');
+    renderCFDPaperSummary(d);
+    renderCFDPaperTrades(d);
+  }catch(e){}
+}
+function renderCFDPaperSummary(d){
+  const el=document.getElementById('cfdPaperSummary');
+  if(!el) return;
+  const wrColor=d.wr>=54.95?'var(--green)':d.wr>=40?'var(--yellow)':'var(--red)';
+  const pnlColor=d.total_pnl>=0?'var(--green)':'var(--red)';
+  const items=[
+    {label:'Total Trades',val:d.total,color:'var(--text)'},
+    {label:'Open',val:d.open,color:'var(--cyan)'},
+    {label:'TP1 Hits',val:d.tp1,color:'var(--green)'},
+    {label:'TP2 Hits',val:d.tp2,color:'var(--green)'},
+    {label:'SL Hits',val:d.sl,color:'var(--red)'},
+    {label:'Win Rate',val:d.wr+'%',color:wrColor},
+    {label:'Total P&L',val:'$'+d.total_pnl.toFixed(2),color:pnlColor},
+  ];
+  el.innerHTML=items.map(i=>`<div class="j-card"><div class="j-card-label">${i.label}</div><div class="val" style="color:${i.color};font-size:15px;font-weight:800;">${i.val}</div></div>`).join('');
+}
+function renderCFDPaperTrades(d){
+  const tbody=document.querySelector('#cfdPaperTable tbody');
+  if(!tbody) return;
+  const trades=d.trades.slice(-50).reverse();
+  tbody.innerHTML=trades.map(t=>{
+    const rc=t.result==='TP1'||t.result==='TP2'?'var(--green)':t.result==='SL'?'var(--red)':'var(--yellow)';
+    return `<tr>
+      <td>${t.id}</td>
+      <td>${fmtHM(t.entry_time)}</td>
+      <td>${t.signal_type}</td>
+      <td class="${t.direction==='CALL'?'dir-call':'dir-put'}">${t.direction}</td>
+      <td>${t.entry_price?.toFixed(2)}</td>
+      <td>${t.sl_price?.toFixed(2)}</td>
+      <td>${t.tp1_price?.toFixed(2)}</td>
+      <td>${t.tp2_price?.toFixed(2)}</td>
+      <td style="color:${rc}">${t.result}</td>
+      <td>${t.exit_price?.toFixed(2)??'–'}</td>
+      <td>${t.hold_bars??'–'}</td>
+      <td style="color:${(t.pnl||0)>=0?'var(--green)':'var(--red)'}">${t.pnl!=null?'$'+t.pnl.toFixed(2):'–'}</td>
+    </tr>`;
+  }).join('');
+
+  const openDiv=document.getElementById('cfdOpenTrades');
+  if(!openDiv) return;
+  const open=d.open_trades||[];
+  if(!open.length){openDiv.innerHTML='';return;}
+  openDiv.innerHTML='<h4 style="color:var(--cyan);font-size:12px;margin-bottom:8px;">OPEN TRADES ('+open.length+')</h4>'+
+    open.map(t=>{
+      const lp=t.live_price||t.entry_price;
+      const pnlCol=(t.unrealized_pnl||0)>=0?'var(--green)':'var(--red)';
+      const dirCol=t.direction==='CALL'?'var(--green)':'var(--red)';
+      const progress=t.direction==='CALL'
+        ? ((lp-t.entry_price)/(t.tp2_price-t.entry_price)*100)
+        : ((t.entry_price-lp)/(t.entry_price-t.tp2_price)*100);
+      return `<div style="background:var(--bg);border:1px solid ${t.tp1_hit?'var(--yellow)':'var(--border)'};border-radius:8px;padding:10px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="color:${dirCol};font-weight:700;">${t.direction} ${t.signal_type} #${t.signal_id} ${t.tp1_hit?'<span style="color:var(--yellow);font-size:10px;">TP1 HIT →</span>':''}</span>
+          <span style="color:var(--muted);font-size:11px;">${fmtHM(t.entry_time)}</span>
+        </div>
+        <div class="open-trade-grid">
+          <div><span style="color:var(--muted);">Entry</span><br><b>${t.effective_entry?.toFixed(2)||'?'}</b></div>
+          <div><span style="color:var(--cyan);">Live</span><br><b>${lp?.toFixed(2)||'?'}</b></div>
+          <div><span style="color:var(--red);">SL (${t.dist_to_sl??'?'})</span><br><b style="color:var(--red)">${t.sl_price?.toFixed(2)}</b></div>
+          <div><span style="color:var(--yellow);">TP1 (${t.dist_to_tp1??'?'})</span><br><b style="color:var(--yellow)">${t.tp1_price?.toFixed(2)}</b></div>
+          <div><span style="color:var(--green);">TP2 (${t.dist_to_tp2??'?'})</span><br><b style="color:var(--green)">${t.tp2_price?.toFixed(2)}</b></div>
+        </div>
+        <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <span style="font-size:11px;color:var(--muted);">P&L: </span>
+            <span style="font-weight:700;color:${pnlCol}">${t.unrealized_pnl!=null?'$'+t.unrealized_pnl.toFixed(2):'–'}</span>
+            <span style="font-size:11px;color:var(--muted);margin-left:8px;">(${t.unrealized_pips??'–'} pips)</span>
+          </div>
+          <div style="flex:0 1 120px;min-width:60px;height:6px;background:var(--bg2);border-radius:3px;overflow:hidden;">
+            <div style="height:100%;width:${Math.min(Math.max(progress||0,0),100)}%;background:${dirCol};border-radius:3px;transition:width 1s;"></div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+}
+
+async function refreshAll(){
+  updateClock();
+  // watchlist ต้องไม่ถูกบล็อกโดยแผงอื่น — เดิมรออยู่หลัง Promise.all
+  // ถ้าตัวไหนค้าง (VPS ช้า/ถูก reset) ทั้ง Promise.all ไม่จบ → watchlist ไม่มีอะไรขึ้นเลย
+  refreshWatchlist().catch(()=>{});
+  // allSettled: แผงหนึ่งพัง ห้ามลากทั้งรอบ (เดิม Promise.all → reject ทิ้ง → รอบถัดไปก็พังตาม)
+  await Promise.allSettled([
+    refreshOverview(),refreshPrice(),refreshGauges(),refreshHeaderSignals(),
+    refreshMlTab(),refreshSetupTab(),refreshSetupMini(),refreshSetupAll(),
+    refreshJournalTab(),refreshJournalMoney(),refreshCFDPaper(),
+  ]);
+  checkNewSignals();
+}
+
+(async()=>{
+  await loadSymbols();
+  requestNotifPermission();
+  refreshAll();
+  setInterval(refreshAll, REFRESH_MS);
+})();
+
+// ── fallback: ถ้า CDN หลัก (unpkg) โหลดไม่ได้ → ลอง jsdelivr แทน กันกราฟ/ปุ่มตายทั้งหน้า ──
+if(!window.LightweightCharts && !window.__lwFallback){
+  window.__lwFallback=true;
+  const _bs=document.createElement('script');
+  _bs.src='https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js';
+  _bs.onload=()=>{ try{ if(lastCandles&&lastCandles.length) drawLWChart(lastCandles,window._signalMarkers||[]); else refreshPrice(); }catch(e){ console.error('LW fallback draw fail',e); } };
+  _bs.onerror=()=>{ const c=document.getElementById('candleChart'); if(c&&!c.querySelector('canvas')) c.innerHTML='<div class="lw-fallback-msg">โหลดไลบรารีกราฟไม่สำเร็จ — ตรวจการเชื่อมต่อแล้วรีเฟรชใหม่</div>'; };
+  document.head.appendChild(_bs);
+}
+</script>
+</body>
+</html>

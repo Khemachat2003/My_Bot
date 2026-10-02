@@ -1,0 +1,64 @@
+/* responsive ทุกหน้า (tablet/mobile) — ย้ายจาก index.html เดิม บรรทัด 416–479 */
+  /* ═══ MOBILE RESPONSIVE ═══ */
+  @media(max-width:1100px){
+    .topstat{display:none;}
+  }
+  @media(max-width:600px){
+    .open-trade-grid{grid-template-columns:repeat(3,1fr);gap:8px 6px;font-size:11px;}
+  }
+  @media(max-width:380px){
+    .open-trade-grid{grid-template-columns:repeat(2,1fr);}
+  }
+  @media(max-width:820px){
+    body{font-size:13px; overflow:auto;}
+    .topbar{flex-wrap:wrap; gap:8px; padding:8px 12px;}
+    .brand .ver{display:none;}
+    .pricebox{order:3; flex:1 1 100%; justify-content:center; padding:5px 10px;}
+    .pricebox .price{font-size:26px;}
+    .pricebox .chg{font-size:11px;}
+    .live-badge{margin-left:auto;}
+     .content{padding:12px 10px 30px;}
+    .kpi-row{grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:9px;}
+    .kpi{padding:11px 13px;}
+    .kpi .val{font-size:21px;}
+    .cols.l2,.cols.l3{grid-template-columns:1fr;}
+    .panel{padding:12px;}
+    .chart-wrap{height:280px;}
+    .statusbar{flex-wrap:wrap; gap:6px; padding:5px 12px; font-size:10px;}
+    .statusbar .st-sep{display:none;}
+    .tbl-wrap{font-size:11.5px;}
+    th,td{padding:7px 9px;}
+    .gauge .gname{font-size:10px;}
+    .chart-toolbar{justify-content:flex-start; gap:6px; margin-top:8px;}
+    .sym-select{flex:1 1 100%; font-size:12px; padding:7px 9px;}
+    .tf-btn{padding:6px 10px; font-size:11.5px;}
+  }
+  @media(max-width:480px){
+    .brand .name{font-size:12.5px;}
+    .logout{font-size:10.5px; padding:5px 9px;}
+    .live-badge{font-size:9px; padding:2px 7px;}
+    .topbar{gap:6px;}
+    .kpi .val{font-size:19px;}
+    .chart-wrap{height:240px;}
+    .guide-steps .gname{white-space:normal;}
+    .guide-action{font-size:11.5px;}
+  }
+
+  /* ═══ MOBILE: sidebar → bottom bar ═══ */
+  @media(max-width:768px){
+    .shell{grid-template-columns:1fr;}
+    .sidebar{
+      position:fixed; bottom:0; left:0; right:0; z-index:100;
+      border-right:none; border-top:1px solid var(--border);
+      padding:0; display:flex; background:var(--panel);
+    }
+    .nav-group{display:flex; margin-bottom:0; flex:1;}
+    .nav-group-label{display:none;}
+    .nav-item{
+      flex:1; justify-content:center; padding:10px 4px; font-size:11px;
+      border-left:none; border-top:2px solid transparent; text-align:center;
+    }
+    .nav-item.active{border-left-color:transparent; border-top-color:var(--accent);}
+    .nav-group+.nav-group{border-left:1px solid var(--border);}
+    .content{padding-bottom:60px;}
+  }

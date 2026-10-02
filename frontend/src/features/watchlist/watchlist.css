@@ -1,0 +1,26 @@
+/* watchlist — ย้ายจาก index.html เดิม บรรทัด 195–220 */
+  /* watchlist sidebar */
+  .wlist{
+    background:linear-gradient(180deg,var(--panel),var(--card));
+    border:1px solid var(--border); border-radius:12px; overflow:hidden; display:flex; flex-direction:column;
+  }
+  .wlist-head{
+    display:flex; align-items:center; gap:8px; padding:11px 14px; font-size:10px; font-weight:800;
+    color:var(--muted); text-transform:uppercase; letter-spacing:.12em; border-bottom:1px solid var(--border);
+  }
+  .wlist-head .ph{width:3px;height:12px;border-radius:2px;background:var(--accent);}
+  .wl-scroll{overflow-y:auto; max-height:600px;}
+  .wl-row{
+    display:grid; grid-template-columns:1fr auto auto; gap:8px; align-items:center;
+    padding:9px 14px; cursor:pointer; border-bottom:1px solid rgba(19,28,48,.6);
+    transition:background .12s; position:relative;
+  }
+  .wl-row:hover{background:rgba(41,98,255,.05);}
+  .wl-row.active{background:rgba(41,98,255,.06); box-shadow:inset 3px 0 0 var(--cyan);}
+  .wl-name{font-size:12px; font-weight:800; letter-spacing:.3px;}
+  .wl-kind{display:block; font-size:9px; color:var(--dim); font-weight:600; letter-spacing:.5px;}
+  .wl-price{font-family:var(--num); font-size:12.5px; font-weight:700; font-variant-numeric:tabular-nums;}
+  .wl-chg{font-family:var(--num); font-size:10px; font-weight:800; padding:2px 7px; border-radius:6px; min-width:52px; text-align:center;}
+  .wl-chg.up{color:var(--green); background:rgba(38,166,154,.1);}
+  .wl-chg.down{color:var(--red); background:rgba(239,83,80,.1);}
+  .wl-chg.flat{color:var(--muted); background:rgba(116,128,156,.1);}

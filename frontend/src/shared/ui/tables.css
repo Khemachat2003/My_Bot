@@ -1,0 +1,20 @@
+/* ตาราง + pill + empty state — ย้ายจาก index.html เดิม บรรทัด 323–342 */
+  /* ═══ TABLES ═══ */
+  .tbl-wrap{overflow-x:auto; border:1px solid var(--border); border-radius:10px;}
+  table{width:100%; border-collapse:collapse; font-size:12px; font-variant-numeric:tabular-nums;}
+  th{
+    text-align:left; color:var(--muted); font-size:9.5px; text-transform:uppercase; letter-spacing:.08em;
+    padding:9px 12px; border-bottom:1px solid var(--border); white-space:nowrap;
+    position:sticky; top:0; background:var(--panel2); z-index:1;
+  }
+  td{padding:8px 12px; border-bottom:1px solid var(--grid); white-space:nowrap;}
+  tbody tr{transition:background .1s;}
+  tbody tr:hover{background:rgba(41,98,255,.045);}
+  tbody tr:last-child td{border-bottom:none;}
+  .pill{padding:2.5px 9px; border-radius:99px; font-size:10px; font-weight:800; letter-spacing:.3px;}
+  .pill.WIN{background:rgba(38,166,154,.14); color:var(--green);}
+  .pill.LOSE{background:rgba(239,83,80,.14); color:var(--red);}
+  .pill.PENDING{background:rgba(232,163,61,.14); color:var(--yellow);}
+  .dir-call{color:var(--green); font-weight:800;}
+  .dir-put{color:var(--red); font-weight:800;}
+  .empty{color:var(--dim); text-align:center; padding:26px; font-size:12px;}
