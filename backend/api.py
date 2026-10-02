@@ -14,6 +14,7 @@ DB มาโชว์) ทั้งคู่เขียน/อ่าน sqlite 
     ใส่ใน .env → DASHBOARD_USER=xxx และ DASHBOARD_PASS=xxx
     ถ้าไม่ตั้ง จะไม่มี auth (สะดวกตอน dev บน localhost)
 """
+
 from __future__ import annotations
 
 import base64
@@ -28,17 +29,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
-
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from fastapi.responses import (FileResponse, HTMLResponse, RedirectResponse,
-                               Response)
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from backend import db
-from backend import setup_db
+from backend import db, setup_db
 from backend.market_hours import choose_symbol, symbol_label
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -46,23 +44,34 @@ FRONTEND_DIR = ROOT_DIR / "frontend"
 
 # ── TF → Deriv granularity (วินาที) ─────────────────────────────────────────
 TF_GRANULARITY = {
-    "1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400,
+    "1m": 60,
+    "5m": 300,
+    "15m": 900,
+    "30m": 1800,
+    "1h": 3600,
+    "4h": 14400,
 }
-_CANDLE_CACHE: dict = {}        # (symbol, tf) -> (fetch_ts, rows)
-_CANDLE_CACHE_TTL = 30          # กันยิง Deriv API ถี่เกินเมื่อสลับ TF
+_CANDLE_CACHE: dict = {}  # (symbol, tf) -> (fetch_ts, rows)
+_CANDLE_CACHE_TTL = 30  # กันยิง Deriv API ถี่เกินเมื่อสลับ TF
 
 # ── watchlist: ราคาล่าสุดทุก symbol ใน request เดียว (ลด load จาก 8 → 1) ──
 _WATCHLIST_SYMBOLS = (
-    "frxXAUUSD", "frxEURUSD", "frxGBPUSD", "frxUSDJPY",
-    "frxAUDUSD", "frxUSDCAD", "frxUSDCHF", "frxNZDUSD",
+    "frxXAUUSD",
+    "frxEURUSD",
+    "frxGBPUSD",
+    "frxUSDJPY",
+    "frxAUDUSD",
+    "frxUSDCAD",
+    "frxUSDCHF",
+    "frxNZDUSD",
 )
-_WATCHLIST_CACHE: dict = {}      # "sym1,sym2" -> (fetch_ts, rows)
-_WATCHLIST_CACHE_TTL = 10         # วินาที
-_WATCHLIST_LIVE_TTL = 60          # symbol ที่ไม่มีใน DB ดึงสด แต่ไม่ถี่กว่านี้
-_WATCHLIST_LIVE_MAX = 12          # สูงพอครอบทุก symbol — ปกติ feed ทำงานจะมีแค่ 1-2 ตัว
-                                  # (กันไว้ด้วย concurrency 3 + cache สองชั้น)
+_WATCHLIST_CACHE: dict = {}  # "sym1,sym2" -> (fetch_ts, rows)
+_WATCHLIST_CACHE_TTL = 10  # วินาที
+_WATCHLIST_LIVE_TTL = 60  # symbol ที่ไม่มีใน DB ดึงสด แต่ไม่ถี่กว่านี้
+_WATCHLIST_LIVE_MAX = 12  # สูงพอครอบทุก symbol — ปกติ feed ทำงานจะมีแค่ 1-2 ตัว
+# (กันไว้ด้วย concurrency 3 + cache สองชั้น)
 _WATCHLIST_LIVE_CACHE: dict = {}  # symbol -> (fetch_ts, (last, prev))
-_WATCHLIST_STALE_SEC = 180         # ข้อมูลใน DB เก่ากว่านี้ = ไม่นับ (ไปดึงสดแทน)
+_WATCHLIST_STALE_SEC = 180  # ข้อมูลใน DB เก่ากว่านี้ = ไม่นับ (ไปดึงสดแทน)
 
 
 def _ts_is_stale(ts) -> bool:
@@ -71,6 +80,7 @@ def _ts_is_stale(ts) -> bool:
         return True
     try:
         from datetime import datetime, timezone
+
         dt = datetime.fromisoformat(str(ts))
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
@@ -92,6 +102,7 @@ def _live_last_prices(symbol: str):
     pair = (None, None)
     try:
         from backend.data_feed.deriv_feed import fetch_candles_history
+
         df = fetch_candles_history(symbol=symbol, granularity=60, count=2)
         if df is not None and len(df):
             last = float(df["close"].iloc[-1])
@@ -116,15 +127,21 @@ def _fetch_candles(symbol: str, tf: str, count: int) -> list[dict]:
     rows: list[dict] = []
     try:
         from backend.data_feed.deriv_feed import fetch_candles_history
+
         gran = TF_GRANULARITY[tf]
         df = fetch_candles_history(symbol=symbol, granularity=gran, count=count)
         if df is not None and len(df):
-            rows = [{
-                "t": pd.Timestamp(ts).strftime("%Y-%m-%d %H:%M:%S"),
-                "o": float(r["open"]), "h": float(r["high"]),
-                "l": float(r["low"]), "c": float(r["close"]),
-                "v": float(r.get("volume", 0) or 0),
-            } for ts, r in df.iterrows()]
+            rows = [
+                {
+                    "t": pd.Timestamp(ts).strftime("%Y-%m-%d %H:%M:%S"),
+                    "o": float(r["open"]),
+                    "h": float(r["high"]),
+                    "l": float(r["low"]),
+                    "c": float(r["close"]),
+                    "v": float(r.get("volume", 0) or 0),
+                }
+                for ts, r in df.iterrows()
+            ]
     except Exception:
         pass
 
@@ -137,38 +154,47 @@ def _fetch_candles(symbol: str, tf: str, count: int) -> list[dict]:
             if prices:
                 rows = _resample_from_prices(prices, minute)
                 if count and len(rows) > count:
-                    rows = rows[-count:]   # คืนตามจำนวนที่ขอจริง (ไม่ยัดทั้งก้อน)
+                    rows = rows[-count:]  # คืนตามจำนวนที่ขอจริง (ไม่ยัดทั้งก้อน)
         except Exception as e:
-            print(f"[api] candles fallback fail ({symbol}, {tf}, count={count}): "
-                  f"{type(e).__name__}: {str(e)[:140]}")
+            print(
+                f"[api] candles fallback fail ({symbol}, {tf}, count={count}): "
+                f"{type(e).__name__}: {str(e)[:140]}"
+            )
             rows = []
 
     if rows:
-        _CANDLE_CACHE[key] = (now, rows)   # แคชเฉพาะผลสำเร็จ — กันผลว่าง/พังติดแคช 30 วิ
+        _CANDLE_CACHE[key] = (now, rows)  # แคชเฉพาะผลสำเร็จ — กันผลว่าง/พังติดแคช 30 วิ
     return rows
 
 
 def _resample_from_prices(prices: list[dict], minutes: int) -> list[dict]:
     """resample รายการราคา 1m → แท่งตาม TF (ใช้ fallback เมื่อ Deriv ดึงไม่ได้)"""
     import pandas as pd
+
     if not prices:
         return []
     df = pd.DataFrame(prices)
-    df["ts"] = pd.to_datetime(df["ts"], utc=True)   # กัน ts ผสม naive/aware → บังคับ UTC
+    df["ts"] = pd.to_datetime(df["ts"], utc=True)  # กัน ts ผสม naive/aware → บังคับ UTC
     df = df.set_index("ts")[["open", "high", "low", "close"]].sort_index()
     rule = f"{minutes}min"
     # origin="start_day" (ไม่ใช้ "epoch") — bucket ตรงกันกับ epoch สำหรับ TF ทุกตัวที่ระบบใช้
     # (1m/5m/15m/30m/1h/4h ล้วนหาร 24h ลงตัว) แต่ไม่ชน edge case tz-aware + origin='epoch'
     o = df["open"].resample(rule, closed="left", label="left", origin="start_day").first()
     h = df["high"].resample(rule, closed="left", label="left", origin="start_day").max()
-    l = df["low"].resample(rule, closed="left", label="left", origin="start_day").min()
+    low_o = df["low"].resample(rule, closed="left", label="left", origin="start_day").min()
     c = df["close"].resample(rule, closed="left", label="left", origin="start_day").last()
-    out = pd.concat([o, h, l, c], axis=1).dropna()
-    return [{
-        "t": pd.Timestamp(ts).strftime("%Y-%m-%d %H:%M:%S"),
-        "o": float(r["open"]), "h": float(r["high"]),
-        "l": float(r["low"]), "c": float(r["close"]), "v": 0,
-    } for ts, r in out.iterrows()]
+    out = pd.concat([o, h, low_o, c], axis=1).dropna()
+    return [
+        {
+            "t": pd.Timestamp(ts).strftime("%Y-%m-%d %H:%M:%S"),
+            "o": float(r["open"]),
+            "h": float(r["high"]),
+            "l": float(r["low"]),
+            "c": float(r["close"]),
+            "v": 0,
+        }
+        for ts, r in out.iterrows()
+    ]
 
 
 load_dotenv(ROOT_DIR / ".env")
@@ -208,8 +234,9 @@ def _cookie_secret() -> str:
 
 
 def _sign(raw: str) -> str:
-    return hmac.new(_cookie_secret().encode("utf-8"), raw.encode("utf-8"),
-                    hashlib.sha256).hexdigest()
+    return hmac.new(
+        _cookie_secret().encode("utf-8"), raw.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
 
 
 def create_session_token(username: str) -> str:
@@ -245,16 +272,22 @@ def require_auth(request: Request, credentials: HTTPBasicCredentials = Depends(s
         ok_pass = secrets.compare_digest(credentials.password, DASHBOARD_PASS)
         if ok_user and ok_pass:
             if _default_creds_used() and not _is_localhost(request):
-                print("[Security] ❌ ปฏิเสธ login ด้วยรหัสผ่านเริ่มต้นจาก IP ภายนอก — "
-                      "ตั้ง DASHBOARD_USER/DASHBOARD_PASS ใน .env ก่อน (ดู .env.example)")
-                raise HTTPException(status_code=403, detail="รหัสผ่านเริ่มต้นใช้ได้เฉพาะ localhost — ตั้ง DASHBOARD_USER/DASHBOARD_PASS ใน .env ก่อน")
+                print(
+                    "[Security] ❌ ปฏิเสธ login ด้วยรหัสผ่านเริ่มต้นจาก IP ภายนอก — "
+                    "ตั้ง DASHBOARD_USER/DASHBOARD_PASS ใน .env ก่อน (ดู .env.example)"
+                )
+                raise HTTPException(
+                    status_code=403,
+                    detail="รหัสผ่านเริ่มต้นใช้ได้เฉพาะ localhost — ตั้ง DASHBOARD_USER/DASHBOARD_PASS ใน .env ก่อน",
+                )
             return True
     token = request.cookies.get(_SESSION_COOKIE)
     if token and verify_session_token(token):
         return True
     if request.url.path.startswith("/api/"):
-        raise HTTPException(status_code=401, detail="Unauthorized",
-                             headers={"WWW-Authenticate": "Basic"})
+        raise HTTPException(
+            status_code=401, detail="Unauthorized", headers={"WWW-Authenticate": "Basic"}
+        )
     raise HTTPException(status_code=307, headers={"Location": "/login"})
 
 
@@ -275,7 +308,7 @@ def health():
 # ── หน้า login (session cookie — ใช้ได้กับทุกเบราว์เซอร์ รวมถึง VS Code) ────
 _LOGIN_MSG = ""
 # ไม่เฉลย user/pass เริ่มต้นบนหน้า login (กันคนแปลกหน้าลองรหัสผ่านจากที่เห็นบนหน้าเว็บ)
-_HINT = ("<div class='hint'>ชื่อผู้ใช้/รหัสผ่านตั้งได้ในไฟล์ .env → DASHBOARD_USER / DASHBOARD_PASS</div>")
+_HINT = "<div class='hint'>ชื่อผู้ใช้/รหัสผ่านตั้งได้ในไฟล์ .env → DASHBOARD_USER / DASHBOARD_PASS</div>"
 
 LOGIN_HTML = f"""<!DOCTYPE html>
 <html lang="th">
@@ -363,12 +396,22 @@ def login(body: LoginBody, request: Request):
         raise HTTPException(status_code=401, detail="ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
     # กัน brute-force จากอินเทอร์เน็ต: ถ้ายังใช้ user/pass เริ่มต้น → อนุญาตเฉพาะ localhost
     if _default_creds_used() and not _is_localhost(request):
-        print(f"[Security] ❌ ปฏิเสธ login ด้วยรหัสผ่านเริ่มต้นจาก IP ภายนอก "
-              f"({request.client.host if request.client else '?'}) — ตั้ง DASHBOARD_USER/DASHBOARD_PASS ใน .env ก่อน")
-        raise HTTPException(status_code=403, detail="รหัสผ่านเริ่มต้นใช้ได้เฉพาะ localhost — ตั้ง DASHBOARD_USER/DASHBOARD_PASS ใน .env ก่อน")
+        print(
+            f"[Security] ❌ ปฏิเสธ login ด้วยรหัสผ่านเริ่มต้นจาก IP ภายนอก "
+            f"({request.client.host if request.client else '?'}) — ตั้ง DASHBOARD_USER/DASHBOARD_PASS ใน .env ก่อน"
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="รหัสผ่านเริ่มต้นใช้ได้เฉพาะ localhost — ตั้ง DASHBOARD_USER/DASHBOARD_PASS ใน .env ก่อน",
+        )
     resp = RedirectResponse("/", status_code=303)
-    resp.set_cookie(_SESSION_COOKIE, create_session_token(body.username),
-                    max_age=_SESSION_DAYS * 86400, httponly=True, samesite="lax")
+    resp.set_cookie(
+        _SESSION_COOKIE,
+        create_session_token(body.username),
+        max_age=_SESSION_DAYS * 86400,
+        httponly=True,
+        samesite="lax",
+    )
     return resp
 
 
@@ -404,18 +447,22 @@ def get_symbols(_auth=Depends(require_auth)):
 
 
 @app.get("/api/candles")
-def get_candles(tf: str = Query("1m", pattern="^(1m|5m|15m|30m|1h|4h)$"),
-                count: int = Query(300, ge=2, le=1000),
-                symbol: str = Query("", description="เช่น frxXAUUSD / R_100 / frxEURUSD"),
-                _auth=Depends(require_auth)):
+def get_candles(
+    tf: str = Query("1m", pattern="^(1m|5m|15m|30m|1h|4h)$"),
+    count: int = Query(300, ge=2, le=1000),
+    symbol: str = Query("", description="เช่น frxXAUUSD / R_100 / frxEURUSD"),
+    _auth=Depends(require_auth),
+):
     """แท่งเทียน history ตาม TF สำหรับกราฟ (1m/5m/15m/30m/1h/4h) — cache 30 วิ"""
     sym = symbol or db.DEFAULT_SYMBOL
     return _fetch_candles(sym, tf, count)
 
 
 @app.get("/api/watchlist")
-def get_watchlist(symbols: str = Query("", description="คั่นด้วย comma — เว้นว่าง = 8 ตัวมาตรฐาน"),
-                 _auth=Depends(require_auth)):
+def get_watchlist(
+    symbols: str = Query("", description="คั่นด้วย comma — เว้นว่าง = 8 ตัวมาตรฐาน"),
+    _auth=Depends(require_auth),
+):
     """ราคาล่าสุดของทุก symbol ที่แสดงใน watchlist — request เดียวจบ (cache 10 วิ)
 
     เดิม frontend ยิง /api/candles ทีละ symbol (8 requests/รอบ) ทำให้ VPS 1 vCPU
@@ -449,7 +496,9 @@ def get_watchlist(symbols: str = Query("", description="คั่นด้วย
             chg = (price - prev["c"]) / prev["c"] * 100
         if price is None:
             missing.append(sym)
-        out.append({"symbol": sym, "price": price, "chgPct": chg, "ts": last["ts"] if last else None})
+        out.append(
+            {"symbol": sym, "price": price, "chgPct": chg, "ts": last["ts"] if last else None}
+        )
     # symbol ที่ไม่ได้อยู่ใน TRADE_SYMBOLS (เช่น XAGUSD / R_100) → ไม่มีในตาราง prices
     # ต้องดึงสดจาก Deriv แต่ไม่ให้ยิงทุก 5 วิ (โดน rate-limit + ทำให้ VPS หนัก)
     # → แคช 60 วิ แยกต่างหาก และจำกัดจำนวนไว้ไม่เกิน 4 ตัวต่อรอบ
@@ -457,10 +506,11 @@ def get_watchlist(symbols: str = Query("", description="คั่นด้วย
         todo = missing[:_WATCHLIST_LIVE_MAX]
         try:
             from concurrent.futures import ThreadPoolExecutor
+
             # จำกัด 3 ตัวพร้อมกัน — ยิงพร้อมกันหลายตัว Deriv จะตอบ 429/ว่าง
             with ThreadPoolExecutor(max_workers=min(3, len(todo))) as pool:
                 pairs = list(pool.map(_live_last_prices, todo))
-            for sym, (last, prev) in zip(todo, pairs):
+            for sym, (last, prev) in zip(todo, pairs, strict=True):
                 if last is None:
                     continue
                 chg = (last - prev) / prev * 100 if prev else None
@@ -476,9 +526,11 @@ def get_watchlist(symbols: str = Query("", description="คั่นด้วย
 
 
 @app.get("/api/prices")
-def get_prices(limit: int = Query(500, ge=1, le=5000),
-               symbol: str = Query("", description="เช่น frxXAUUSD / R_100 — ว่าง = ค่าเริ่มต้น"),
-               _auth=Depends(require_auth)):
+def get_prices(
+    limit: int = Query(500, ge=1, le=5000),
+    symbol: str = Query("", description="เช่น frxXAUUSD / R_100 — ว่าง = ค่าเริ่มต้น"),
+    _auth=Depends(require_auth),
+):
     """ราคา/กราฟ ใช้ร่วมกันทั้ง 2 ระบบ — กรองตาม symbol (กันสเกลราคาปนกัน)"""
     sym = symbol or db.DEFAULT_SYMBOL
     return db.fetch_recent_prices(limit=limit, symbol=sym)
@@ -486,8 +538,11 @@ def get_prices(limit: int = Query(500, ge=1, le=5000),
 
 # ── 🔵 RULE-BASED SETUP ENGINE (System 1) ───────────────────────────────
 @app.get("/api/signals")
-def get_signals(limit: int = Query(100, ge=1, le=1000),
-                symbol: str | None = Query(None), _auth=Depends(require_auth)):
+def get_signals(
+    limit: int = Query(100, ge=1, le=1000),
+    symbol: str | None = Query(None),
+    _auth=Depends(require_auth),
+):
     return db.fetch_recent_setup_signals(limit=limit, symbol=symbol, exclude_tick=True)
 
 
@@ -498,9 +553,11 @@ def get_tick_touch_stats(_auth=Depends(require_auth)):
 
 
 @app.get("/api/signals/markers")
-def get_signal_markers(symbol: str = Query("frxXAUUSD"),
-                       limit: int = Query(50, ge=1, le=200),
-                       _auth=Depends(require_auth)):
+def get_signal_markers(
+    symbol: str = Query("frxXAUUSD"),
+    limit: int = Query(50, ge=1, le=200),
+    _auth=Depends(require_auth),
+):
     """ส่งสัญญาณทั้ง SETUP + ML + CFD สำหรับแสดง entry markers + levels บนกราฟ"""
     setup_rows = db.fetch_recent_setup_signals(limit=limit, symbol=symbol, exclude_tick=True)
     ml_rows = db.fetch_recent_ml_signals(limit=limit)
@@ -573,7 +630,9 @@ def get_stats(payout: float = Query(0.82, ge=0.0, le=5.0), _auth=Depends(require
 
 
 @app.get("/api/stats/by_timeframe")
-def get_stats_by_timeframe(payout: float = Query(0.82, ge=0.0, le=5.0), _auth=Depends(require_auth)):
+def get_stats_by_timeframe(
+    payout: float = Query(0.82, ge=0.0, le=5.0), _auth=Depends(require_auth)
+):
     """Winrate แยกตาม timeframe (M1/M5) แบบ real-time — {"M1": {...}, "M5": {...}}"""
     return db.compute_setup_stats_by_timeframe(payout=payout)
 
@@ -614,7 +673,9 @@ def get_ml_stats(payout: float = Query(0.82, ge=0.0, le=5.0), _auth=Depends(requ
 
 
 @app.get("/api/ml/stats/by_timeframe")
-def get_ml_stats_by_timeframe(payout: float = Query(0.82, ge=0.0, le=5.0), _auth=Depends(require_auth)):
+def get_ml_stats_by_timeframe(
+    payout: float = Query(0.82, ge=0.0, le=5.0), _auth=Depends(require_auth)
+):
     return db.compute_ml_stats_by_timeframe(payout=payout)
 
 
@@ -632,7 +693,7 @@ def get_ml_latest(_auth=Depends(require_auth)):
         except ValueError:
             pass
     if env_threshold is not None:
-        for k, v in data.items():
+        for _k, v in data.items():
             v["env_threshold"] = env_threshold
     return data
 
@@ -678,36 +739,51 @@ def get_journal_report(_auth=Depends(require_auth)):
 
 
 @app.get("/api/journal/export")
-def export_journal(start: str | None = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
-                   end: str | None = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
-                   _auth=Depends(require_auth)):
+def export_journal(
+    start: str | None = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    end: str | None = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    _auth=Depends(require_auth),
+):
     """ดาวน์โหลด Excel (.xlsx) — ประวัติเทรดทั้งหมด + สรุปแยกระบบ ทุกช่วงเวลา.
     ระบุ start/end ('YYYY-MM-DD') เพื่อกรองเฉพาะช่วง เช่น ?start=2026-08-01&end=2026-08-07"""
     report = db.compute_money_report(start=start, end=end)
-    capital = report["settings"]["capital"]
     stake = report["settings"]["stake"]
     currency = report["settings"]["currency"]
 
     trades = db.fetch_recent_trades(limit=100000)
     if start or end:
-        trades = [t for t in trades
-                  if (not start or (t.get("entry_time") or "")[:10] >= start)
-                  and (not end or (t.get("entry_time") or "")[:10] <= end)]
+        trades = [
+            t
+            for t in trades
+            if (not start or (t.get("entry_time") or "")[:10] >= start)
+            and (not end or (t.get("entry_time") or "")[:10] <= end)
+        ]
     trades_df = pd.DataFrame(trades)
     if len(trades_df):
         trades_df = trades_df.sort_values("entry_time", ascending=False).reset_index(drop=True)
         trades_df["pnl_money"] = (trades_df["pnl"] * stake).round(2)
         trades_df["status"] = trades_df["result"]
-        trades_df = trades_df.rename(columns={
-            "signal_type": "ระบบ", "timeframe": "TF", "symbol": "สัญลักษณ์",
-            "direction": "ทิศทาง", "entry_price": "ราคาเข้า", "exit_price": "ราคาออก",
-            "entry_time": "เวลาเข้า", "exit_time": "เวลาออก", "hold_min": "ถือ(นาที)",
-            "confidence": "confidence", "model_version": "โมเดล", "result": "ผล",
-            "pnl": "P&L(หน่วย)", "payout": "payout", "note": "หมายเหตุ",
-        })
+        trades_df = trades_df.rename(
+            columns={
+                "signal_type": "ระบบ",
+                "timeframe": "TF",
+                "symbol": "สัญลักษณ์",
+                "direction": "ทิศทาง",
+                "entry_price": "ราคาเข้า",
+                "exit_price": "ราคาออก",
+                "entry_time": "เวลาเข้า",
+                "exit_time": "เวลาออก",
+                "hold_min": "ถือ(นาที)",
+                "confidence": "confidence",
+                "model_version": "โมเดล",
+                "result": "ผล",
+                "pnl": "P&L(หน่วย)",
+                "payout": "payout",
+                "note": "หมายเหตุ",
+            }
+        )
     else:
-        trades_df = pd.DataFrame({"ระบบ": [], "TF": [], "ผล": [], "P&L(หน่วย)": [],
-                                  "P&L(บาท)": []})
+        trades_df = pd.DataFrame({"ระบบ": [], "TF": [], "ผล": [], "P&L(หน่วย)": [], "P&L(บาท)": []})
 
     def frame(rows, cols, labels):
         data = []
@@ -725,8 +801,11 @@ def export_journal(start: str | None = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$
             data.append(rec)
         return pd.DataFrame(data, columns=cols + labels)
 
-    labels = [f"{n} {c}" for n in ("รวม", "ML", "Rule-Based") for c in
-              ("เทรด", "ชนะ", "Winrate%", f"P&L ({currency})", "ROI%")]
+    labels = [
+        f"{n} {c}"
+        for n in ("รวม", "ML", "Rule-Based")
+        for c in ("เทรด", "ชนะ", "Winrate%", f"P&L ({currency})", "ROI%")
+    ]
 
     df_daily = frame(report["daily"], ["ช่วงเวลา"], labels)
     df_weekly = frame(report["weekly"], ["ช่วงเวลา"], labels)
@@ -736,11 +815,18 @@ def export_journal(start: str | None = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$
     sum_rows = []
     for s, name in (("ALL", "รวม (ALL)"), ("ML", "ML"), ("SETUP", "Rule-Based")):
         a = report["summary"][s]
-        sum_rows.append({
-            "ระบบ": name, "เทรด": a["n"], "ชนะ": a["wins"], "แพ้": a["losses"],
-            "Winrate%": a["winrate"], "P&L (หน่วย)": a["pnl_units"],
-            f"P&L ({currency})": a["pnl_money"], "ROI%": a["roi"],
-        })
+        sum_rows.append(
+            {
+                "ระบบ": name,
+                "เทรด": a["n"],
+                "ชนะ": a["wins"],
+                "แพ้": a["losses"],
+                "Winrate%": a["winrate"],
+                "P&L (หน่วย)": a["pnl_units"],
+                f"P&L ({currency})": a["pnl_money"],
+                "ROI%": a["roi"],
+            }
+        )
     df_summary = pd.DataFrame(sum_rows)
 
     buf = io.BytesIO()
@@ -757,8 +843,7 @@ def export_journal(start: str | None = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$
         span = f"_{start}"
     elif start or end:
         span = f"_{start or '0000'}__{end or '9999'}"
-    fname = (f"trading_report{span}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
-             ".xlsx")
+    fname = f"trading_report{span}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.xlsx"
     return Response(
         content=buf.getvalue(),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -785,9 +870,14 @@ def get_cfd_backtest(
 ):
     """CFD Backtest — จำลองเทรด CFD ด้วย signal เก่า + price data"""
     from backend.cfd_backtest import CFDBacktest
+
     bt = CFDBacktest(
-        capital=capital, sl_pips=sl_pips, tp1_pips=tp1_pips, tp2_pips=tp2_pips,
-        spread_pips=spread_pips, risk_pct=risk_pct,
+        capital=capital,
+        sl_pips=sl_pips,
+        tp1_pips=tp1_pips,
+        tp2_pips=tp2_pips,
+        spread_pips=spread_pips,
+        risk_pct=risk_pct,
     )
     return bt.run(signal_type)
 
@@ -796,6 +886,7 @@ def get_cfd_backtest(
 def get_cfd_paper(_auth=Depends(require_auth)):
     """CFD Paper Trading — สถิติ realtime + live P&L สำหรับ OPEN trades"""
     from backend.db import fetch_cfd_stats, get_conn, get_pip_value
+
     stats = fetch_cfd_stats()
     open_trades = stats.get("open_trades", [])
     if open_trades:
@@ -803,7 +894,7 @@ def get_cfd_paper(_auth=Depends(require_auth)):
         for t in open_trades:
             row = conn.execute(
                 "SELECT close FROM prices WHERE symbol = ? ORDER BY ts DESC LIMIT 1",
-                (t.get("symbol", "frxXAUUSD"),)
+                (t.get("symbol", "frxXAUUSD"),),
             ).fetchone()
             if row:
                 live_price = float(row[0])
@@ -825,7 +916,11 @@ def get_cfd_paper(_auth=Depends(require_auth)):
 # ── serve หน้าเว็บ dashboard ────────────────────────────────────────────────
 @app.get("/")
 def index(_auth=Depends(require_auth)):
-    return FileResponse(FRONTEND_DIR / "index.html")
+    # หน้า dashboard build ด้วย Vite → frontend/dist (commit ไว้ใน git เพราะ VPS ไม่มี Node)
+    # กันลืม build: ถ้า dist หาย ให้เสิร์ฟไฟล์เดิมจาก _archive แทน (หน้าขาวดีกว่า 500)
+    _dist = FRONTEND_DIR / "dist" / "index.html"
+    _legacy = ROOT_DIR / "_archive" / "index.legacy.html"
+    return FileResponse(_dist if _dist.exists() else _legacy)
 
 
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")

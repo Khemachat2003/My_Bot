@@ -1,0 +1,67 @@
+// dashboard.spec.js — พิสูจน์ว่าหน้าเว็บหลังแยกไฟล์ "เหมือนเดิม"
+//   1) screenshot ทุกแท็บ (desktop + mobile) ต้องตรง baseline ที่ถ่ายจาก index.legacy.html ทุก pixel
+//   2) network: ชุด request /api/* (method + path + query + body) ต้องตรงกับของเดิม
+//   3) console: ห้ามมี error ใหม่
+// baseline: npm run test:visual:baseline  |  เทียบ: npm run build && npm run test:visual
+import { test, expect } from '@playwright/test';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const LEGACY = process.env.UI_TARGET === 'legacy';
+const FIXED_NOW = new Date('2026-10-02T10:30:00Z'); // นาฬิกานิ่ง → เวลาบนจอเหมือนกันทุกครั้ง
+const TABS = ['overview', 'ml', 'setup', 'journal', 'cfd'];
+const VIEWPORTS = { desktop: { width: 1440, height: 900 }, mobile: { width: 390, height: 844 } };
+const NET_FILE = resolve(HERE, '__snapshots__/network.legacy.json');
+
+async function openDashboard(page, viewport) {
+  await page.setViewportSize(viewport);
+  await page.clock.setFixedTime(FIXED_NOW);
+  // ตัดของภายนอก (Google Fonts / CDN fallback) → ภาพนิ่ง ไม่ขึ้นกับเน็ต (ตัดเหมือนกันทั้งก่อน-หลัง)
+  // ตอบว่างแทน abort → ไม่เกิด console error ปลอมจากตัวเทสต์เอง (ทั้ง legacy/dist ได้ fallback font เดียวกัน)
+  await page.route(/^https?:\/\/(fonts\.googleapis\.com|fonts\.gstatic\.com|cdn\.jsdelivr\.net)\//, (r) =>
+    r.fulfill({ status: 200, contentType: 'text/css', body: '' }),
+  );
+  const errors = [];
+  page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+  page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+  await page.request.get('/__requests'); // ล้าง log
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(1500); // ให้ refreshAll รอบแรก + วาดกราฟเสร็จ
+  return errors;
+}
+
+for (const [vpName, viewport] of Object.entries(VIEWPORTS)) {
+  test(`ทุกแท็บเหมือนเดิม — ${vpName}`, async ({ page }) => {
+    const errors = await openDashboard(page, viewport);
+    for (const tab of TABS) {
+      await page.locator(`.nav-item[data-tab="${tab}"]`).click();
+      await page.waitForTimeout(800);
+      await expect(page).toHaveScreenshot(`${vpName}-${tab}.png`);
+    }
+    // พับ/ขยาย section (แทน inline onclick) ต้องทำงานเหมือนเดิม
+    await page.locator('.nav-item[data-tab="journal"]').click();
+    await page.locator('#jSecPeriod .j-section-head').click();
+    await expect(page.locator('#jSecPeriod')).toHaveClass(/open/);
+    await page.locator('#jSecPeriod .j-section-head').click();
+    await expect(page.locator('#jSecPeriod')).not.toHaveClass(/open/);
+    expect(errors, 'console error').toEqual([]);
+  });
+}
+
+test('network ที่หน้าเว็บเรียก ตรงกับของเดิม', async ({ page }) => {
+  await openDashboard(page, VIEWPORTS.desktop);
+  await page.locator('.nav-item[data-tab="cfd"]').click();
+  await page.locator('#btnRunCfdBacktest, [onclick="runCFDBacktest()"]').first().click(); // ปุ่ม Run Backtest
+  await page.waitForTimeout(800);
+  const reqs = await (await page.request.get('/__requests')).json();
+  const set = [...new Set(reqs.map((r) => `${r.method} ${r.key} ${r.body ?? ''}`.trim()))].sort();
+  if (LEGACY) {
+    writeFileSync(NET_FILE, JSON.stringify(set, null, 1));
+  } else {
+    expect(existsSync(NET_FILE), 'ยังไม่มี baseline network — รัน test:visual:baseline ก่อน').toBe(true);
+    expect(set).toEqual(JSON.parse(readFileSync(NET_FILE, 'utf8')));
+  }
+});

@@ -22,3 +22,7 @@ logs
 .env.production
 *.log
 test_*.py
+
+# ── frontend build tools (VPS เสิร์ฟ dist ที่ commit ไว้แล้ว — ไม่ต้องมี Node ใน image) ──
+frontend/node_modules
+frontend/tests/visual/fixtures

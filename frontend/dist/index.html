@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,">
+<title>XAUUSD Pro Trading Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- โหลดไลบรารีจากไฟล์ในเครื่อง (/static = โฟลเดอร์ frontend) กัน CDN ล่มแล้วกราฟหาย -->
+<script src="/static/vendor/chart.umd.min.js"></script>
+<script src="/static/vendor/lightweight-charts.standalone.production.js"></script>
+<link rel="stylesheet" href="/static/vendor/tabler/tabler-icons.min.css">
+<!-- CSS + JS ทั้งหมดอยู่ใน src/ (แยกตาม feature) — แผนที่ไฟล์: frontend/AGENTS.md / docs/code_map.md -->
+  <script type="module" crossorigin src="/static/dist/assets/index-CCeRWaEs.js"></script>
+  <link rel="stylesheet" crossorigin href="/static/dist/assets/index-BZ182FP-.css">
+</head>
+<body>
+
+<!-- ═══════════ TOP BAR ═══════════ -->
+<div class="topbar">
+  <div class="brand">
+    <div class="logo">X</div>
+    <div>
+      <div class="name">XAUUSD<span> PRO</span> TERMINAL</div>
+      <div class="ver">ML + RULE-BASED MONITOR</div>
+    </div>
+  </div>
+  <div class="pricebox">
+    <span class="sym" id="symbolBadge">frxXAUUSD</span>
+    <span class="price" id="tickerPrice">–</span>
+    <span class="chg" id="tickerChg"></span>
+  </div>
+  <span class="live-badge"><span class="dot"></span>LIVE</span>
+  <div class="spacer"></div>
+  <div class="topstat">
+    <div class="ts">M1<br><b id="hM1">–</b></div>
+    <div class="ts">M5<br><b id="hM5">–</b></div>
+    <div class="ts">Session<br><b id="hSession">–</b></div>
+    <div class="ts">UTC<br><b id="hUtc">–</b></div>
+  </div>
+  <a class="logout" href="/logout">ออกจากระบบ</a>
+</div>
+
+<!-- ═══════════ SHELL ═══════════ -->
+<div class="shell">
+
+<!-- ═══════════ SIDEBAR ═══════════ -->
+<aside class="sidebar">
+  <div class="nav-group">
+    <div class="nav-group-label">มอนิเตอร์สด</div>
+    <div class="nav-item active" data-tab="overview">ภาพรวม</div>
+    <div class="nav-item" data-tab="ml">ML สัญญาณ</div>
+    <div class="nav-item" data-tab="setup">Rule-Based</div>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-label">รายงานย้อนหลัง</div>
+    <div class="nav-item" data-tab="journal">Journal / P&amp;L</div>
+    <div class="nav-item" data-tab="cfd">CFD Backtest</div>
+  </div>
+</aside>
+
+<!-- ═══════════ CONTENT ═══════════ -->
+<div class="content">
+
+  <!-- ─── OVERVIEW ─── -->
+  <section id="tab-overview">
+    <div class="terminal">
+      <!-- Watchlist sidebar -->
+      <div class="wlist">
+        <div class="wlist-head"><span class="ph"></span>Watchlist</div>
+        <div class="wl-scroll" id="watchlistRows"></div>
+      </div>
+
+      <!-- Main chart panel (TradingView style) -->
+      <div class="panel chart-panel" id="chartPanel">
+        <h3><span class="ph cyan"></span><span id="chartTitle">กราฟราคา</span></h3>
+        <div class="chart-toolbar">
+          <select id="chartSymbol" class="sym-select" title="เลือกสัญลักษณ์"></select>
+          <span class="tf-group" id="tfGroup">
+            <button class="tf-btn active" data-tf="1m">1m</button>
+            <button class="tf-btn" data-tf="5m">5m</button>
+            <button class="tf-btn" data-tf="15m">15m</button>
+            <button class="tf-btn" data-tf="30m">30m</button>
+            <button class="tf-btn" data-tf="1h">1h</button>
+            <button class="tf-btn" data-tf="4h">4h</button>
+          </span>
+          <span class="tf-group" id="zoomGroup" title="ลากเพื่อเลื่อน · ล้อเมาส์/สองนิ้วเพื่อซูม (มือถือ: pinch)">
+            <button class="tf-btn has-lbl" id="zoomReset" title="กลับมุมมองล่าสุด (fit)"><i class="ti ti-refresh"></i><span class="btn-lbl">กลับมุมมอง</span></button>
+            <button class="tf-btn has-lbl" id="addSrR" title="กดเพื่อเริ่มวางเส้นแนวรับ/ต้าน — คลิกบนกราฟเพื่อวาง"><i class="ti ti-layout-horizontal"></i><span class="btn-lbl">เพิ่ม S/R</span></button>
+            <button class="tf-btn has-lbl" id="btnDelSr" title="กดเพื่อเปิดโหมดลบ — คลิกที่เส้น S/R เพื่อลบเส้นนั้น"><i class="ti ti-eraser"></i><span class="btn-lbl">ลบ S/R</span></button>
+            <button class="tf-btn has-lbl" id="btnSrList" title="รายการเส้น S/R ที่วางไว้"><i class="ti ti-adjustments-horizontal"></i><span class="btn-lbl">S/R ลิสต์</span></button>
+            <button class="tf-btn has-lbl" id="btnFullscreen" title="ขยายกราฟเต็มจอ"><i class="ti ti-maximize"></i><span class="btn-lbl">เต็มจอ</span></button>
+            <button class="tf-btn has-lbl" id="btnTradeList" title="แสดง/ซ่อนรายการสัญญาณ"><i class="ti ti-list"></i><span class="btn-lbl">สัญญาณ</span></button>
+          </span>
+        </div>
+        <div class="chart-legendbar" id="chartLegendBar">
+          <span class="lb-ohlc" id="lbOhlc">—</span>
+          <span class="lb-spacer"></span>
+          <span id="lbValues" class="lb-values"></span>
+          <button class="lb-collapse" id="lbCollapse" title="ย่อ/ขยายค่า indicator"><i class="ti ti-chevron-down"></i></button>
+        </div>
+        <div class="chart-wrap" id="lwWrap">
+          <div class="lw-pane" id="lwPaneMain"><span class="lw-pane-label">ราคา</span><div id="candleChart"></div></div>
+          <div class="lw-pane" id="lwPaneVol"><span class="lw-pane-label">Volume</span><div id="volChart"></div></div>
+          <div class="lw-pane" id="lwPaneRsi"><span class="lw-pane-label">RSI (14)</span><div id="rsiChart"></div></div>
+          <div class="lw-pane" id="lwPaneAdx"><span class="lw-pane-label">ADX (14)</span><div id="adxChart"></div></div>
+          <div class="lw-modehint" id="lwModeHint" style="display:none;"></div>
+        </div>
+        <!-- trade list (คลิกเลือกเพื่อดู SL/TP เฉพาะรายการ) -->
+        <div class="lw-tradelist" id="lwTradeList" style="display:none; border-top:1px solid var(--border); max-height:220px; overflow-y:auto;">
+          <div class="lw-trade-head">คลิกแถวเพื่อดู Entry / SL / TP บนกราฟ (เห็นทีละรายการ)</div>
+          <div id="lwTradeRows"></div>
+        </div>
+        <div class="lw-tradelist" id="lwSrPanel" style="display:none; border-top:1px solid var(--border); max-height:150px; overflow-y:auto;">
+          <div class="lw-trade-head">เส้น S/R ที่วางเอง <button id="srClearAll" class="sr-clear" title="ลบเส้น S/R ทั้งหมด">ล้างทั้งหมด</button></div>
+          <div id="lwSrRows"></div>
+        </div>
+        <div class="ind-bar" id="chartIndBar">
+          <span class="ind-chip active" data-ind="ema">EMA 50/100/200</span>
+          <span class="ind-chip active" data-ind="bb">BB (20,2)</span>
+          <span class="ind-chip active" data-ind="sma5">SMA5</span>
+          <span class="ind-chip active" data-ind="rsi">RSI 14</span>
+          <span class="ind-chip active" data-ind="adx">ADX 14</span>
+          <span class="ind-chip active" data-ind="fractal">Fractal 15</span>
+          <span class="ind-chip" data-ind="vol">Volume</span>
+          <span class="ind-spacer"></span>
+          <span class="ind-hint" id="indHint">กดเพื่อเปิด/ปิดตัวชี้วัดบนกราฟ</span>
+        </div>
+        <div class="chart-legend">
+          <span><i style="background:#9C6FE0;"></i>EMA50</span>
+          <span><i style="background:#787B86;"></i>EMA100</span>
+          <span><i style="background:#FF9800;"></i>EMA200</span>
+          <span><i style="background:#2962FF;"></i>BB 20,2</span>
+          <span><i style="background:#26C6DA;"></i>SMA5</span>
+          <span><i style="background:#9C6FE0;"></i>RSI 14</span>
+          <span><i style="background:#FF9800;"></i>ADX</span>
+          <span><i style="background:#FF9800;"></i>Fractal สูง (ต้าน)</span>
+          <span><i style="background:#26A69A;"></i>Fractal ต่ำ (รับ)</span>
+          <span><i style="background:var(--green);"></i>ML (▲ CALL)</span>
+          <span><i style="background:var(--blue);"></i>Rule-base (▼ PUT)</span>
+        </div>
+      </div>
+
+      <!-- Right side column -->
+      <div class="side-col">
+        <div class="panel">
+          <h3><span class="ph green"></span>Probability Gauges</h3>
+          <div id="gaugePanel"></div>
+        </div>
+        <div class="panel">
+          <h3><span class="ph blue"></span>Setup — ทุกคู่เงิน</h3>
+          <div id="setupMini"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ov-status-bar">
+      <div class="ov-stat"><span class="ov-stat-lbl">ML Winrate</span><span class="ov-stat-val" id="ovMlWinrate">–</span><span class="ov-stat-sub" id="ovMlWinrateSub">รอสัญญาณ...</span></div>
+      <div class="ov-stat"><span class="ov-stat-lbl">ML Margin</span><span class="ov-stat-val" id="ovMlMargin">–</span><span class="ov-stat-sub" id="ovMlN">–</span></div>
+      <div class="ov-stat"><span class="ov-stat-lbl">Setup Winrate</span><span class="ov-stat-val" id="ovSetWinrate">–</span><span class="ov-stat-sub" id="ovSetWinrateSub">รอสัญญาณ...</span></div>
+      <div class="ov-stat"><span class="ov-stat-lbl">Setup Margin</span><span class="ov-stat-val" id="ovSetMargin">–</span><span class="ov-stat-sub" id="ovSetN">–</span></div>
+      <div class="ov-stat"><span class="ov-stat-lbl">Model M1</span><span class="ov-stat-val purple" id="ovModelM1">–</span><span class="ov-stat-sub" id="ovModelM1Sub">–</span></div>
+      <div class="ov-stat"><span class="ov-stat-lbl">Model M5</span><span class="ov-stat-val purple" id="ovModelM5">–</span><span class="ov-stat-sub" id="ovModelM5Sub">–</span></div>
+    </div>
+    <div class="ov-bottom">
+      <div class="panel ov-equity-panel">
+        <h3><span class="ph purple"></span>Equity Curve <span class="eq-stats" id="eqStatsOv"></span></h3>
+        <div style="position:relative;">
+          <div style="height:260px;"><div id="equityChart"></div></div>
+          <div class="eq-empty" id="eqEmptyOv" style="display:none;">ยังไม่มีข้อมูลเทรดที่จบแล้ว — รอสัญญาณ &amp; ปิดตำแหน่งก่อน</div>
+        </div>
+      </div>
+      <div class="panel ov-feed-panel">
+        <h3><span class="ph green"></span>สัญญาณล่าสุด</h3>
+        <div id="mlRecentFeed" style="max-height:310px;overflow-y:auto;"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── ML ─── -->
+  <section id="tab-ml" style="display:none;">
+    <div class="j-hero">
+      <div class="j-hero-card wr">
+        <div class="jh-lbl">ML Winrate</div>
+        <div class="jh-val" id="mlWr">–</div>
+        <div class="jh-sub" id="mlWrSub">–</div>
+      </div>
+      <div class="j-hero-card pnl">
+        <div class="jh-lbl">Resolved / Pending</div>
+        <div class="jh-val" id="mlN">–</div>
+        <div class="jh-sub" id="mlNsub">–</div>
+      </div>
+      <div class="j-hero-card bal">
+        <div class="jh-lbl">Confidence</div>
+        <div class="jh-val" id="mlCi" style="font-size:20px;">–</div>
+        <div class="jh-sub">BE <b id="mlBe">–</b> · Margin <b id="mlMargin">–</b></div>
+      </div>
+    </div>
+    <div class="j-compare" style="margin-bottom:14px;">
+      <div class="j-cmp-card">
+        <h4><span class="dot ml"></span>Hold 15 นาที (M1)</h4>
+        <div class="j-cmp-stats">
+          <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="mlWrM1">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">Trades</div><div class="cs-val" id="mlM1N">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">P&L</div><div class="cs-val" id="mlM1Pnl">–</div></div>
+        </div>
+      </div>
+      <div class="j-cmp-card">
+        <h4><span class="dot rb"></span>Hold 30 นาที (M5)</h4>
+        <div class="j-cmp-stats">
+          <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="mlWrM5">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">Trades</div><div class="cs-val" id="mlM5N">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">P&L</div><div class="cs-val" id="mlM5Pnl">–</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="guide-card">
+      <div class="gname">แนวทางสัญญาณ ML ที่ความมั่นใจสูง (conf ≥ 0.70)</div>
+      <div class="guide-steps" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">
+        <div class="gstep">
+          <b style="color:var(--yellow);">≥ 0.70 — HIGH</b>
+          <span>สัญญาณแรง · ใช้ <b>1/3 ของเงินเดิมพัน</b> · เข้าตามทิศทางสัญญาณ (CALL/PUT)</span>
+        </div>
+        <div class="gstep">
+          <b style="color:var(--green);">0.60 – 0.69</b>
+          <span>สัญญาณปานกลาง · รอจังหวะยืนยันจาก Rule-Based (แนวรับ/ต้าน) ก่อนเข้า</span>
+        </div>
+        <div class="gstep">
+          <b style="color:var(--muted);">&lt; 0.60</b>
+          <span>ความมั่นใจต่ำกว่าจุดคุ้มทุน — <b>ไม่ควรเปิดออเดอร์</b> รอสัญญาณถัดไป</span>
+        </div>
+      </div>
+      <div class="guide-note">จุดคุ้มทุนจริงดูจากค่า <b>Breakeven</b> ด้านบน — จะเปิดออเดอร์ได้เมื่อความมั่นใจ (Win Prob) สูงกว่า Breakeven เสมอ</div>
+    </div>
+    <div class="panel">
+      <h3><span class="ph green"></span>ประวัติสัญญาณ ML ทั้งหมด</h3>
+      <div class="tbl-wrap" style="max-height:480px;overflow-y:auto;">
+        <table id="mlFullTable">
+          <thead><tr><th>เวลา</th><th>TF</th><th>ทิศทาง</th><th>Entry</th><th>Exit</th><th>Win Prob</th><th>Thresh</th><th>Hold</th><th>Model</th><th>ผล</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div id="mlEmpty" class="empty" style="display:none;">ยังไม่มีสัญญาณ ML — รอ notifier.py ทำงาน</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── SETUP ─── -->
+  <section id="tab-setup" style="display:none;">
+    <div class="j-hero">
+      <div class="j-hero-card wr">
+        <div class="jh-lbl">Setup Winrate</div>
+        <div class="jh-val" id="setWr">–</div>
+        <div class="jh-sub" id="setWrSub">–</div>
+      </div>
+      <div class="j-hero-card pnl">
+        <div class="jh-lbl">Resolved / Pending</div>
+        <div class="jh-val" id="setN">–</div>
+        <div class="jh-sub" id="setNsub">–</div>
+      </div>
+      <div class="j-hero-card bal">
+        <div class="jh-lbl">Confidence</div>
+        <div class="jh-val" id="setCi" style="font-size:20px;">–</div>
+        <div class="jh-sub">BE <b id="setBe">–</b> · Margin <b id="setMargin">–</b></div>
+      </div>
+    </div>
+    <div class="j-compare" style="margin-bottom:14px;">
+      <div class="j-cmp-card">
+        <h4><span class="dot ml"></span>Hold 15 นาที (M1)</h4>
+        <div class="j-cmp-stats">
+          <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="setWrM1">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">Trades</div><div class="cs-val" id="setM1N">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">P&L</div><div class="cs-val" id="setM1Pnl">–</div></div>
+        </div>
+      </div>
+      <div class="j-cmp-card">
+        <h4><span class="dot rb"></span>Hold 30 นาที (M5)</h4>
+        <div class="j-cmp-stats">
+          <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="setWrM5">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">Trades</div><div class="cs-val" id="setM5N">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">P&L</div><div class="cs-val" id="setM5Pnl">–</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="cols l3">
+      <div class="panel"><h3><span class="ph blue"></span>Setup — M5</h3><div id="setupAllM5"></div></div>
+      <div class="panel"><h3><span class="ph blue"></span>Setup — M1</h3><div id="setupAllM1"></div></div>
+      <div class="panel">
+        <h3><span class="ph blue"></span>ประวัติสัญญาณ Rule-Based
+          <select id="setupSymFilter" style="background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:800;font-family:inherit;float:right;">
+            <option value="">ทั้งหมด</option>
+            <option value="frxXAUUSD">XAUUSD</option>
+            <option value="frxEURUSD">EURUSD</option>
+            <option value="frxGBPUSD">GBPUSD</option>
+            <option value="frxUSDJPY">USDJPY</option>
+            <option value="frxAUDUSD">AUDUSD</option>
+            <option value="frxUSDCAD">USDCAD</option>
+            <option value="frxUSDCHF">USDCHF</option>
+            <option value="frxNZDUSD">NZDUSD</option>
+          </select>
+        </h3>
+        <div class="tbl-wrap" style="max-height:420px;overflow-y:auto;">
+          <table id="setupTable">
+            <thead><tr><th>เวลา</th><th>คู่</th><th>TF</th><th>Imp</th><th>ทิศทาง</th><th>Entry</th><th>Exit</th><th>Score</th><th>Tier</th><th>ผ่าน</th><th>ผล</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div id="setEmpty" class="empty" style="display:none;">ยังไม่มีสัญญาณ — รอ setup_feed.py ทำงาน</div>
+        </div>
+      </div>
+
+      <!-- TICK TOUCH RESEARCH MONITOR -->
+      <div style="margin-top:20px;">
+        <h3><span class="ph purple"></span>Tick Touch Research
+          <span style="font-size:11px;color:var(--muted);font-weight:400;margin-left:8px;">เก็บข้อมูล 3 เคสแตะ EMA200 + checklist vote (ไม่ส่งสัญญาณจริง)</span>
+        </h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px;" id="ttCaseCards">
+          <div class="empty" style="grid-column:1/-1;">ยังไม่มีข้อมูล research</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div>
+            <h4 style="color:var(--cyan);font-size:12px;margin-bottom:6px;">🗳 Checklist Vote Weight (WR เมื่อ cond = true)</h4>
+            <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
+              <table id="ttCondTable" style="font-size:11px;">
+                <thead><tr><th>Condition</th><th>True</th><th>Win</th><th>WR</th><th>False WR</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <h4 style="color:var(--cyan);font-size:12px;margin-bottom:6px;">Recent Touches</h4>
+            <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
+              <table id="ttRecentTable" style="font-size:11px;">
+                <thead><tr><th>เวลา</th><th>คู่</th><th>Case</th><th>Dir</th><th>Entry</th><th>Exit</th><th>✓</th><th>ผล</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── JOURNAL REDESIGNED ─── -->
+  <section id="tab-journal" style="display:none;">
+    <div class="j-header">
+      <div class="j-title"><span class="jicon"></span>Journal & P&amp;L</div>
+      <div class="j-actions">
+        <button class="btn" id="btnExportJ" title="Export Excel">⬇ Export</button>
+      </div>
+    </div>
+
+    <div class="j-settings" id="jSettings">
+      <div class="j-settings-head" data-toggle-parent="open">
+        <span class="jsl">ตั้งค่าการเทรด + Export</span>
+        <span class="jsa">▾</span>
+      </div>
+      <div class="j-settings-body">
+        <label>ทุนเริ่มต้น<input type="number" id="setCapital" min="1" step="100"></label>
+        <label>ขนาดต่อไม้<input type="number" id="setStake" min="1" step="10"></label>
+        <label>สกุลเงิน<input type="text" id="setCurrency" maxlength="5" style="width:70px;"></label>
+        <button class="btn accent" id="btnSaveSettings">บันทึก</button>
+        <span id="settStatus" style="font-size:11px;color:var(--green);align-self:center;"></span>
+        <label style="margin-left:12px;">Export จากวัน<input type="date" id="expStart"></label>
+        <label>ถึงวัน<input type="date" id="expEnd"></label>
+        <button class="btn accent" id="btnExport">ดาวน์โหลด Excel</button>
+      </div>
+    </div>
+
+    <div class="j-hero">
+      <div class="j-hero-card pnl">
+        <div class="jh-lbl">Total P&amp;L</div>
+        <div class="jh-val" id="mPnlAll">–</div>
+        <div class="jh-sub" id="mPnlAllSub">–</div>
+      </div>
+      <div class="j-hero-card wr">
+        <div class="jh-lbl">Winrate</div>
+        <div class="jh-val" id="jWr">–</div>
+        <div class="jh-sub" id="jWrSub">–</div>
+      </div>
+      <div class="j-hero-card bal">
+        <div class="jh-lbl">💰 Option Balance</div>
+        <div class="jh-val" id="mBalance">–</div>
+        <div class="jh-sub" id="mBalanceSub">–</div>
+      </div>
+      <div class="j-hero-card bal" style="border-left:2px solid var(--cyan);">
+        <div class="jh-lbl">CFD Balance</div>
+        <div class="jh-val" id="mCfdBalance">–</div>
+        <div class="jh-sub" id="mCfdBalanceSub">–</div>
+      </div>
+    </div>
+
+    <div class="j-compare">
+      <div class="j-cmp-card">
+        <h4><span class="dot ml"></span>ML Model</h4>
+        <div class="j-cmp-stats">
+          <div class="j-cmp-stat"><div class="cs-lbl">Trades</div><div class="cs-val" id="jMlN">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="jMlWr">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">P&amp;L</div><div class="cs-val" id="mPnlMl">–</div></div>
+        </div>
+        <div class="j-cmp-bar"><div class="j-cmp-bar-fill" id="jMlBar" style="width:0%;background:var(--purple);"></div></div>
+        <div class="jh-sub" id="mRoiMl" style="margin-top:6px;">ROI –</div>
+      </div>
+      <div class="j-cmp-card">
+        <h4><span class="dot rb"></span>Rule-Based</h4>
+        <div class="j-cmp-stats">
+          <div class="j-cmp-stat"><div class="cs-lbl">Trades</div><div class="cs-val" id="jRbN">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="jRbWr">–</div></div>
+          <div class="j-cmp-stat"><div class="cs-lbl">P&amp;L</div><div class="cs-val" id="mPnlSt">–</div></div>
+        </div>
+        <div class="j-cmp-bar"><div class="j-cmp-bar-fill" id="jRbBar" style="width:0%;background:var(--blue);"></div></div>
+        <div class="jh-sub" id="mRoiSt" style="margin-top:6px;">ROI –</div>
+      </div>
+    </div>
+
+    <div class="j-equity">
+      <h3>Equity Curve <span class="eq-stats" id="eqStatsFull"></span></h3>
+      <div style="position:relative;">
+        <div style="height:260px;"><div id="equityFullChart"></div></div>
+        <div class="eq-empty" id="eqEmptyFull" style="display:none;">ยังไม่มีข้อมูลเทรดที่จบแล้ว — รอสัญญาณ &amp; ปิดตำแหน่งก่อน</div>
+      </div>
+    </div>
+
+    <div class="j-section open" id="jSecDaily">
+      <div class="j-section-head" data-toggle-parent="open">
+        <h3>ผลรายวัน</h3><span class="j-arrow">▾</span>
+      </div>
+      <div class="j-section-body">
+        <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
+          <table id="dailyTable">
+            <thead><tr><th>วัน</th><th>Trades</th><th>Wins</th><th>Winrate</th><th>P&amp;L</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="j-section" id="jSecPeriod">
+      <div class="j-section-head" data-toggle-parent="open">
+        <h3>สรุป ML vs Rule-Based</h3><span class="j-arrow">▾</span>
+      </div>
+      <div class="j-section-body">
+        <div class="j-period-tabs" id="jPeriodTabs">
+          <button class="j-ptab active" data-period="daily">Daily</button>
+          <button class="j-ptab" data-period="weekly">Weekly</button>
+          <button class="j-ptab" data-period="monthly">Monthly</button>
+          <button class="j-ptab" data-period="yearly">Yearly</button>
+        </div>
+        <div class="tbl-wrap" style="max-height:300px;overflow-y:auto;">
+          <table id="periodTable">
+            <thead>
+              <tr>
+                <th>Period</th>
+                <th>Trades</th><th>WR</th><th>P&amp;L</th><th>ROI</th>
+                <th style="border-left:1px solid var(--border);">ML Trades</th><th>ML WR</th><th>ML P&amp;L</th>
+                <th style="border-left:1px solid var(--border);">RB Trades</th><th>RB WR</th><th>RB P&amp;L</th>
+                <th>Balance</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="j-section" id="jSecModel">
+      <div class="j-section-head" data-toggle-parent="open">
+        <h3>Model Registry</h3><span class="j-arrow">▾</span>
+      </div>
+      <div class="j-section-body">
+        <div class="tbl-wrap">
+          <table id="modelTable">
+            <thead><tr><th>Key</th><th>Version</th><th>Horizon</th><th>n_rows</th><th>AUC</th><th>Conf</th><th>Feature Set</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ CFD BACKTEST TAB ═══════════ -->
+  <section id="tab-cfd" style="display:none;">
+    <div class="j-col">
+      <!-- params bar -->
+      <div class="j-section open">
+        <div class="j-section-head" data-toggle-parent="open">
+          <h3>CFD Parameters</h3><span class="j-arrow">▾</span>
+        </div>
+        <div class="j-section-body" style="padding:12px;">
+          <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center; font-size:11px;">
+            <label>ทุน $<input id="cfdCapital" type="number" value="5000" min="100" max="100000" style="width:70px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <label>SL (pip) <input id="cfdSL" type="number" value="20" min="5" max="100" step="1" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <label>TP1 (pip) <input id="cfdTP1" type="number" value="40" min="10" max="200" step="1" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <label>TP2 (pip) <input id="cfdTP2" type="number" value="60" min="10" max="300" step="1" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <label>Spread <input id="cfdSpread" type="number" value="1.5" min="0" max="10" step="0.5" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <label>Risk % <input id="cfdRisk" type="number" value="1" min="0.1" max="10" step="0.1" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <select id="cfdSignalType" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 8px;font-size:11px;">
+              <option value="ALL">All Systems</option>
+              <option value="SETUP">Rule-Based Only</option>
+              <option value="ML">ML Only</option>
+            </select>
+            <button id="btnRunCfdBacktest" style="background:var(--yellow);color:#000;border:none;border-radius:4px;padding:4px 14px;font-size:11px;font-weight:700;cursor:pointer;">Run Backtest</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- summary cards -->
+      <div id="cfdSummary" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:14px;"></div>
+
+      <!-- ═══ CFD PAPER TRADING ═══ -->
+      <div class="j-section open" style="margin-top:14px;">
+        <div class="j-section-head" data-toggle-parent="open">
+          <h3>CFD Paper Trading (Real-time)</h3><span class="j-arrow">▾</span>
+        </div>
+        <div class="j-section-body" style="padding:12px;">
+          <div id="cfdPaperSummary" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px;"></div>
+          <div id="cfdOpenTrades" style="margin-top:12px;"></div>
+          <div class="tbl-wrap" style="margin-top:12px;">
+            <h4 style="color:var(--muted);font-size:11px;margin-bottom:6px;">Resolved Trades</h4>
+            <table id="cfdPaperTable">
+              <thead><tr>
+                <th>#</th><th>Time</th><th>System</th><th>Dir</th><th>Entry</th>
+                <th>SL</th><th>TP1</th><th>TP2</th><th>Result</th><th>Exit</th>
+                <th>Hold</th><th>P&L</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TP1 vs TP2 comparison -->
+      <div class="j-section" style="margin-top:14px;">
+        <div class="j-section-head" data-toggle-parent="open">
+          <h3>TP1 vs TP2 Comparison</h3><span class="j-arrow">▾</span>
+        </div>
+        <div class="j-section-body">
+          <div class="tbl-wrap">
+            <table id="cfdCompareTable">
+              <thead><tr>
+                <th>System</th><th>Direction</th>
+                <th colspan="3">TP1 (R:R 1:2)</th>
+                <th colspan="3">TP2 (R:R 1:3)</th>
+              </tr>
+              <tr>
+                <th></th><th></th>
+                <th>Trades</th><th>WR%</th><th>P&L</th>
+                <th>Trades</th><th>WR%</th><th>P&L</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- trade list -->
+      <div class="j-section" style="margin-top:14px;">
+        <div class="j-section-head" data-toggle-parent="open">
+          <h3>Trade List</h3><span class="j-arrow">▾</span>
+        </div>
+        <div class="j-section-body">
+          <div class="tbl-wrap">
+            <table id="cfdTradeTable">
+              <thead><tr>
+                <th>#</th><th>System</th><th>Dir</th><th>Entry</th>
+                <th>TP1</th><th>TP2</th><th>P&L (TP1)</th><th>P&L (TP2)</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /content -->
+</div><!-- /shell -->
+
+<!-- ═══════════ STATUS BAR ═══════════ -->
+<div class="statusbar">
+  <span class="st-ok" id="statusConn">● LIVE</span>
+  <span class="st-sep"></span>
+  <span>สัญลักษณ์: <b id="statusSym">–</b></span>
+  <span class="st-sep"></span>
+  <span>อัปเดตล่าสุด: <b id="statusTs">–</b></span>
+  <span class="st-sep"></span>
+  <span>Setup V8 · EMA200(M5) คือใจหลัก | กราฟ: EMA200(1m)</span>
+  <span class="spacer"></span>
+  <span id="statusNote"></span>
+</div>
+
+</body>
+</html>
