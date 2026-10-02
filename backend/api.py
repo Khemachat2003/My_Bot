@@ -56,7 +56,29 @@ _WATCHLIST_SYMBOLS = (
     "frxXAUUSD", "frxEURUSD", "frxGBPUSD", "frxUSDJPY",
     "frxAUDUSD", "frxUSDCAD", "frxUSDCHF", "frxNZDUSD",
 )
-_WATCHLIST_CACHE = {"ts": 0.0, "data": None}
+_WATCHLIST_CACHE: dict = {}      # "sym1,sym2" -> (fetch_ts, rows)
+_WATCHLIST_CACHE_TTL = 10         # วินาที
+_WATCHLIST_LIVE_TTL = 60          # symbol ที่ไม่มีใน DB ดึงสด แต่ไม่ถี่กว่านี้
+_WATCHLIST_LIVE_MAX = 4           # ดึงสดได้ไม่เกินกี่ตัวต่อรอบ (กัน VPS หนัก)
+_WATCHLIST_LIVE_CACHE: dict = {}  # symbol -> (fetch_ts, price)
+
+
+def _live_last_price(symbol: str):
+    """ราคาล่าสุดจาก Deriv สำหรับ symbol ที่ไม่ได้เก็บลง DB (cache 60 วิ)"""
+    hit = _WATCHLIST_LIVE_CACHE.get(symbol)
+    now = time.time()
+    if hit and now - hit[0] < _WATCHLIST_LIVE_TTL:
+        return hit[1]
+    price = None
+    try:
+        from backend.data_feed.deriv_feed import fetch_candles_history
+        df = fetch_candles_history(symbol=symbol, granularity=60, count=2)
+        if df is not None and len(df):
+            price = float(df["close"].iloc[-1])
+    except Exception:
+        price = None
+    _WATCHLIST_LIVE_CACHE[symbol] = (now, price)
+    return price
 
 
 def _fetch_candles(symbol: str, tf: str, count: int) -> list[dict]:
@@ -370,21 +392,28 @@ def get_candles(tf: str = Query("1m", pattern="^(1m|5m|15m|30m|1h|4h)$"),
 
 
 @app.get("/api/watchlist")
-def get_watchlist(_auth=Depends(require_auth)):
+def get_watchlist(symbols: str = Query("", description="คั่นด้วย comma — เว้นว่าง = 8 ตัวมาตรฐาน"),
+                 _auth=Depends(require_auth)):
     """ราคาล่าสุดของทุก symbol ที่แสดงใน watchlist — request เดียวจบ (cache 10 วิ)
 
     เดิม frontend ยิง /api/candles ทีละ symbol (8 requests/รอบ) ทำให้ VPS 1 vCPU
     ค้างและ connection reset → watchlist ไม่ขึ้น ตอนนี้รวมเป็น query เดียว
     """
     now = time.time()
-    if _WATCHLIST_CACHE["data"] and now - _WATCHLIST_CACHE["ts"] < 10:
-        return _WATCHLIST_CACHE["data"]
+    syms = [s.strip() for s in (symbols or "").split(",") if s.strip()][:20]
+    if not syms:
+        syms = list(_WATCHLIST_SYMBOLS)
+    cache_key = ",".join(syms)
+    cache = _WATCHLIST_CACHE.get(cache_key)
+    if cache and now - cache[0] < _WATCHLIST_CACHE_TTL:
+        return cache[1]
     try:
-        raw = db.fetch_last_prices(_WATCHLIST_SYMBOLS, per_symbol=2)
+        raw = db.fetch_last_prices(syms, per_symbol=2)
     except Exception:
         raw = {}
     out = []
-    for sym in _WATCHLIST_SYMBOLS:
+    missing = []
+    for sym in syms:
         rows = raw.get(sym) or []
         last = rows[0] if rows else None
         prev = rows[1] if len(rows) >= 2 else None
@@ -392,8 +421,27 @@ def get_watchlist(_auth=Depends(require_auth)):
         chg = None
         if price is not None and prev and prev.get("c"):
             chg = (price - prev["c"]) / prev["c"] * 100
+        if price is None:
+            missing.append(sym)
         out.append({"symbol": sym, "price": price, "chgPct": chg, "ts": last["ts"] if last else None})
-    _WATCHLIST_CACHE.update(ts=now, data=out)
+    # symbol ที่ไม่ได้อยู่ใน TRADE_SYMBOLS (เช่น XAGUSD / R_100) → ไม่มีในตาราง prices
+    # ต้องดึงสดจาก Deriv แต่ไม่ให้ยิงทุก 5 วิ (โดน rate-limit + ทำให้ VPS หนัก)
+    # → แคช 60 วิ แยกต่างหาก และจำกัดจำนวนไว้ไม่เกิน 4 ตัวต่อรอบ
+    if missing:
+        todo = missing[:_WATCHLIST_LIVE_MAX]
+        try:
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=len(todo)) as pool:
+                prices = list(pool.map(_live_last_price, todo))
+            for sym, price in zip(todo, prices):
+                if price is not None:
+                    for item in out:
+                        if item["symbol"] == sym:
+                            item["price"] = price
+                            break
+        except Exception:
+            pass
+    _WATCHLIST_CACHE[cache_key] = (now, out)
     return out
 
 
