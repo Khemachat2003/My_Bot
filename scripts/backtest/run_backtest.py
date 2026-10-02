@@ -3,19 +3,20 @@ run_backtest.py — สคริปต์หลักสำหรับรัน
 
 วิธีใช้:
   1. pip install pandas yfinance ta numpy matplotlib
-  2. python run_backtest.py
+  2. python scripts/backtest/run_backtest.py   (จาก root ของโปรเจกต์)
 
 ข้อมูลจะดึงจาก yfinance (Gold Futures GC=F) อัตโนมัติ
 ถ้าดึงไม่ได้จะใช้ synthetic data แทน
 """
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent / "backend"))
+# ไฟล์นี้อยู่ที่ scripts/backtest/ — เพิ่ม root เข้า sys.path สำหรับ backend.indicators
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from data_fetcher import get_data, generate_synthetic_xauusd
-from indicators   import add_all_indicators
-from backtest     import BacktestConfig, BacktestEngine
-from report       import generate_report
+from data_fetcher import get_data, generate_synthetic_xauusd  # โฟลเดอร์เดียวกัน
+from backend.indicators import add_all_indicators
+from backtest import BacktestConfig, BacktestEngine           # โฟลเดอร์เดียวกัน
+from report import generate_report                             # โฟลเดอร์เดียวกัน
 
 
 def main():

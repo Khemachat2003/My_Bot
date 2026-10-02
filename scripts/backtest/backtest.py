@@ -1,5 +1,5 @@
 """
-backtest.py — Backtest Engine สำหรับ XAUUSD
+backtest.py — Backtest Engine สำหรับ XAUUSD (legacy Phase-1 — อยู่ที่ scripts/backtest/)
 Features:
   - Simulate trade execution (market order)
   - Position management (SL / TP1 / TP2)
@@ -14,9 +14,11 @@ from typing import Optional
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
-from indicators import add_all_indicators
-from strategies import get_signal, Signal
+# ไฟล์นี้อยู่ที่ scripts/backtest/ — เพิ่ม root ของโปรเจกต์เข้า sys.path
+# เพื่อ import backend.indicators (indicators ตัวเดียวกับที่ live engine ใช้)
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from backend.indicators import add_all_indicators
+from strategies import get_signal, Signal  # อยู่โฟลเดอร์เดียวกัน (scripts/backtest/)
 
 
 # ─── Config ──────────────────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 """
 setup_backtest.py — Backtest ของ 🔵 Setup Scorer (9-Checklist) จริง
+รัน (จาก root ของโปรเจกต์): python scripts/backtest/setup_backtest.py [--csv <ไฟล์>]
 ===================================================================================
 บทบาท: backtest.py เดิมในโปรเจกต์ทดสอบ strategies.py (EMA_RSI/RSI_MACD/BB_BREAKOUT)
 ซึ่งเป็นคนละระบบกับ setup_scorer.py ที่พี่ใช้เทรดจริง (9-Checklist + EMA200 Rejection)

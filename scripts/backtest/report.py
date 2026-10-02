@@ -12,11 +12,11 @@ from matplotlib.patches import FancyBboxPatch
 from pathlib import Path
 import sys
 
-sys.path.insert(0, str(Path(__file__).parent))
-from backtest import BacktestResult, BacktestConfig, BacktestEngine
-from indicators import add_all_indicators
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from backend.indicators import add_all_indicators
+from backtest import BacktestResult, BacktestConfig, BacktestEngine  # โฟลเดอร์เดียวกัน
 
-REPORT_DIR = Path(__file__).parent.parent / "reports"
+REPORT_DIR = Path(__file__).resolve().parents[2] / "reports"
 REPORT_DIR.mkdir(exist_ok=True)
 
 # ─── Color Theme ─────────────────────────────────────────────────────────────
