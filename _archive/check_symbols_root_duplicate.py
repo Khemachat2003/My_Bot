@@ -1,4 +1,7 @@
 """
+[_archive] check_symbols.py — ตัวซ้ำ (เก่า) ย้ายมาจาก root เมื่อ refactor โครงสร้าง
+ตัวใช้งานจริงอยู่ที่: scripts/diagnostics/check_symbols.py
+
 check_symbols.py — เครื่องมือ diagnostic: ดึงรายชื่อ active_symbols จาก Deriv API
 เพื่อเช็คว่าสัญลักษณ์ปัจจุบัน (DERIV_SYMBOL ใน .env หรือ frxXAUUSD ค่า default)
 ใช้งานได้จริงบน app_id/บัญชีนี้หรือไม่ — ใช้ตอนเจอ error "Symbol ... is invalid"

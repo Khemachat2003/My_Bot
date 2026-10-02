@@ -1,6 +1,6 @@
 """
 test_connection.py — เช็คว่าเน็ต/ไฟร์วอลล์บล็อกการต่อ Deriv อยู่หรือไม่
-รัน: python test_connection.py
+รัน: python scripts/diagnostics/test_connection.py   (จาก root ของโปรเจกต์)
 """
 import socket
 import ssl

@@ -4,7 +4,7 @@ check_symbols.py — เครื่องมือ diagnostic: ดึงรา�
 บน app_id/บัญชีนี้หรือไม่ — ใช้ตอนเจอ error "Symbol ... is invalid"
 
 รัน:
-    python -m backend.check_symbols
+    python scripts/diagnostics/check_symbols.py   (จาก root ของโปรเจกต์)
 """
 from __future__ import annotations
 

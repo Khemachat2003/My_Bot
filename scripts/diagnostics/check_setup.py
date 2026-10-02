@@ -2,7 +2,7 @@
 check_setup.py — ทดสอบ setup_scorer.py กับราคาจริงจาก cache ที่มีอยู่แล้ว
 (data/deriv_frxXAUUSD_60s.csv ที่ notifier.py สร้างไว้ให้ตอนรันครั้งแรก)
 
-รัน: python check_setup.py
+รัน: python scripts/diagnostics/check_setup.py   (จาก root ของโปรเจกต์)
 
 พิมพ์ผล checklist ของทั้ง timeframe 1 นาที และ 5 นาที (resample จาก 1m) สำหรับ
 แท่งล่าสุดที่มีอยู่ในไฟล์ — เทียบกับที่พี่อ่านชาร์ตเองตอนนี้ว่าตรงกันไหม

@@ -1,6 +1,6 @@
 """
 test_ws_handshake.py — เช็คว่า WebSocket upgrade (ไม่ใช่แค่ TLS) ผ่านหรือไม่
-รัน: python test_ws_handshake.py
+รัน: python scripts/diagnostics/test_ws_handshake.py   (จาก root ของโปรเจกต์)
 """
 import json
 import websocket
