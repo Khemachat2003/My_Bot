@@ -7,11 +7,11 @@ request วนไปเรื่อยๆ โดยขยับ "end" ให้�
 จนกว่าจะได้ข้อมูลครบตามจำนวนวันที่ขอ (หรือ Deriv ไม่มีข้อมูลเก่ากว่านี้ให้แล้ว)
 
 วิธีใช้:
-    python fetch_history_paginated.py --symbol frxXAUUSD --granularity 60 --days 90
-    python fetch_history_paginated.py --symbol frxXAUUSD --granularity 300 --days 180
+    python scripts/data_tools/fetch_history_paginated.py --symbol frxXAUUSD --granularity 60 --days 90
+    python scripts/data_tools/fetch_history_paginated.py --symbol frxXAUUSD --granularity 300 --days 180
 
 ผลลัพธ์: บันทึกเป็น CSV คอลัมน์ datetime,open,high,low,close,volume — ใช้กับ
-    setup_backtest.py --csv <ไฟล์นี้> ได้ทันที
+    scripts/backtest/setup_backtest.py --csv <ไฟล์นี้> ได้ทันที
 """
 from __future__ import annotations
 
@@ -131,4 +131,4 @@ if __name__ == "__main__":
     print(f"\n✅ เสร็จแล้ว: {len(df)} แท่ง | {df.index[0]} → {df.index[-1]} "
           f"(~{actual_days:.1f} วัน)")
     print(f"บันทึกไว้ที่: {out_path.resolve()}")
-    print(f"\nรัน backtest ต่อได้เลย:\n  python setup_backtest.py --csv \"{out_path.resolve()}\"")
+    print(f"\nรัน backtest ต่อได้เลย:\n  python scripts/backtest/setup_backtest.py --csv \"{out_path.resolve()}\"")

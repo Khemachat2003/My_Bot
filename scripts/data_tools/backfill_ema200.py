@@ -5,9 +5,13 @@ from pathlib import Path
 
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parent
+# ROOT ชี้ root ของโปรเจกต์ (ไฟล์อยู่ที่ scripts/data_tools/ → ขึ้น 3 ชั้น)
+ROOT = Path(__file__).resolve().parent.parent.parent
 DB_PATH = ROOT / "data" / "bot.db"
 CFG_PATH = ROOT / "backend" / "setup_config.json"
+
+# วิธีรัน (จาก root ของโปรเจกต์):
+#   python scripts/data_tools/backfill_ema200.py [--db data/bot.db]
 
 
 def load_cfg() -> dict:
