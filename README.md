@@ -27,9 +27,7 @@
 ```
 xauusd-bot/
 ├── run_live.py             ← รันทุกระบบด้วยคำสั่งเดียว (supervisor + auto-restart)
-├── run_backtest.py         ← backtest rule-based (Phase 1)
-├── mt5_executor.py         ← MT5 order executor (Windows เท่านั้น)
-├── backend/
+├── backend/                ← ระบบหลัก (module paths เดิม เรียกผ่าน -m backend.X)
 │   ├── api.py              ← Dashboard (FastAPI + basic auth + session cookie)
 │   ├── db.py               ← SQLite (WAL mode): setup_signals, ml_signals, trade_journal...
 │   ├── setup_feed.py       ← 🔵 Rule-Based live engine
@@ -40,13 +38,27 @@ xauusd-bot/
 │   ├── telegram.py         ← ส่งแจ้งเตือน (retry + log สถานะ)
 │   ├── macro_feed.py       ← DXY รายชั่วโมง → DB
 │   ├── backup.py           ← backup อัตโนมัติ
+│   ├── indicators.py       ← EMA/RSI/ADX/ATR ฯลฯ (ใช้ทั้ง live + ML)
 │   ├── data_feed/
 │   │   ├── deriv_feed.py   ← Deriv WebSocket feed (ตัวจริงตัวเดียว)
 │   │   ├── backfill.py     ← ดึงข้อมูลย้อนหลังเป็น CSV
-│   │   └── macro_feed.py   ← backfill correlated assets (yfinance, สำหรับ research)
+│   │   └── macro_feed.py   ← backfill correlated assets (yfinance, research)
 │   └── ml_forecaster/      ← เทรน/ตรวจโมเดล (walk-forward, auto-retrain, features v2)
-├── frontend/index.html     ← Dashboard SPA (ใช้ lightweight-charts)
-├── scripts/                ← สคริปต์เช็คการเชื่อมต่อ (test_connection ฯลฯ)
+├── executor/
+│   └── mt5_executor.py     ← MT5 order executor (Windows เท่านั้น, รันแยกจาก VPS)
+├── frontend/
+│   ├── index.html          ← Dashboard SPA (ใช้ lightweight-charts)
+│   ├── vendor/             ← ไลบรารี JS/CSS ในเครื่อง (กัน CDN ล่ม)
+│   ├── demos/              ← ไฟล์ demo กราฟ standalone (โหลดจาก CDN)
+│   └── design/             ← design briefs (มอบหมายงาน redesign)
+├── scripts/
+│   ├── diagnostics/        ← เช็คการเชื่อมต่อ/symbol/setup (test_connection ฯลฯ)
+│   ├── data_tools/         ← backfill_ema200, fetch_history_paginated
+│   └── backtest/           ← ชุด backtest legacy Phase-1 (run_backtest ฯลฯ)
+├── tests/                  ← pytest — characterization tests (63 เคส)
+├── docs/                   ← system_map, architecture, runbook, CONTRIBUTING, ui_handoff
+├── deploy/                 ← systemd + nginx + firewall (VPS)
+├── _archive/               ← ไฟล์เก่า/พังที่ยังไม่ลบ (confluence.py ฯลฯ)
 ├── data/                   ← SQLite DB + CSV cache (git-ignored)
 ├── docker-compose.yml      ← deploy บน VPS
 └── .github/workflows/      ← auto-deploy เมื่อ push main
@@ -68,6 +80,15 @@ Dashboard: `http://localhost:8000` (login ด้วย DASHBOARD_USER/DASHBOARD_
 > ระบบจะอนุญาตให้ login **จาก localhost เท่านั้น** — ก่อน deploy ขึ้น VPS ให้ตั้ง
 > `DASHBOARD_USER`/`DASHBOARD_PASS` ใหม่ใน .env เสมอ
 
+## รันเทสต์ / เครื่องมือช่วยพัฒนา
+
+```bash
+./venv/Scripts/python.exe -m pip install -r requirements-dev.txt   # ครั้งแรก
+./venv/Scripts/python.exe -m pytest                 # รัน characterization tests (63 เคส)
+./venv/Scripts/python.exe -m ruff check backend     # lint
+./venv/Scripts/python.exe -m pre-commit install       # เปิด hook ก่อน commit (lint + test)
+```
+
 ## เทรนโมเดล ML
 
 ```bash
@@ -83,8 +104,8 @@ python -m backend.ml_forecaster.auto_retrain                      # เรีย
 
 ```bash
 pip install MetaTrader5
-python mt5_executor.py --dry-run   # ทดสอบโดยไม่ส่งออเดอร์จริง
-python mt5_executor.py             # ต้องเปิด MT5 terminal + login ก่อน
+python executor/mt5_executor.py --dry-run   # ทดสอบโดยไม่ส่งออเดอร์จริง
+python executor/mt5_executor.py             # ต้องเปิด MT5 terminal + login ก่อน
 ```
 
 ตั้งค่าความเสี่ยงใน .env: `MT5_RISK_PCT=0.5`, `MT5_RR=2.0`, `MT5_DAILY_MAX=20` (ดู .env.example ทั้งหมด)
