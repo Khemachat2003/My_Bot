@@ -60,25 +60,31 @@ _WATCHLIST_CACHE: dict = {}      # "sym1,sym2" -> (fetch_ts, rows)
 _WATCHLIST_CACHE_TTL = 10         # วินาที
 _WATCHLIST_LIVE_TTL = 60          # symbol ที่ไม่มีใน DB ดึงสด แต่ไม่ถี่กว่านี้
 _WATCHLIST_LIVE_MAX = 4           # ดึงสดได้ไม่เกินกี่ตัวต่อรอบ (กัน VPS หนัก)
-_WATCHLIST_LIVE_CACHE: dict = {}  # symbol -> (fetch_ts, price)
+_WATCHLIST_LIVE_CACHE: dict = {}  # symbol -> (fetch_ts, (last, prev))
 
 
-def _live_last_price(symbol: str):
-    """ราคาล่าสุดจาก Deriv สำหรับ symbol ที่ไม่ได้เก็บลง DB (cache 60 วิ)"""
+def _live_last_prices(symbol: str):
+    """(ราคาล่าสุด, ราคาก่อนหน้า) จาก Deriv สำหรับ symbol ที่ไม่ได้เก็บลง DB
+
+    คืน (last, prev) — ต้องมีทั้งคู่ถึงจะคำนวณ % เปลี่ยนแปลงใน watchlist ได้
+    cache 60 วิ เพื่อไม่ให้ยิง Deriv ถี่เกินไป (โดน rate-limit + VPS 1 vCPU หนัก)
+    """
     hit = _WATCHLIST_LIVE_CACHE.get(symbol)
     now = time.time()
     if hit and now - hit[0] < _WATCHLIST_LIVE_TTL:
         return hit[1]
-    price = None
+    pair = (None, None)
     try:
         from backend.data_feed.deriv_feed import fetch_candles_history
         df = fetch_candles_history(symbol=symbol, granularity=60, count=2)
         if df is not None and len(df):
-            price = float(df["close"].iloc[-1])
+            last = float(df["close"].iloc[-1])
+            prev = float(df["close"].iloc[-2]) if len(df) >= 2 else None
+            pair = (last, prev)
     except Exception:
-        price = None
-    _WATCHLIST_LIVE_CACHE[symbol] = (now, price)
-    return price
+        pair = (None, None)
+    _WATCHLIST_LIVE_CACHE[symbol] = (now, pair)
+    return pair
 
 
 def _fetch_candles(symbol: str, tf: str, count: int) -> list[dict]:
@@ -432,13 +438,16 @@ def get_watchlist(symbols: str = Query("", description="คั่นด้วย
         try:
             from concurrent.futures import ThreadPoolExecutor
             with ThreadPoolExecutor(max_workers=len(todo)) as pool:
-                prices = list(pool.map(_live_last_price, todo))
-            for sym, price in zip(todo, prices):
-                if price is not None:
-                    for item in out:
-                        if item["symbol"] == sym:
-                            item["price"] = price
-                            break
+                pairs = list(pool.map(_live_last_prices, todo))
+            for sym, (last, prev) in zip(todo, pairs):
+                if last is None:
+                    continue
+                chg = (last - prev) / prev * 100 if prev else None
+                for item in out:
+                    if item["symbol"] == sym:
+                        item["price"] = last
+                        item["chgPct"] = chg
+                        break
         except Exception:
             pass
     _WATCHLIST_CACHE[cache_key] = (now, out)
