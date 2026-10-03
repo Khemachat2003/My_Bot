@@ -95,8 +95,10 @@ function drawLWChart(prices,markers,tf){
   };
   const sigMarkerList=(markers||[]).filter(m=>m&&m.ts&&m.price!=null&&m.direction).map(m=>{
     const barTime=snapToBar(m); if(barTime==null) return null;
-    const color=m.type==='ML'?'#9C6FE0':'#2962FF';
     const sysLabel=m.type==='ML'?'ML':m.importance===1?'IMP1':m.importance===2?'IMP2':'RBF';
+    // design_system C-3: สี marker = ทิศทาง (bull/bear) + รูปทรง ▲▼ — ตัดสีม่วง/น้ำเงินแยก ML/RB
+    // ระบบต้นทางบอกด้วยข้อความบน marker (ML/IMP1/IMP2/RBF) เสมอ (canvas ไม่รองรับ var() → ใช้ hex ของ token)
+    const color=m.direction==='CALL'?'#16C784':'#F0465C';
     return {
       time:barTime,
       position:m.direction==='CALL'?'belowBar':'aboveBar',

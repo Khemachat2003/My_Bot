@@ -1,9 +1,15 @@
 // กราฟ Equity Curve ในแท็บภาพรวม
-// ย้ายจาก index.html เดิม (_archive/index.legacy.html) บรรทัด 2028–2078 แบบ move-only
+// Phase C-3 (design_system 5.1): เส้นเดียวสี --accent + fill เหนือฐาน --bull-dim / ใต้ฐาน --bear-dim
+// (baseline = ทุนเริ่มต้น) — ไม่เปลี่ยนสีเส้นตามช่วงขึ้น/ลง
 
 import { _buildEqData } from '../../shared/lib/equityData.js';
 
-let lwEqChart=null, lwEqSeries=null, lwEqSeries2=null, lwEqBaseLine=null, lwEqBaseLine2=null;
+const ACCENT='#4C8DFF', DIM='#4C5566';
+const BULL_FILL1='rgba(22,199,132,0.22)', BULL_FILL2='rgba(22,199,132,0.03)';
+const BEAR_FILL1='rgba(240,70,92,0.03)',  BEAR_FILL2='rgba(240,70,92,0.22)';
+
+let lwEqChart=null, lwEqSeries=null, lwEqSeries2=null;
+let lwEqBase=null, lwEqBase2=null; // base ปัจจุบันของแต่ละ series (เปลี่ยน → สร้างใหม่)
 function drawEquity(payload){
   const el=document.getElementById('equityChart'); if(!el) return;
   const b=_buildEqData(payload&&payload.opt, payload&&payload.cfd);
@@ -14,34 +20,38 @@ function drawEquity(payload){
   if(!lwEqChart){
     lwEqChart=LightweightCharts.createChart(el,{
       height:el.clientHeight||260, width:el.clientWidth||300,
-      layout:{background:{color:'transparent'},textColor:'#787B86',fontFamily:'IBM Plex Mono, monospace'},
-      grid:{vertLines:{color:'#1E222D'},horzLines:{color:'#1E222D'}},
-      rightPriceScale:{borderColor:'#2A2E39'},
-      timeScale:{borderColor:'#2A2E39',rightOffset:2},
+      layout:{background:{color:'transparent'},textColor:'#838B9C',fontFamily:'IBM Plex Mono, monospace'},
+      grid:{vertLines:{color:'#1A1D27'},horzLines:{color:'#1A1D27'}},
+      rightPriceScale:{borderColor:'#232732'},
+      timeScale:{borderColor:'#232732',rightOffset:2},
     });
     window.addEventListener('resize',()=>{ if(lwEqChart&&el.clientWidth>0) lwEqChart.applyOptions({width:el.clientWidth}); });
   }
   const fmt=p=>Number(p).toLocaleString('th-TH',{maximumFractionDigits:0});
-  if(b.cfdN && !lwEqSeries){
-    lwEqSeries=lwEqChart.addAreaSeries({
-      lineColor:'#26A69A', topColor:'rgba(38,166,154,0.28)', bottomColor:'rgba(38,166,154,0.02)',
-      lineWidth:2, priceLineVisible:false, lastValueVisible:false,
-      priceFormat:{type:'custom',formatter:p=>'$'+fmt(p)},
+  // สร้าง baseline series ใหม่เมื่อยังไม่มี หรือ base (ทุนเริ่มต้น) เปลี่ยน — baseline series วาดเส้นฐานเอง
+  const mkSeries=(existing,curBase,prevBase,priceFmt)=>{
+    if(existing&&prevBase===(curBase||0)) return existing;
+    if(existing) lwEqChart.removeSeries(existing);
+    return lwEqChart.addBaselineSeries({
+      baseValue:{type:'price',price:curBase||0},
+      lineColor:ACCENT, lineWidth:2,
+      topLineColor:DIM, topLineColor1:DIM,
+      topFillColor1:BULL_FILL1, topFillColor2:BULL_FILL2,
+      bottomLineColor:DIM, bottomLineColor1:DIM,
+      bottomFillColor1:BEAR_FILL1, bottomFillColor2:BEAR_FILL2,
+      priceLineVisible:false, lastValueVisible:false, priceFormat:priceFmt,
     });
-    lwEqBaseLine=lwEqSeries.createPriceLine({price:b.cfdBase||0,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,title:'CFD ทุน'});
+  };
+  if(b.cfdN){
+    lwEqSeries=mkSeries(lwEqSeries,b.cfdBase,lwEqBase,{type:'custom',formatter:p=>'$'+fmt(p)});
+    lwEqBase=b.cfdBase||0;
   }
-  if(b.optN && !lwEqSeries2){
-    lwEqSeries2=lwEqChart.addAreaSeries({
-      lineColor:'#2962FF', topColor:'rgba(41,98,255,0.20)', bottomColor:'rgba(41,98,255,0.02)',
-      lineWidth:2, priceLineVisible:false, lastValueVisible:false,
-      priceFormat:{type:'custom',formatter:p=>fmt(p)+' '+cur},
-    });
-    lwEqBaseLine2=lwEqSeries2.createPriceLine({price:b.optCapitalBase||0,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,title:'Option ทุน'});
+  if(b.optN){
+    lwEqSeries2=mkSeries(lwEqSeries2,b.optCapitalBase,lwEqBase2,{type:'custom',formatter:p=>fmt(p)+' '+cur});
+    lwEqBase2=b.optCapitalBase||0;
   }
   if(lwEqSeries) lwEqSeries.setData(b.cfdPts);
   if(lwEqSeries2) lwEqSeries2.setData(b.optPts);
-  if(lwEqBaseLine) lwEqBaseLine.applyOptions({price:b.cfdBase||0});
-  if(lwEqBaseLine2) lwEqBaseLine2.applyOptions({price:b.optCapitalBase||0});
   lwEqChart.applyOptions({width:el.clientWidth||300,height:el.clientHeight||260});
   if(b.optN+b.cfdN>0) lwEqChart.timeScale().fitContent();
   if(emptyEl) emptyEl.style.display=(b.optN+b.cfdN)>0?'none':'block';
