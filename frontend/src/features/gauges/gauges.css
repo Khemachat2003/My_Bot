@@ -13,4 +13,4 @@
   .gsig.NEUTRAL{background:rgba(116,128,156,.12); color:var(--muted); border:1px solid rgba(116,128,156,.25);}
   .gauge-svg{display:flex; justify-content:center; margin:6px 0 2px;}
   .gauge-svg svg{max-width:100%; height:auto;}
-  .gauge .gmeta{display:flex; justify-content:space-between; font-family:var(--num); font-size:10px; color:var(--dim); margin-top:4px;}
+  .gauge .gmeta{display:flex; justify-content:space-between; font-family:var(--num); font-size:10px; color:var(--muted); margin-top:4px;}

@@ -17,4 +17,4 @@
   .pill.PENDING{background:rgba(232,163,61,.14); color:var(--yellow);}
   .dir-call{color:var(--green); font-weight:800;}
   .dir-put{color:var(--red); font-weight:800;}
-  .empty{color:var(--dim); text-align:center; padding:26px; font-size:12px;}
+  .empty{color:var(--muted); text-align:center; padding:26px; font-size:12px;}

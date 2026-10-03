@@ -19,7 +19,7 @@
   .tf-btn.has-lbl .btn-lbl{font-size:10px; font-weight:800;}
   .tf-btn.has-lbl.active{background:var(--cyan); color:#04121a;}
   @media(max-width:900px){ .btn-lbl{display:none;} }
-  .ind-hint{font-size:9.5px; color:var(--dim); font-weight:600; letter-spacing:.02em;}
+  .ind-hint{font-size:9.5px; color:var(--muted); font-weight:600; letter-spacing:.02em;}
   .lb-values{display:inline-flex; gap:10px; white-space:nowrap; font-family:var(--num); font-size:10px;}
   .lb-values b{color:var(--text); font-weight:700;}
   .lb-values .v-u{color:var(--green);} .lb-values .v-d{color:var(--red);} .lb-values .v-m{color:var(--muted);}

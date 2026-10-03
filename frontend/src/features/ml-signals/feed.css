@@ -7,7 +7,7 @@
   .feed-row .fdir{width:52px; text-align:center; font-weight:900; font-size:11px; border-radius:6px; padding:2px 0;}
   .feed-row .fdir.CALL{background:rgba(38,166,154,.14); color:var(--green);}
   .feed-row .fdir.PUT{background:rgba(239,83,80,.14); color:var(--red);}
-  .feed-row .ftime{color:var(--dim); font-family:var(--num); font-size:10.5px;}
+  .feed-row .ftime{color:var(--muted); font-family:var(--num); font-size:10.5px;}
   .feed-row .fprice{font-family:var(--num); font-weight:700; margin-left:auto;}
   .feed-row .fconf{font-family:var(--num); color:var(--muted); font-size:11px;}
   .hi-badge{

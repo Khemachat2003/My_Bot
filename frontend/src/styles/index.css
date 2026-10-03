@@ -1,5 +1,7 @@
 /* styles/index.css — รวม CSS ทุกไฟล์ "ตามลำดับเดิม" (cascade เหมือน <style> ก้อนเดิมทุกกฎ) */
 /* เพิ่มไฟล์ใหม่ = แทรกตามลำดับที่ต้องการ override — ห้ามสลับลำดับเดิมโดยไม่ตรวจ screenshot */
+@import '../vendor/fonts/fonts.css'; /* self-host woff2 (Phase C-1) — ห้าม Google Fonts CDN */
+@import './tokens.css';
 @import './tokens.css';
 @import './global.css';
 @import '../features/status-bar/topbar.css';

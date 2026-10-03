@@ -1,15 +1,55 @@
-/* design tokens (สี/ฟอนต์) — แหล่งความจริงเดียว — ย้ายจาก index.html เดิม บรรทัด 15–28 */
-  /* ═══ DESIGN TOKENS ═══ */
-  :root{
-    --bg:#131722; --panel:#1A1E29; --panel2:#1E222D; --card:#1A1E29;
-    --border:#2A2E39; --border2:#363A45;
-    --text:#D1D4DC; --muted:#787B86; --dim:#565B66;
-    --green:#26A69A; --red:#EF5350; --yellow:#FF9800;
-    --blue:#2962FF; --cyan:#2962FF; --purple:#9C6FE0; --ml:#9C6FE0;
-    --grid:#1E222D; --bg2:#1E222D;
-    --accent:var(--blue);
-    --font-display:'Archivo',sans-serif;
-    --font-body:'IBM Plex Sans',sans-serif;
-    --font-mono:'IBM Plex Mono',ui-monospace,monospace;
-    --num:'IBM Plex Mono',ui-monospace,monospace;
-  }
+/* design tokens (สี/ฟอนต์) — แหล่งความจริงเดียว
+   ตาม docs/design_system.md Section 2 (ฉบับ 04e82d4) — Phase C-1
+   หมายเหตุ: ชื่อ var ชุดเดิม (--panel/--green/--red/...) คงไว้เป็น alias ชี้ไปที่ token ใหม่
+   เพื่อไม่ให้ CSS ของ feature อื่นพัง — งาน C-4 ขึ้นไปจะค่อย ๆ ย้ายไปใช้ชื่อใหม่ */
+:root{
+  /* Surface & Backgrounds */
+  --bg:#0A0C10;          /* พื้นหลังแอปหลัก ดำลึก */
+  --surface:#12151C;     /* Panel, Sidebar, Topbar */
+  --surface-alt:#171B24; /* Card ย่อย, Hover, Input */
+  --border:#232732;      /* เส้นขอบมาตรฐาน */
+  --border-subtle:#1A1D27; /* เส้นแบ่งภายในตาราง */
+
+  /* Text & Labels — --dim คอนทราสต์ 2.6:1 ใช้ได้เฉพาะเส้น/ขอบ/ตกแต่ง ห้ามใช้กับข้อความ */
+  --text:#EDEFF3;
+  --muted:#838B9C;
+  --dim:#4C5566;
+
+  /* Semantic State Colors */
+  --bull:#16C784;        /* BUY / กำไร / ผ่าน */
+  --bear:#F0465C;        /* SELL / ขาดทุน / ไม่ผ่าน */
+  --warn:#E8A33D;        /* รอ / ก้ำกึ่ง / คำเตือน */
+  --accent:#4C8DFF;      /* Active state / CTA / gauge ความมั่นใจ */
+
+  /* Translucent Badges / Highlights */
+  --bull-dim:rgba(22,199,132,0.12);
+  --bear-dim:rgba(240,70,92,0.12);
+  --warn-dim:rgba(232,163,61,0.12);
+  --accent-dim:rgba(76,141,255,0.12);
+
+  /* Elevation */
+  --shadow-sm:0 1px 2px rgba(0,0,0,0.3);
+  --shadow-panel:0 2px 8px rgba(0,0,0,0.4);
+
+  /* Typography — body = IBM Plex Sans Thai (self-host ที่ src/vendor/fonts/, ดู fonts.css)
+     Archivo/Plex Sans (ละติน) ใช้เฉพาะข้อความอังกฤษ/ตัวเลข ห้ามรับข้อความไทย */
+  --font-display:'Archivo',-apple-system,sans-serif;
+  --font-body:'IBM Plex Sans Thai','IBM Plex Sans',-apple-system,sans-serif;
+  --font-mono:'IBM Plex Mono','SF Mono',monospace;
+
+  /* ═══ legacy aliases (ชื่อเดิมจาก index.html ก่อน Phase C — อย่าเพิ่มใช้ในโค้ดใหม่) ═══ */
+  --panel:var(--surface);
+  --panel2:var(--surface-alt);
+  --card:var(--surface);
+  --bg2:var(--surface-alt);
+  --grid:var(--border-subtle);
+  --border2:var(--border);
+  --green:var(--bull);
+  --red:var(--bear);
+  --yellow:var(--warn);
+  --blue:var(--accent);
+  --cyan:var(--accent);
+  --purple:var(--accent); /* สีม่วง ML ถูกตัดออกตาม design_system Section 6 → ใช้ accent แทน */
+  --ml:var(--accent);
+  --num:var(--font-mono);
+}
