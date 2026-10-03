@@ -4,10 +4,12 @@
 import { requestNotifPermission } from '../features/notifications/index.js';
 import { loadSymbols } from '../features/watchlist/index.js';
 import { REFRESH_MS, refreshAll } from './refreshLoop.js';
+import { initStaleBadge } from './staleBadge.js';
 
 (async()=>{
   await loadSymbols();
   requestNotifPermission();
+  initStaleBadge(REFRESH_MS);
   refreshAll();
   setInterval(refreshAll, REFRESH_MS);
 })();

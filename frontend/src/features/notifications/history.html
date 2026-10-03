@@ -1,0 +1,16 @@
+<!-- ─── LOG/ALERT (Phase C-2) — เฉพาะข้อมูลจริง: ประวัติสัญญาณ (ML/Setup) + Tick-Touch Research
+     ห้ามแสดง: สถานะส่ง Telegram / System Log / โหมด LIVE-PHANTOM (ยังไม่มี endpoint — design_system Section 7) -->
+  <div class="subtab-pane" id="pane-siglog" data-pane="siglog" style="display:none;">
+    <div class="panel" style="margin-bottom:14px;">
+      <h3><span class="ph"></span>สัญญาณล่าสุด (ML + Rule-Based)
+        <span style="font-size:11px;color:var(--muted);font-weight:400;margin-left:8px;">จาก /api/ml/signals และ /api/signals — ยังไม่มีสถานะการส่งจริง</span>
+      </h3>
+      <div class="tbl-wrap" style="max-height:420px;overflow-y:auto;">
+        <table id="sigLogTable">
+          <thead><tr><th>เวลา</th><th>ชนิด</th><th>ทิศทาง</th><th>ราคา</th><th>Prob/Score</th><th>ผล</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div id="sigLogEmpty" class="empty" style="display:none;">ยังไม่มีสัญญาณ — รอระบบยิงสัญญาณแรก</div>
+      </div>
+    </div>
+  </div>

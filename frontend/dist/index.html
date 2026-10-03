@@ -15,8 +15,8 @@
 <script src="/static/vendor/lightweight-charts.standalone.production.js"></script>
 <link rel="stylesheet" href="/static/vendor/tabler/tabler-icons.min.css">
 <!-- CSS + JS ทั้งหมดอยู่ใน src/ (แยกตาม feature) — แผนที่ไฟล์: frontend/AGENTS.md / docs/code_map.md -->
-  <script type="module" crossorigin src="/static/dist/assets/index-Ct-VmIM_.js"></script>
-  <link rel="stylesheet" crossorigin href="/static/dist/assets/index-DPz2aoy2.css">
+  <script type="module" crossorigin src="/static/dist/assets/index-eLGRwWxa.js"></script>
+  <link rel="stylesheet" crossorigin href="/static/dist/assets/index-DxP8MHFk.css">
 </head>
 <body>
 
@@ -34,7 +34,7 @@
     <span class="price" id="tickerPrice">–</span>
     <span class="chg" id="tickerChg"></span>
   </div>
-  <span class="live-badge"><span class="dot"></span>LIVE</span>
+  <!-- badge โหมด LIVE/PHANTOM: ยังไม่มี endpoint บอกโหมด (design_system Section 7 ⛔) — ซ่อนไว้ ห้ามใส่ค่าคงที่ -->
   <div class="spacer"></div>
   <div class="topstat">
     <div class="ts">M1<br><b id="hM1">–</b></div>
@@ -48,18 +48,17 @@
 <!-- ═══════════ SHELL ═══════════ -->
 <div class="shell">
 
-<!-- ═══════════ SIDEBAR ═══════════ -->
+<!-- ═══════════ SIDEBAR (Phase C-2: 4 รายการ / 2 กลุ่ม — design_system Section 3) ═══════════ -->
 <aside class="sidebar">
   <div class="nav-group">
     <div class="nav-group-label">มอนิเตอร์สด</div>
     <div class="nav-item active" data-tab="overview">ภาพรวม</div>
-    <div class="nav-item" data-tab="ml">ML สัญญาณ</div>
-    <div class="nav-item" data-tab="setup">Rule-Based</div>
+    <div class="nav-item" data-tab="signals">ศูนย์สัญญาณ</div>
   </div>
   <div class="nav-group">
-    <div class="nav-group-label">รายงานย้อนหลัง</div>
-    <div class="nav-item" data-tab="journal">Journal / P&amp;L</div>
-    <div class="nav-item" data-tab="cfd">CFD Backtest</div>
+    <div class="nav-group-label">ผลงาน &amp; บันทึก</div>
+    <div class="nav-item" data-tab="performance">ผลงาน &amp; บันทึก</div>
+    <div class="nav-item" data-tab="log">ประวัติ &amp; แจ้งเตือน</div>
   </div>
 </aside>
 
@@ -181,8 +180,15 @@
     </div>
   </section>
 
-  <!-- ─── ML ─── -->
-  <section id="tab-ml" style="display:none;">
+  <!-- ─── SIGNAL CENTER (Phase C-2: รวม ML + Rule-Based เป็น sub-tab — design_system 5.2) ─── -->
+  <section id="tab-signals" style="display:none;">
+    <div class="subtabs">
+      <button class="subtab active" data-subtab="ml">ML Signals</button>
+      <button class="subtab" data-subtab="setup">Rule-Based 11-Checklist</button>
+    </div>
+
+<!-- ─── ML ─── (Phase C-2: กลายเป็น sub-tab pane ของ tab-signals) -->
+  <div class="subtab-pane" id="pane-ml" data-pane="ml" style="display:none;">
     <div class="j-hero">
       <div class="j-hero-card wr">
         <div class="jh-lbl">ML Winrate</div>
@@ -222,11 +228,11 @@
       <div class="gname">แนวทางสัญญาณ ML ที่ความมั่นใจสูง (conf ≥ 0.70)</div>
       <div class="guide-steps" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">
         <div class="gstep">
-          <b style="color:var(--yellow);">≥ 0.70 — HIGH</b>
+          <b style="color:var(--warn);">≥ 0.70 — HIGH</b>
           <span>สัญญาณแรง · ใช้ <b>1/3 ของเงินเดิมพัน</b> · เข้าตามทิศทางสัญญาณ (CALL/PUT)</span>
         </div>
         <div class="gstep">
-          <b style="color:var(--green);">0.60 – 0.69</b>
+          <b style="color:var(--bull);">0.60 – 0.69</b>
           <span>สัญญาณปานกลาง · รอจังหวะยืนยันจาก Rule-Based (แนวรับ/ต้าน) ก่อนเข้า</span>
         </div>
         <div class="gstep">
@@ -237,7 +243,7 @@
       <div class="guide-note">จุดคุ้มทุนจริงดูจากค่า <b>Breakeven</b> ด้านบน — จะเปิดออเดอร์ได้เมื่อความมั่นใจ (Win Prob) สูงกว่า Breakeven เสมอ</div>
     </div>
     <div class="panel">
-      <h3><span class="ph green"></span>ประวัติสัญญาณ ML ทั้งหมด</h3>
+      <h3><span class="ph"></span>ประวัติสัญญาณ ML ทั้งหมด</h3>
       <div class="tbl-wrap" style="max-height:480px;overflow-y:auto;">
         <table id="mlFullTable">
           <thead><tr><th>เวลา</th><th>TF</th><th>ทิศทาง</th><th>Entry</th><th>Exit</th><th>Win Prob</th><th>Thresh</th><th>Hold</th><th>Model</th><th>ผล</th></tr></thead>
@@ -246,10 +252,10 @@
         <div id="mlEmpty" class="empty" style="display:none;">ยังไม่มีสัญญาณ ML — รอ notifier.py ทำงาน</div>
       </div>
     </div>
-  </section>
+  </div>
 
-  <!-- ─── SETUP ─── -->
-  <section id="tab-setup" style="display:none;">
+<!-- ─── SETUP ─── (Phase C-2: กลายเป็น sub-tab pane ของ tab-signals; Tick-Touch ย้ายไปหน้า Log/Alert) -->
+  <div class="subtab-pane" id="pane-setup" data-pane="setup" style="display:none;">
     <div class="j-hero">
       <div class="j-hero-card wr">
         <div class="jh-lbl">Setup Winrate</div>
@@ -286,11 +292,11 @@
       </div>
     </div>
     <div class="cols l3">
-      <div class="panel"><h3><span class="ph blue"></span>Setup — M5</h3><div id="setupAllM5"></div></div>
-      <div class="panel"><h3><span class="ph blue"></span>Setup — M1</h3><div id="setupAllM1"></div></div>
+      <div class="panel"><h3><span class="ph"></span>Setup — M5</h3><div id="setupAllM5"></div></div>
+      <div class="panel"><h3><span class="ph"></span>Setup — M1</h3><div id="setupAllM1"></div></div>
       <div class="panel">
-        <h3><span class="ph blue"></span>ประวัติสัญญาณ Rule-Based
-          <select id="setupSymFilter" style="background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:800;font-family:inherit;float:right;">
+        <h3><span class="ph"></span>ประวัติสัญญาณ Rule-Based
+          <select id="setupSymFilter" style="background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:800;font-family:inherit;float:right;">
             <option value="">ทั้งหมด</option>
             <option value="frxXAUUSD">XAUUSD</option>
             <option value="frxEURUSD">EURUSD</option>
@@ -310,41 +316,20 @@
           <div id="setEmpty" class="empty" style="display:none;">ยังไม่มีสัญญาณ — รอ setup_feed.py ทำงาน</div>
         </div>
       </div>
-
-      <!-- TICK TOUCH RESEARCH MONITOR -->
-      <div style="margin-top:20px;">
-        <h3><span class="ph purple"></span>Tick Touch Research
-          <span style="font-size:11px;color:var(--muted);font-weight:400;margin-left:8px;">เก็บข้อมูล 3 เคสแตะ EMA200 + checklist vote (ไม่ส่งสัญญาณจริง)</span>
-        </h3>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px;" id="ttCaseCards">
-          <div class="empty" style="grid-column:1/-1;">ยังไม่มีข้อมูล research</div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-          <div>
-            <h4 style="color:var(--cyan);font-size:12px;margin-bottom:6px;">🗳 Checklist Vote Weight (WR เมื่อ cond = true)</h4>
-            <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
-              <table id="ttCondTable" style="font-size:11px;">
-                <thead><tr><th>Condition</th><th>True</th><th>Win</th><th>WR</th><th>False WR</th></tr></thead>
-                <tbody></tbody>
-              </table>
-            </div>
-          </div>
-          <div>
-            <h4 style="color:var(--cyan);font-size:12px;margin-bottom:6px;">Recent Touches</h4>
-            <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
-              <table id="ttRecentTable" style="font-size:11px;">
-                <thead><tr><th>เวลา</th><th>คู่</th><th>Case</th><th>Dir</th><th>Entry</th><th>Exit</th><th>✓</th><th>ผล</th></tr></thead>
-                <tbody></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
+  </div>
+
   </section>
 
-  <!-- ─── JOURNAL REDESIGNED ─── -->
-  <section id="tab-journal" style="display:none;">
+  <!-- ─── ผลงาน & บันทึก (Phase C-2: รวม Journal + CFD เป็น sub-tab — design_system 5.3) ─── -->
+  <section id="tab-performance" style="display:none;">
+    <div class="subtabs">
+      <button class="subtab active" data-subtab="journal">Equity &amp; P&amp;L</button>
+      <button class="subtab" data-subtab="cfd">CFD Paper Trade / Backtest</button>
+    </div>
+
+<!-- ─── JOURNAL (Phase C-2: กลายเป็น sub-tab pane ของ tab-performance) ─── -->
+  <div class="subtab-pane" id="pane-journal" data-pane="journal" style="display:none;">
     <div class="j-header">
       <div class="j-title"><span class="jicon"></span>Journal & P&amp;L</div>
       <div class="j-actions">
@@ -362,7 +347,7 @@
         <label>ขนาดต่อไม้<input type="number" id="setStake" min="1" step="10"></label>
         <label>สกุลเงิน<input type="text" id="setCurrency" maxlength="5" style="width:70px;"></label>
         <button class="btn accent" id="btnSaveSettings">บันทึก</button>
-        <span id="settStatus" style="font-size:11px;color:var(--green);align-self:center;"></span>
+        <span id="settStatus" style="font-size:11px;color:var(--bull);align-self:center;"></span>
         <label style="margin-left:12px;">Export จากวัน<input type="date" id="expStart"></label>
         <label>ถึงวัน<input type="date" id="expEnd"></label>
         <button class="btn accent" id="btnExport">ดาวน์โหลด Excel</button>
@@ -381,11 +366,11 @@
         <div class="jh-sub" id="jWrSub">–</div>
       </div>
       <div class="j-hero-card bal">
-        <div class="jh-lbl">💰 Option Balance</div>
+        <div class="jh-lbl">Option Balance</div>
         <div class="jh-val" id="mBalance">–</div>
         <div class="jh-sub" id="mBalanceSub">–</div>
       </div>
-      <div class="j-hero-card bal" style="border-left:2px solid var(--cyan);">
+      <div class="j-hero-card bal" style="border-left:2px solid var(--accent);">
         <div class="jh-lbl">CFD Balance</div>
         <div class="jh-val" id="mCfdBalance">–</div>
         <div class="jh-sub" id="mCfdBalanceSub">–</div>
@@ -400,7 +385,7 @@
           <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="jMlWr">–</div></div>
           <div class="j-cmp-stat"><div class="cs-lbl">P&amp;L</div><div class="cs-val" id="mPnlMl">–</div></div>
         </div>
-        <div class="j-cmp-bar"><div class="j-cmp-bar-fill" id="jMlBar" style="width:0%;background:var(--purple);"></div></div>
+        <div class="j-cmp-bar"><div class="j-cmp-bar-fill" id="jMlBar" style="width:0%;background:var(--accent);"></div></div>
         <div class="jh-sub" id="mRoiMl" style="margin-top:6px;">ROI –</div>
       </div>
       <div class="j-cmp-card">
@@ -410,7 +395,7 @@
           <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="jRbWr">–</div></div>
           <div class="j-cmp-stat"><div class="cs-lbl">P&amp;L</div><div class="cs-val" id="mPnlSt">–</div></div>
         </div>
-        <div class="j-cmp-bar"><div class="j-cmp-bar-fill" id="jRbBar" style="width:0%;background:var(--blue);"></div></div>
+        <div class="j-cmp-bar"><div class="j-cmp-bar-fill" id="jRbBar" style="width:0%;background:var(--accent);"></div></div>
         <div class="jh-sub" id="mRoiSt" style="margin-top:6px;">ROI –</div>
       </div>
     </div>
@@ -478,10 +463,10 @@
         </div>
       </div>
     </div>
-  </section>
+  </div>
 
-  <!-- ═══════════ CFD BACKTEST TAB ═══════════ -->
-  <section id="tab-cfd" style="display:none;">
+<!-- ─── CFD BACKTEST (Phase C-2: กลายเป็น sub-tab pane ของ tab-performance) ─── -->
+  <div class="subtab-pane" id="pane-cfd" data-pane="cfd" style="display:none;">
     <div class="j-col">
       <!-- params bar -->
       <div class="j-section open">
@@ -490,18 +475,18 @@
         </div>
         <div class="j-section-body" style="padding:12px;">
           <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center; font-size:11px;">
-            <label>ทุน $<input id="cfdCapital" type="number" value="5000" min="100" max="100000" style="width:70px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
-            <label>SL (pip) <input id="cfdSL" type="number" value="20" min="5" max="100" step="1" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
-            <label>TP1 (pip) <input id="cfdTP1" type="number" value="40" min="10" max="200" step="1" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
-            <label>TP2 (pip) <input id="cfdTP2" type="number" value="60" min="10" max="300" step="1" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
-            <label>Spread <input id="cfdSpread" type="number" value="1.5" min="0" max="10" step="0.5" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
-            <label>Risk % <input id="cfdRisk" type="number" value="1" min="0.1" max="10" step="0.1" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
-            <select id="cfdSignalType" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 8px;font-size:11px;">
+            <label>ทุน $<input id="cfdCapital" type="number" value="5000" min="100" max="100000" style="width:70px;background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <label>SL (pip) <input id="cfdSL" type="number" value="20" min="5" max="100" step="1" style="width:50px;background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <label>TP1 (pip) <input id="cfdTP1" type="number" value="40" min="10" max="200" step="1" style="width:50px;background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <label>TP2 (pip) <input id="cfdTP2" type="number" value="60" min="10" max="300" step="1" style="width:50px;background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <label>Spread <input id="cfdSpread" type="number" value="1.5" min="0" max="10" step="0.5" style="width:50px;background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <label>Risk % <input id="cfdRisk" type="number" value="1" min="0.1" max="10" step="0.1" style="width:50px;background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:11px;"></label>
+            <select id="cfdSignalType" style="background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 8px;font-size:11px;">
               <option value="ALL">All Systems</option>
               <option value="SETUP">Rule-Based Only</option>
               <option value="ML">ML Only</option>
             </select>
-            <button id="btnRunCfdBacktest" style="background:var(--yellow);color:#000;border:none;border-radius:4px;padding:4px 14px;font-size:11px;font-weight:700;cursor:pointer;">Run Backtest</button>
+            <button id="btnRunCfdBacktest" style="background:var(--warn);color:#000;border:none;border-radius:4px;padding:4px 14px;font-size:11px;font-weight:700;cursor:pointer;">Run Backtest</button>
           </div>
         </div>
       </div>
@@ -573,6 +558,66 @@
         </div>
       </div>
     </div>
+  </div>
+
+  </section>
+
+  <!-- ─── ประวัติ & แจ้งเตือน (Phase C-2: เฉพาะข้อมูลจริง — Tick-Touch + สัญญาณล่าสุด — design_system 5.4) ─── -->
+  <section id="tab-log" style="display:none;">
+    <div class="subtabs">
+      <button class="subtab active" data-subtab="siglog">ประวัติสัญญาณ</button>
+      <button class="subtab" data-subtab="ticktouch">Tick-Touch Research</button>
+    </div>
+
+<!-- ─── LOG/ALERT (Phase C-2) — เฉพาะข้อมูลจริง: ประวัติสัญญาณ (ML/Setup) + Tick-Touch Research
+     ห้ามแสดง: สถานะส่ง Telegram / System Log / โหมด LIVE-PHANTOM (ยังไม่มี endpoint — design_system Section 7) -->
+  <div class="subtab-pane" id="pane-siglog" data-pane="siglog" style="display:none;">
+    <div class="panel" style="margin-bottom:14px;">
+      <h3><span class="ph"></span>สัญญาณล่าสุด (ML + Rule-Based)
+        <span style="font-size:11px;color:var(--muted);font-weight:400;margin-left:8px;">จาก /api/ml/signals และ /api/signals — ยังไม่มีสถานะการส่งจริง</span>
+      </h3>
+      <div class="tbl-wrap" style="max-height:420px;overflow-y:auto;">
+        <table id="sigLogTable">
+          <thead><tr><th>เวลา</th><th>ชนิด</th><th>ทิศทาง</th><th>ราคา</th><th>Prob/Score</th><th>ผล</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div id="sigLogEmpty" class="empty" style="display:none;">ยังไม่มีสัญญาณ — รอระบบยิงสัญญาณแรก</div>
+      </div>
+    </div>
+  </div>
+
+    <div class="subtab-pane" id="pane-ticktouch" data-pane="ticktouch" style="display:none;">
+<!-- ─── TICK TOUCH RESEARCH (Phase C-2: ย้ายจาก tab-setup มาไว้หน้า Log/Alert — ข้อมูลจริงจาก /api/ticktouch/stats) -->
+      <div class="panel">
+        <h3><span class="ph"></span>Tick Touch Research
+          <span style="font-size:11px;color:var(--muted);font-weight:400;margin-left:8px;">เก็บข้อมูล 3 เคสแตะ EMA200 + checklist vote (ไม่ส่งสัญญาณจริง)</span>
+        </h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px;" id="ttCaseCards">
+          <div class="empty" style="grid-column:1/-1;">ยังไม่มีข้อมูล research</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div>
+            <h4 style="color:var(--accent);font-size:12px;margin-bottom:6px;">Checklist Vote Weight (WR เมื่อ cond = true)</h4>
+            <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
+              <table id="ttCondTable" style="font-size:11px;">
+                <thead><tr><th>Condition</th><th>True</th><th>Win</th><th>WR</th><th>False WR</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <h4 style="color:var(--accent);font-size:12px;margin-bottom:6px;">Recent Touches</h4>
+            <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
+              <table id="ttRecentTable" style="font-size:11px;">
+                <thead><tr><th>เวลา</th><th>คู่</th><th>Case</th><th>Dir</th><th>Entry</th><th>Exit</th><th>✓</th><th>ผล</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </section>
 
 </div><!-- /content -->
@@ -586,6 +631,7 @@
   <span class="st-sep"></span>
   <span>อัปเดตล่าสุด: <b id="statusTs">–</b></span>
   <span class="st-sep"></span>
+  <span class="st-stale" id="staleBadge" style="display:none;"></span>
   <span>Setup V8 · EMA200(M5) คือใจหลัก | กราฟ: EMA200(1m)</span>
   <span class="spacer"></span>
   <span id="statusNote"></span>

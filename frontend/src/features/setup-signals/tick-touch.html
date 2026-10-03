@@ -1,0 +1,29 @@
+<!-- ─── TICK TOUCH RESEARCH (Phase C-2: ย้ายจาก tab-setup มาไว้หน้า Log/Alert — ข้อมูลจริงจาก /api/ticktouch/stats) -->
+      <div class="panel">
+        <h3><span class="ph"></span>Tick Touch Research
+          <span style="font-size:11px;color:var(--muted);font-weight:400;margin-left:8px;">เก็บข้อมูล 3 เคสแตะ EMA200 + checklist vote (ไม่ส่งสัญญาณจริง)</span>
+        </h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px;" id="ttCaseCards">
+          <div class="empty" style="grid-column:1/-1;">ยังไม่มีข้อมูล research</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div>
+            <h4 style="color:var(--accent);font-size:12px;margin-bottom:6px;">Checklist Vote Weight (WR เมื่อ cond = true)</h4>
+            <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
+              <table id="ttCondTable" style="font-size:11px;">
+                <thead><tr><th>Condition</th><th>True</th><th>Win</th><th>WR</th><th>False WR</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <h4 style="color:var(--accent);font-size:12px;margin-bottom:6px;">Recent Touches</h4>
+            <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
+              <table id="ttRecentTable" style="font-size:11px;">
+                <thead><tr><th>เวลา</th><th>คู่</th><th>Case</th><th>Dir</th><th>Entry</th><th>Exit</th><th>✓</th><th>ผล</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>

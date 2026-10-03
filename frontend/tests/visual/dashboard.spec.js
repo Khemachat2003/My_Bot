@@ -11,7 +11,8 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const LEGACY = process.env.UI_TARGET === 'legacy';
 const FIXED_NOW = new Date('2026-10-02T10:30:00Z'); // นาฬิกานิ่ง → เวลาบนจอเหมือนกันทุกครั้ง
-const TABS = ['overview', 'ml', 'setup', 'journal', 'cfd'];
+const TABS = ['overview', 'signals', 'performance', 'log']; // Phase C-2: sidebar ใหม่ 4 แท็บ
+const SUBTABS = { signals: ['ml', 'setup'], performance: ['journal', 'cfd'], log: ['siglog', 'ticktouch'] };
 const VIEWPORTS = { desktop: { width: 1440, height: 900 }, mobile: { width: 390, height: 844 } };
 const NET_FILE = resolve(HERE, '__snapshots__/network.legacy.json');
 
@@ -40,9 +41,16 @@ for (const [vpName, viewport] of Object.entries(VIEWPORTS)) {
       await page.locator(`.nav-item[data-tab="${tab}"]`).click();
       await page.waitForTimeout(800);
       await expect(page).toHaveScreenshot(`${vpName}-${tab}.png`);
+      // sub-tab ของแท็บรวม (Phase C-2) — ภาพเฉพาะ sub-tab ที่ 2 ขึ้นไป (อันแรกอยู่ในภาพหลักแล้ว)
+      for (const sub of (SUBTABS[tab] || []).slice(1)) {
+        await page.locator(`#tab-${tab} .subtab[data-subtab="${sub}"]`).click();
+        await page.waitForTimeout(800);
+        await expect(page).toHaveScreenshot(`${vpName}-${tab}-${sub}.png`);
+      }
     }
-    // พับ/ขยาย section (แทน inline onclick) ต้องทำงานเหมือนเดิม
-    await page.locator('.nav-item[data-tab="journal"]').click();
+    // พับ/ขยาย section (แทน inline onclick) ต้องทำงานเหมือนเดิม — อยู่ sub-tab journal ของ tab-performance
+    await page.locator('.nav-item[data-tab="performance"]').click();
+    await page.locator('#tab-performance .subtab[data-subtab="journal"]').click();
     await page.locator('#jSecPeriod .j-section-head').click();
     await expect(page.locator('#jSecPeriod')).toHaveClass(/open/);
     await page.locator('#jSecPeriod .j-section-head').click();
@@ -53,7 +61,8 @@ for (const [vpName, viewport] of Object.entries(VIEWPORTS)) {
 
 test('network ที่หน้าเว็บเรียก ตรงกับของเดิม', async ({ page }) => {
   await openDashboard(page, VIEWPORTS.desktop);
-  await page.locator('.nav-item[data-tab="cfd"]').click();
+  await page.locator('.nav-item[data-tab="performance"]').click();
+  await page.locator('#tab-performance .subtab[data-subtab="cfd"]').click();
   await page.locator('#btnRunCfdBacktest, [onclick="runCFDBacktest()"]').first().click(); // ปุ่ม Run Backtest
   await page.waitForTimeout(800);
   const reqs = await (await page.request.get('/__requests')).json();

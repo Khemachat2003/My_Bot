@@ -31,13 +31,46 @@
 
   <!-- @include src/features/overview/view.html -->
 
-  <!-- @include src/features/ml-signals/view.html -->
+  <!-- ─── SIGNAL CENTER (Phase C-2: รวม ML + Rule-Based เป็น sub-tab — design_system 5.2) ─── -->
+  <section id="tab-signals" style="display:none;">
+    <div class="subtabs">
+      <button class="subtab active" data-subtab="ml">ML Signals</button>
+      <button class="subtab" data-subtab="setup">Rule-Based 11-Checklist</button>
+    </div>
 
-  <!-- @include src/features/setup-signals/view.html -->
+    <!-- @include src/features/ml-signals/view.html -->
 
-  <!-- @include src/features/journal/view.html -->
+    <!-- @include src/features/setup-signals/view.html -->
 
-  <!-- @include src/features/cfd/view.html -->
+  </section>
+
+  <!-- ─── ผลงาน & บันทึก (Phase C-2: รวม Journal + CFD เป็น sub-tab — design_system 5.3) ─── -->
+  <section id="tab-performance" style="display:none;">
+    <div class="subtabs">
+      <button class="subtab active" data-subtab="journal">Equity &amp; P&amp;L</button>
+      <button class="subtab" data-subtab="cfd">CFD Paper Trade / Backtest</button>
+    </div>
+
+    <!-- @include src/features/journal/view.html -->
+
+    <!-- @include src/features/cfd/view.html -->
+
+  </section>
+
+  <!-- ─── ประวัติ & แจ้งเตือน (Phase C-2: เฉพาะข้อมูลจริง — Tick-Touch + สัญญาณล่าสุด — design_system 5.4) ─── -->
+  <section id="tab-log" style="display:none;">
+    <div class="subtabs">
+      <button class="subtab active" data-subtab="siglog">ประวัติสัญญาณ</button>
+      <button class="subtab" data-subtab="ticktouch">Tick-Touch Research</button>
+    </div>
+
+    <!-- @include src/features/notifications/history.html -->
+
+    <div class="subtab-pane" id="pane-ticktouch" data-pane="ticktouch" style="display:none;">
+      <!-- @include src/features/setup-signals/tick-touch.html -->
+    </div>
+
+  </section>
 
 </div><!-- /content -->
 </div><!-- /shell -->

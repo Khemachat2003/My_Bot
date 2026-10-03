@@ -1,5 +1,5 @@
-  <!-- ─── SETUP ─── -->
-  <section id="tab-setup" style="display:none;">
+<!-- ─── SETUP ─── (Phase C-2: กลายเป็น sub-tab pane ของ tab-signals; Tick-Touch ย้ายไปหน้า Log/Alert) -->
+  <div class="subtab-pane" id="pane-setup" data-pane="setup" style="display:none;">
     <div class="j-hero">
       <div class="j-hero-card wr">
         <div class="jh-lbl">Setup Winrate</div>
@@ -36,11 +36,11 @@
       </div>
     </div>
     <div class="cols l3">
-      <div class="panel"><h3><span class="ph blue"></span>Setup — M5</h3><div id="setupAllM5"></div></div>
-      <div class="panel"><h3><span class="ph blue"></span>Setup — M1</h3><div id="setupAllM1"></div></div>
+      <div class="panel"><h3><span class="ph"></span>Setup — M5</h3><div id="setupAllM5"></div></div>
+      <div class="panel"><h3><span class="ph"></span>Setup — M1</h3><div id="setupAllM1"></div></div>
       <div class="panel">
-        <h3><span class="ph blue"></span>ประวัติสัญญาณ Rule-Based
-          <select id="setupSymFilter" style="background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:800;font-family:inherit;float:right;">
+        <h3><span class="ph"></span>ประวัติสัญญาณ Rule-Based
+          <select id="setupSymFilter" style="background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:800;font-family:inherit;float:right;">
             <option value="">ทั้งหมด</option>
             <option value="frxXAUUSD">XAUUSD</option>
             <option value="frxEURUSD">EURUSD</option>
@@ -60,35 +60,5 @@
           <div id="setEmpty" class="empty" style="display:none;">ยังไม่มีสัญญาณ — รอ setup_feed.py ทำงาน</div>
         </div>
       </div>
-
-      <!-- TICK TOUCH RESEARCH MONITOR -->
-      <div style="margin-top:20px;">
-        <h3><span class="ph purple"></span>Tick Touch Research
-          <span style="font-size:11px;color:var(--muted);font-weight:400;margin-left:8px;">เก็บข้อมูล 3 เคสแตะ EMA200 + checklist vote (ไม่ส่งสัญญาณจริง)</span>
-        </h3>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px;" id="ttCaseCards">
-          <div class="empty" style="grid-column:1/-1;">ยังไม่มีข้อมูล research</div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-          <div>
-            <h4 style="color:var(--cyan);font-size:12px;margin-bottom:6px;">🗳 Checklist Vote Weight (WR เมื่อ cond = true)</h4>
-            <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
-              <table id="ttCondTable" style="font-size:11px;">
-                <thead><tr><th>Condition</th><th>True</th><th>Win</th><th>WR</th><th>False WR</th></tr></thead>
-                <tbody></tbody>
-              </table>
-            </div>
-          </div>
-          <div>
-            <h4 style="color:var(--cyan);font-size:12px;margin-bottom:6px;">Recent Touches</h4>
-            <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
-              <table id="ttRecentTable" style="font-size:11px;">
-                <thead><tr><th>เวลา</th><th>คู่</th><th>Case</th><th>Dir</th><th>Entry</th><th>Exit</th><th>✓</th><th>ผล</th></tr></thead>
-                <tbody></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
-  </section>
+  </div>

@@ -1,5 +1,5 @@
-  <!-- ─── JOURNAL REDESIGNED ─── -->
-  <section id="tab-journal" style="display:none;">
+<!-- ─── JOURNAL (Phase C-2: กลายเป็น sub-tab pane ของ tab-performance) ─── -->
+  <div class="subtab-pane" id="pane-journal" data-pane="journal" style="display:none;">
     <div class="j-header">
       <div class="j-title"><span class="jicon"></span>Journal & P&amp;L</div>
       <div class="j-actions">
@@ -17,7 +17,7 @@
         <label>ขนาดต่อไม้<input type="number" id="setStake" min="1" step="10"></label>
         <label>สกุลเงิน<input type="text" id="setCurrency" maxlength="5" style="width:70px;"></label>
         <button class="btn accent" id="btnSaveSettings">บันทึก</button>
-        <span id="settStatus" style="font-size:11px;color:var(--green);align-self:center;"></span>
+        <span id="settStatus" style="font-size:11px;color:var(--bull);align-self:center;"></span>
         <label style="margin-left:12px;">Export จากวัน<input type="date" id="expStart"></label>
         <label>ถึงวัน<input type="date" id="expEnd"></label>
         <button class="btn accent" id="btnExport">ดาวน์โหลด Excel</button>
@@ -36,11 +36,11 @@
         <div class="jh-sub" id="jWrSub">–</div>
       </div>
       <div class="j-hero-card bal">
-        <div class="jh-lbl">💰 Option Balance</div>
+        <div class="jh-lbl">Option Balance</div>
         <div class="jh-val" id="mBalance">–</div>
         <div class="jh-sub" id="mBalanceSub">–</div>
       </div>
-      <div class="j-hero-card bal" style="border-left:2px solid var(--cyan);">
+      <div class="j-hero-card bal" style="border-left:2px solid var(--accent);">
         <div class="jh-lbl">CFD Balance</div>
         <div class="jh-val" id="mCfdBalance">–</div>
         <div class="jh-sub" id="mCfdBalanceSub">–</div>
@@ -55,7 +55,7 @@
           <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="jMlWr">–</div></div>
           <div class="j-cmp-stat"><div class="cs-lbl">P&amp;L</div><div class="cs-val" id="mPnlMl">–</div></div>
         </div>
-        <div class="j-cmp-bar"><div class="j-cmp-bar-fill" id="jMlBar" style="width:0%;background:var(--purple);"></div></div>
+        <div class="j-cmp-bar"><div class="j-cmp-bar-fill" id="jMlBar" style="width:0%;background:var(--accent);"></div></div>
         <div class="jh-sub" id="mRoiMl" style="margin-top:6px;">ROI –</div>
       </div>
       <div class="j-cmp-card">
@@ -65,7 +65,7 @@
           <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="jRbWr">–</div></div>
           <div class="j-cmp-stat"><div class="cs-lbl">P&amp;L</div><div class="cs-val" id="mPnlSt">–</div></div>
         </div>
-        <div class="j-cmp-bar"><div class="j-cmp-bar-fill" id="jRbBar" style="width:0%;background:var(--blue);"></div></div>
+        <div class="j-cmp-bar"><div class="j-cmp-bar-fill" id="jRbBar" style="width:0%;background:var(--accent);"></div></div>
         <div class="jh-sub" id="mRoiSt" style="margin-top:6px;">ROI –</div>
       </div>
     </div>
@@ -133,4 +133,4 @@
         </div>
       </div>
     </div>
-  </section>
+  </div>
