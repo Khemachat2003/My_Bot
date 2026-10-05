@@ -14,6 +14,8 @@
   .kpi .sub b{color:var(--text);}
   .val.green{color:var(--green);} .val.red{color:var(--red);} .val.yellow{color:var(--yellow);}
   .val.blue{color:var(--blue);} .val.cyan{color:var(--cyan);} .val.purple{color:var(--purple);} .val.muted{color:var(--muted);}
+  /* C-5 (design_system 5.3): ชื่อ token ใหม่สำหรับ setKpi/renderStat — ค่าสีเดียวกับ alias เดิม (append-only) */
+  .val.bull{color:var(--bull);} .val.bear{color:var(--bear);} .val.warn{color:var(--warn);}
 
   /* panels */
   .cols{display:grid; gap:14px; margin-bottom:16px;}

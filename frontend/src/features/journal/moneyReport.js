@@ -2,10 +2,14 @@
 // ย้ายจาก index.html เดิม (_archive/index.legacy.html) บรรทัด 3123–3190 แบบ move-only
 
 import { fetchJSON } from '../../shared/api/client.js';
+import { pnlColor, pnlText } from '../../shared/lib/pnlText.js';
 
 let moneyReport=null;
 function setKpi(id,val,cls){const el=document.getElementById(id); if(!el)return; el.textContent=val; el.className='val '+(cls||'muted');}
-function fmtMoney(v,cur){ return (v>0?'+':'')+Number(v).toLocaleString('th-TH',{maximumFractionDigits:2})+' '+cur; }
+// C-5 (design_system 5.3): P&L คู่เครื่องหมายเสมอ รูปแบบเลขเดิม (th-TH ทศนิยม ≤2) — ศูนย์ไม่มีเครื่องหมาย
+function fmtMoney(v,cur){ return pnlText(v,{digits:2,suffix:' '+cur}); }
+// ROI ใน sub-line เติม + เมื่อบวก (เลขคงรูปเดิมที่ backend ส่งมา)
+function roiTxt(v){ return (v>0?'+':'')+v+'%'; }
 
 async function refreshJournalMoney(){
   try{
@@ -17,18 +21,18 @@ async function refreshJournalMoney(){
     if(active!==document.getElementById('setStake')) document.getElementById('setStake').value=r.settings.stake;
     if(active!==document.getElementById('setCurrency')) document.getElementById('setCurrency').value=cur;
     const A=r.summary.ALL, ML=r.summary.ML, ST=r.summary.SETUP;
-    setKpi('mPnlAll',fmtMoney(A.pnl_money,cur),A.pnl_money>0?'green':(A.pnl_money<0?'red':'muted'));
-    document.getElementById('mPnlAllSub').textContent=`${A.n} trades · ${A.wins}W / ${A.losses}L · ROI ${A.roi}%`;
-    setKpi('mPnlMl',fmtMoney(ML.pnl_money,cur),ML.pnl_money>0?'green':(ML.pnl_money<0?'red':'muted'));
+    setKpi('mPnlAll',fmtMoney(A.pnl_money,cur),pnlColor(A.pnl_money));
+    document.getElementById('mPnlAllSub').textContent=`${A.n} trades · ${A.wins}W / ${A.losses}L · ROI ${roiTxt(A.roi)}`;
+    setKpi('mPnlMl',fmtMoney(ML.pnl_money,cur),pnlColor(ML.pnl_money));
     document.getElementById('jMlN').textContent=ML.n;
     document.getElementById('jMlWr').textContent=ML.n?ML.winrate+'%':'–';
-    document.getElementById('mRoiMl').textContent=`ROI ${ML.roi}%`;
+    document.getElementById('mRoiMl').textContent=`ROI ${roiTxt(ML.roi)}`;
     const mlBar=document.getElementById('jMlBar');
     if(mlBar) mlBar.style.width=Math.min(ML.winrate||0,100)+'%';
-    setKpi('mPnlSt',fmtMoney(ST.pnl_money,cur),ST.pnl_money>0?'green':(ST.pnl_money<0?'red':'muted'));
+    setKpi('mPnlSt',fmtMoney(ST.pnl_money,cur),pnlColor(ST.pnl_money));
     document.getElementById('jRbN').textContent=ST.n;
     document.getElementById('jRbWr').textContent=ST.n?ST.winrate+'%':'–';
-    document.getElementById('mRoiSt').textContent=`ROI ${ST.roi}%`;
+    document.getElementById('mRoiSt').textContent=`ROI ${roiTxt(ST.roi)}`;
     const rbBar=document.getElementById('jRbBar');
     if(rbBar) rbBar.style.width=Math.min(ST.winrate||0,100)+'%';
     const bal=r.daily.length?r.daily[r.daily.length-1].balance:r.settings.capital;
@@ -41,10 +45,10 @@ async function refreshJournalMoney(){
     const cfdEl=document.getElementById('mCfdBalance');
     if(cfdEl){
       cfdEl.textContent=Number(cfdBal).toLocaleString('th-TH',{maximumFractionDigits:2})+' '+cur;
-      cfdEl.style.color=cfdPnl>0?'var(--green)':(cfdPnl<0?'var(--red)':'var(--text)');
+      cfdEl.style.color='var(--'+pnlColor(cfdPnl)+')'; // C-5 (5.3): ศูนย์/ไม่มีข้อมูล → muted
     }
     const cfdSubEl=document.getElementById('mCfdBalanceSub');
-    if(cfdSubEl) cfdSubEl.textContent='ทุน '+Number(cfd.capital||5000).toLocaleString('th-TH')+' '+cur+' · P&L '+(cfdPnl>=0?'+':'')+Number(cfdPnl).toLocaleString('th-TH',{maximumFractionDigits:2});
+    if(cfdSubEl) cfdSubEl.textContent='ทุน '+Number(cfd.capital||5000).toLocaleString('th-TH')+' '+cur+' · P&L '+pnlText(cfdPnl,{digits:2});
     renderPeriodTable();
   }catch(e){}
 }

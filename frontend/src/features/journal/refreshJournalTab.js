@@ -5,12 +5,14 @@
 import { drawEquityFull } from './drawEquityFull.js';
 import { fetchJSON } from '../../shared/api/client.js';
 import { renderStat } from '../../shared/ui/domText.js';
+import { pnlText, wrColor } from '../../shared/lib/pnlText.js';
 
 async function refreshJournalTab(){
   try{
     const j=await fetchJSON('/api/journal/stats');
     const wr = j.winrate || 0;
-    renderStat(document.getElementById('jWr'), wr+'%', j.n?'green':'muted');
+    // C-5 (5.3): สี winrate ตาม breakeven จาก API — >= breakeven → bull, ต่ำกว่า → bear (ไม่มีข้อมูล → muted)
+    renderStat(document.getElementById('jWr'), wr+'%', j.n?wrColor(j.winrate, j.breakeven):'muted');
     document.getElementById('jWrSub').textContent = j.n
       ? `${j.wins}W / ${j.losses}L · ${j.daily.length} วัน · CI [${j.ci_low}%–${j.ci_high}%]`
       : 'ยังไม่มีผล';
@@ -28,7 +30,7 @@ async function refreshJournalTab(){
     const daily=j.daily||[];
     document.querySelector('#dailyTable tbody').innerHTML=daily.map(d=>`
       <tr><td>${d.day}</td><td class="mono">${d.n}</td><td class="mono">${d.wins}</td><td class="mono">${d.winrate}%</td>
-      <td class="mono ${d.pnl>0?'dir-call':'dir-put'}">${(d.pnl>0?'+':'')+d.pnl.toFixed(2)}</td></tr>`).join('')
+      <td class="mono ${d.pnl>0?'dir-call':(d.pnl<0?'dir-put':'')}">${pnlText(d.pnl,{fixed:true,digits:2})}</td></tr>`).join('')
       || '<tr><td colspan="5" class="empty">ยังไม่มีข้อมูล</td></tr>';
   }catch(e){}
   try{

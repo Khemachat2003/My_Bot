@@ -1,9 +1,16 @@
-// กราฟ Equity Curve เต็มในแท็บ Journal
-// ย้ายจาก index.html เดิม (_archive/index.legacy.html) บรรทัด 3191–3242 แบบ move-only
+// กราฟ Equity Curve เต็มในแท็บ Journal — Phase C-5 (design_system 5.1): mirror รูปแบบ C-3 ทุกค่า
+// เส้นเดียวสี accent + baseline series (fill เหนือฐาน bull / ใต้ฐาน bear, สร้าง series ใหม่เมื่อฐานเปลี่ยน)
+// — ตัด createPriceLine เส้นฐานเดิม 2 เส้น (baseline series วาดเส้นฐานเอง) — ไม่แตะ logic ข้อมูล (_buildEqData)
 
 import { _buildEqData } from '../../shared/lib/equityData.js';
+import { pnlText } from '../../shared/lib/pnlText.js';
 
-let lwEqFullChart=null, lwEqFullSeries=null, lwEqFullSeries2=null, lwEqFullBase=null, lwEqFullBase2=null;
+const ACCENT='#4C8DFF', DIM='#4C5566';
+const BULL_FILL1='rgba(22,199,132,0.22)', BULL_FILL2='rgba(22,199,132,0.03)';
+const BEAR_FILL1='rgba(240,70,92,0.03)',  BEAR_FILL2='rgba(240,70,92,0.22)';
+
+let lwEqFullChart=null, lwEqFullSeries=null, lwEqFullSeries2=null;
+let lwEqFullBase=null, lwEqFullBase2=null; // base ปัจจุบันของแต่ละ series (เปลี่ยน → สร้างใหม่)
 function drawEquityFull(payload){
   const el=document.getElementById('equityFullChart'); if(!el) return;
   const b=_buildEqData(payload&&payload.opt, payload&&payload.cfd);
@@ -17,39 +24,47 @@ function drawEquityFull(payload){
   if(!lwEqFullChart){
     lwEqFullChart=LightweightCharts.createChart(el,{
       height:el.clientHeight||260, width:el.clientWidth||300,
-      layout:{background:{color:'transparent'},textColor:'#787B86',fontFamily:'IBM Plex Mono, monospace'},
-      grid:{vertLines:{color:'#1E222D'},horzLines:{color:'#1E222D'}},
-      rightPriceScale:{borderColor:'#2A2E39'},
-      timeScale:{borderColor:'#2A2E39',rightOffset:2},
+      layout:{background:{color:'transparent'},textColor:'#838B9C',fontFamily:'IBM Plex Mono, monospace'},
+      grid:{vertLines:{color:'#1A1D27'},horzLines:{color:'#1A1D27'}},
+      rightPriceScale:{borderColor:'#232732'},
+      timeScale:{borderColor:'#232732',rightOffset:2},
     });
     window.addEventListener('resize',()=>{ if(lwEqFullChart&&el.clientWidth>0) lwEqFullChart.applyOptions({width:el.clientWidth}); });
   }
-  if(b.cfdN && !lwEqFullSeries){
-    lwEqFullSeries=lwEqFullChart.addAreaSeries({
-      lineColor:'#26A69A', topColor:'rgba(38,166,154,0.28)', bottomColor:'rgba(38,166,154,0.02)',
-      lineWidth:2, priceLineVisible:false, lastValueVisible:false,
-      priceFormat:{type:'custom',formatter:p=>'$'+fmt(p)},
+  // สร้าง baseline series ใหม่เมื่อยังไม่มี หรือ base (ทุนเริ่มต้น) เปลี่ยน — baseline series วาดเส้นฐานเอง
+  const mkSeries=(existing,curBase,prevBase,priceFmt)=>{
+    if(existing&&prevBase===(curBase||0)) return existing;
+    if(existing) lwEqFullChart.removeSeries(existing);
+    return lwEqFullChart.addBaselineSeries({
+      baseValue:{type:'price',price:curBase||0},
+      lineColor:ACCENT, lineWidth:2,
+      topLineColor:DIM, topLineColor1:DIM,
+      topFillColor1:BULL_FILL1, topFillColor2:BULL_FILL2,
+      bottomLineColor:DIM, bottomLineColor1:DIM,
+      bottomFillColor1:BEAR_FILL1, bottomFillColor2:BEAR_FILL2,
+      priceLineVisible:false, lastValueVisible:false, priceFormat:priceFmt,
     });
-    lwEqFullBase=lwEqFullSeries.createPriceLine({price:b.cfdBase||0,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,title:'CFD ทุน'});
+  };
+  if(b.cfdN){
+    lwEqFullSeries=mkSeries(lwEqFullSeries,b.cfdBase,lwEqFullBase,{type:'custom',formatter:p=>'$'+fmt(p)});
+    lwEqFullBase=b.cfdBase||0;
   }
-  if(b.optN && !lwEqFullSeries2){
-    lwEqFullSeries2=lwEqFullChart.addAreaSeries({
-      lineColor:'#2962FF', topColor:'rgba(41,98,255,0.20)', bottomColor:'rgba(41,98,255,0.02)',
-      lineWidth:2, priceLineVisible:false, lastValueVisible:false,
-      priceFormat:{type:'custom',formatter:p=>fmt(p)+' '+cur},
-    });
-    lwEqFullBase2=lwEqFullSeries2.createPriceLine({price:b.optCapitalBase||0,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,title:'Option ทุน'});
+  if(b.optN){
+    lwEqFullSeries2=mkSeries(lwEqFullSeries2,b.optCapitalBase,lwEqFullBase2,{type:'custom',formatter:p=>fmt(p)+' '+cur});
+    lwEqFullBase2=b.optCapitalBase||0;
   }
   if(lwEqFullSeries) lwEqFullSeries.setData(b.cfdPts);
   if(lwEqFullSeries2) lwEqFullSeries2.setData(b.optPts);
-  if(lwEqFullBase) lwEqFullBase.applyOptions({price:b.cfdBase||0});
-  if(lwEqFullBase2) lwEqFullBase2.applyOptions({price:b.optCapitalBase||0});
   lwEqFullChart.applyOptions({width:el.clientWidth||300,height:el.clientHeight||260});
   if(hasData) lwEqFullChart.timeScale().fitContent();
   if(statsEl){
+    // chips: P&L คู่เครื่องหมาย + ศูนย์ไม่ติด eq-up (5.3)
+    const chipPnl=(p)=>p>0
+      ?`<span class="eq-up">(${pnlText(p,{digits:0})})</span>`
+      :(p<0?`<span class="eq-dn">(${pnlText(p,{digits:0})})</span>`:`<span>(${pnlText(p,{digits:0})})</span>`);
     const chips=[];
-    if(b.cfdN) chips.push(`CFD <b>$${fmt((b.cfdBase||0)+b.cfdPnl)}</b> <span class="eq-${b.cfdPnl>=0?'up':'dn'}">(${b.cfdPnl>=0?'+':''}${fmt(b.cfdPnl)})</span> · ${b.cfdN} เทรด`);
-    if(b.optN) chips.push(`Option <b>${fmt((b.optCapitalBase||0)+b.optPnl)} ${cur}</b> <span class="eq-${b.optPnl>=0?'up':'dn'}">(${b.optPnl>=0?'+':''}${fmt(b.optPnl)})</span> · ${b.optN} เทรด`);
+    if(b.cfdN) chips.push(`CFD <b>$${fmt((b.cfdBase||0)+b.cfdPnl)}</b> ${chipPnl(b.cfdPnl)} · ${b.cfdN} เทรด`);
+    if(b.optN) chips.push(`Option <b>${fmt((b.optCapitalBase||0)+b.optPnl)} ${cur}</b> ${chipPnl(b.optPnl)} · ${b.optN} เทรด`);
     if(!chips.length) chips.push('รอข้อมูลเทรดที่จบแล้ว');
     statsEl.innerHTML=chips.join('<span style="color:var(--border)"> | </span>');
   }

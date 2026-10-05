@@ -26,7 +26,7 @@
   .lw-empty{padding:12px; color:var(--muted); font-size:12px;}
   .eq-stats{font-size:10px; font-weight:600; color:var(--muted); font-family:var(--num); letter-spacing:.02em;}
   .eq-stats b{color:var(--text); font-weight:700;}
-  .eq-stats .eq-up{color:var(--green);} .eq-stats .eq-dn{color:var(--red);}
+  .eq-stats .eq-up{color:var(--bull);} .eq-stats .eq-dn{color:var(--bear);} /* C-5: ย้ายชื่อตาม tokens.css (ค่าเดิม) */
   .eq-empty{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
     color:var(--muted); font-size:12px; background:rgba(19,23,34,.0); pointer-events:none; text-align:center; padding:0 16px;}
   .chart-legendbar{
