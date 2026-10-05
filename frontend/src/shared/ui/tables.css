@@ -17,4 +17,9 @@
   .pill.PENDING{background:rgba(232,163,61,.14); color:var(--yellow);}
   .dir-call{color:var(--green); font-weight:800;}
   .dir-put{color:var(--red); font-weight:800;}
+  /* C-4: badge ทิศทางในตารางสัญญาณ (▲ CALL / ▼ PUT / ○ รอ) — คู่สี dim+semantic ตาม design_system */
+  .dir-badge{display:inline-block; padding:2.5px 9px; border-radius:99px; font-size:10px; font-weight:800; letter-spacing:.3px;}
+  .dir-badge.call{background:var(--bull-dim); color:var(--bull);}
+  .dir-badge.put{background:var(--bear-dim); color:var(--bear);}
+  .dir-badge.wait{background:var(--warn-dim); color:var(--warn);}
   .empty{color:var(--muted); text-align:center; padding:26px; font-size:12px;}

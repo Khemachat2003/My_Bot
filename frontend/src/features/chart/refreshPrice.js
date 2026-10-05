@@ -3,6 +3,7 @@
 
 import { drawLWChart } from './drawLwChart.js';
 import { fetchJSON } from '../../shared/api/client.js';
+import { setMarkersCache } from '../../shared/lib/markersCache.js';
 import { symbolList } from '../watchlist/index.js';
 
 async function refreshPrice(showLoading=false){
@@ -17,6 +18,7 @@ async function refreshPrice(showLoading=false){
     const wrap=document.getElementById('lwWrap');
     if(showLoading && wrap) wrap.classList.add('loading');   // ← แสดง loading เฉพาะตอนผู้ใช้กดเปลี่ยน TF/symbol เอง
     // fetch candles + markers พร้อมกัน → เปลี่ยน TF เร็วขึ้น
+    // C-4: markers ที่ได้ถูก setMarkersCache ไว้ให้ตารางสัญญาณอ่านด้วย (ไม่ต้องยิง API ซ้ำ)
     const [[prices,markers]]=await Promise.all([
       Promise.all([
         (async()=>{
@@ -25,7 +27,7 @@ async function refreshPrice(showLoading=false){
           if(Array.isArray(p)&&p.length<30) p=await fetchJSON('/api/candles?tf='+tf+'&count=1000&symbol='+encodeURIComponent(sym));
           return p;
         })(),
-        fetchJSON('/api/signals/markers?symbol='+encodeURIComponent(sym)+'&limit=50').catch(()=>window._signalMarkers||[])
+        fetchJSON('/api/signals/markers?symbol='+encodeURIComponent(sym)+'&limit=50').then(m=>{ setMarkersCache(m); return m; }).catch(()=>window._signalMarkers||[])
       ])
     ]);
     if(wrap) wrap.classList.remove('loading');

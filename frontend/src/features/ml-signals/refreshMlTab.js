@@ -4,9 +4,11 @@
 import { feedRow } from './feedRow.js';
 import { moneyReport } from '../journal/index.js';
 import { fetchJSON } from '../../shared/api/client.js';
-import { dirClass, fmtMargin } from '../../shared/lib/formatSignal.js';
+import { fmtMargin } from '../../shared/lib/formatSignal.js';
 import { fmtTime } from '../../shared/lib/formatTime.js';
+import { ensureMarkers } from '../../shared/lib/markersCache.js';
 import { renderStat } from '../../shared/ui/domText.js';
+import { cfdCells, dirBadge } from '../../shared/lib/signalRows.js';
 
 async function refreshMlTab(){
   try{
@@ -33,7 +35,11 @@ async function refreshMlTab(){
     setPnl('mlM1Pnl',t1); setPnl('mlM5Pnl',t5);
   }catch(e){}
   try{
-    const rows=await fetchJSON('/api/ml/signals?limit=100');
+    // C-4: ดึง markers คู่ไปกับ rows (แคชสด → no-op) — SL/TP/R:R อ่านจาก markers เดียวกับกราฟ
+    const [rows,markers]=await Promise.all([
+      fetchJSON('/api/ml/signals?limit=100'),
+      ensureMarkers(),
+    ]);
     const body=document.querySelector('#mlFullTable tbody');
     const empty=document.getElementById('mlEmpty');
     if(!rows.length){body.innerHTML='';empty.style.display='block';return;}
@@ -41,8 +47,9 @@ async function refreshMlTab(){
     body.innerHTML=rows.map(r=>`<tr>
       <td>${fmtTime(r.signal_time)}</td>
       <td><b>${r.timeframe||'M1'}</b></td>
-      <td class="${dirClass(r.direction)}">${r.direction||'–'}</td>
+      <td>${dirBadge(r.direction)}</td>
       <td class="mono">${r.entry_price!=null?r.entry_price.toFixed(2):'–'}</td>
+      ${cfdCells('ML',r.id,markers,2)}
       <td class="mono">${r.exit_price!=null?r.exit_price.toFixed(2):'–'}</td>
       <td class="mono">${r.confidence!=null?(r.confidence*100).toFixed(1)+'%':'–'}</td>
       <td class="mono">${r.threshold_used!=null?(r.threshold_used*100).toFixed(0)+'%':'–'}</td>

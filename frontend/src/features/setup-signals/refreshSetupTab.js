@@ -4,9 +4,11 @@
 import { moneyReport } from '../journal/index.js';
 import { TIER_ACTION } from './setupCards.js';
 import { fetchJSON } from '../../shared/api/client.js';
-import { dirClass, fmtMargin } from '../../shared/lib/formatSignal.js';
+import { fmtMargin } from '../../shared/lib/formatSignal.js';
 import { fmtTime } from '../../shared/lib/formatTime.js';
+import { ensureMarkers } from '../../shared/lib/markersCache.js';
 import { renderStat } from '../../shared/ui/domText.js';
+import { cfdCells, dirBadge } from '../../shared/lib/signalRows.js';
 import { refreshTickTouchResearch } from './tickTouchResearch.js';
 
 async function refreshSetupTab(){
@@ -35,7 +37,11 @@ async function refreshSetupTab(){
   }catch(e){}
   try{
     const sym=document.getElementById('setupSymFilter').value;
-    const rows=await fetchJSON('/api/signals?limit=100'+(sym?'&symbol='+encodeURIComponent(sym):''));
+    // C-4: ดึง markers คู่ไปกับ rows (แคชสด → no-op) — SL/TP/R:R อ่านจาก markers เดียวกับกราฟ
+    const [rows,markers]=await Promise.all([
+      fetchJSON('/api/signals?limit=100'+(sym?'&symbol='+encodeURIComponent(sym):'')),
+      ensureMarkers(),
+    ]);
     const body=document.querySelector('#setupTable tbody');
     const empty=document.getElementById('setEmpty');
     if(!rows.length){body.innerHTML='';empty.style.display='block';return;}
@@ -48,8 +54,9 @@ async function refreshSetupTab(){
       <td><b>${(r.symbol||'frxXAUUSD').replace('frx','')}</b></td>
       <td><b>${r.timeframe||'M1'}</b></td>
       <td style="color:${impColor};font-weight:700;font-size:11px;">${impLabel||'–'}</td>
-      <td class="${dirClass(r.direction)}">${r.direction}</td>
+      <td>${dirBadge(r.direction)}</td>
       <td class="mono">${r.entry_price!=null?r.entry_price.toFixed(5):'–'}</td>
+      ${cfdCells('SETUP',r.id,markers,5)}
       <td class="mono">${r.exit_price!=null?r.exit_price.toFixed(5):'–'}</td>
       <td class="mono">${r.score!=null?r.score.toFixed(1)+'/'+(r.total||'–'):'–'}</td>
       <td><span class="tier ${r.tier||'NONE'}">${TIER_ACTION[r.tier]?r.tier:'–'}</span></td>
