@@ -12,11 +12,13 @@
   tbody tr:hover{background:rgba(41,98,255,.045);}
   tbody tr:last-child td{border-bottom:none;}
   .pill{padding:2.5px 9px; border-radius:99px; font-size:10px; font-weight:800; letter-spacing:.3px;}
-  .pill.WIN{background:rgba(38,166,154,.14); color:var(--green);}
-  .pill.LOSE{background:rgba(239,83,80,.14); color:var(--red);}
-  .pill.PENDING{background:rgba(232,163,61,.14); color:var(--yellow);}
-  .dir-call{color:var(--green); font-weight:800;}
-  .dir-put{color:var(--red); font-weight:800;}
+  /* C-6: ย้ายชื่อ var เดิม (--green/--red/--yellow) → token ใหม่ (--bull/--bear/--warn)
+     — ค่า alias เท่ากันใน tokens.css = ภาพไม่เปลี่ยน (พื้น rgba คงเดิม) */
+  .pill.WIN{background:rgba(38,166,154,.14); color:var(--bull);}
+  .pill.LOSE{background:rgba(239,83,80,.14); color:var(--bear);}
+  .pill.PENDING{background:rgba(232,163,61,.14); color:var(--warn);}
+  .dir-call{color:var(--bull); font-weight:800;}
+  .dir-put{color:var(--bear); font-weight:800;}
   /* C-4: badge ทิศทางในตารางสัญญาณ (▲ CALL / ▼ PUT / ○ รอ) — คู่สี dim+semantic ตาม design_system */
   .dir-badge{display:inline-block; padding:2.5px 9px; border-radius:99px; font-size:10px; font-weight:800; letter-spacing:.3px;}
   .dir-badge.call{background:var(--bull-dim); color:var(--bull);}

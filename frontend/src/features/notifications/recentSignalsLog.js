@@ -1,19 +1,20 @@
 // หน้า Log/Alert — sub-tab "ประวัติสัญญาณ": รวมสัญญาณล่าสุดจาก /api/ml/signals + /api/signals
 // (Phase C-2 — เฉพาะข้อมูลจริง ไม่มีสถานะการส่ง Telegram / ไม่มี system log — design_system Section 7)
+// (C-6 — ปรับเฉพาะหน้าตาตาม design_system 5.4: คอลัมน์ทิศเปลี่ยนเป็น badge แบบเดียวกับตารางหลัก C-4
+//  — คง mergeRows/sort/slice เดิมทุกค่า ไม่แตะโครงข้อมูล/API)
 import { fetchJSON } from '../../shared/api/client.js';
 import { fmtTime } from '../../shared/lib/formatTime.js';
-
-const DIR_ARROW = { CALL: '▲', PUT: '▼', BUY: '▲', SELL: '▼' };
 
 function pill(result) {
   return `<span class="pill ${result || 'PENDING'}">${result || 'PENDING'}</span>`;
 }
 
-function dirCell(d) {
-  if (!d) return '<td>–</td>';
-  const arrow = DIR_ARROW[d] || '';
-  const cls = d === 'CALL' || d === 'BUY' ? 'dir-call' : d === 'PUT' || d === 'SELL' ? 'dir-put' : '';
-  return `<td class="${cls}">${arrow} ${d}</td>`;
+// badge ทิศทาง — markup เดียวกับ dirBadge ของตารางหลัก (shared/lib/signalRows.js, CSS .dir-badge ใน tables.css)
+// ต่างกันตรงที่แถว log เจอ BUY/SELL ได้ (จาก API เดิม) → โชว์ทิศจริงคู่ ▲/▼ ตามเดิม, ทิศอื่น/ขาด → ○ รอ แบบตารางหลัก
+function dirBadge(d) {
+  if (d === 'CALL' || d === 'BUY') return `<span class="dir-badge call">▲ ${d}</span>`;
+  if (d === 'PUT' || d === 'SELL') return `<span class="dir-badge put">▼ ${d}</span>`;
+  return '<span class="dir-badge wait">○ รอ</span>';
 }
 
 function mergeRows(ml, setup) {
@@ -60,7 +61,7 @@ async function refreshRecentSignalsLog() {
     body.innerHTML = rows.map((r) => `<tr>
       <td>${fmtTime(r.t)}</td>
       <td><b>${r.kind}</b></td>
-      ${dirCell(r.dir)}
+      <td>${dirBadge(r.dir)}</td>
       <td class="mono">${r.price != null ? r.price.toFixed(2) : '–'}</td>
       <td class="mono">${r.strength}</td>
       <td>${pill(r.result)}</td>
