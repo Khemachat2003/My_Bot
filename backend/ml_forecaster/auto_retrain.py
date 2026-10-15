@@ -23,6 +23,7 @@ auto_retrain.py — Auto-Retrain Loop: เรียนรู้จากสั�
   - มีสัญญาณจริง (ml_signals ที่มี features_json + result) อย่างน้อย MIN_REAL_SIGNALS
   - และมีสัญญาณใหม่เพิ่มตั้งแต่ครั้งเทรนล่าสุด ≥ min_new_signals
 """
+
 from __future__ import annotations
 
 import argparse
@@ -47,26 +48,32 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from backend import db
-from backend.ml_forecaster.features_v2 import FEATURE_COLUMNS_V2, build_dataset_v2
+from backend import db, setup_db
+from backend.ml_forecaster.features_v2 import FEATURE_COLUMNS_V2
 from backend.ml_forecaster.setup_features import (
-    SETUP_FEATURE_COLUMNS, flatten_setup_dict,
+    SETUP_FEATURE_COLUMNS,
+    flatten_setup_dict,
 )
 from backend.notifier import _conf_threshold
 from backend.telegram import send_telegram
-from backend import setup_db
 
 MODEL_DIR = Path(__file__).resolve().parent
 MODEL_FILE_M5 = MODEL_DIR / "model_m5.joblib"
-HORIZON_M5 = 6            # M5: พยากรณ์ 6 แท่ง = 30 นาที
+HORIZON_M5 = 6  # M5: พยากรณ์ 6 แท่ง = 30 นาที
 DEADZONE = 0.25
-MIN_REAL_SIGNALS = 10     # สัญญาณจริงขั้นต่ำก่อนคิดเทรนอัตโนมัติ
+MIN_REAL_SIGNALS = 10  # สัญญาณจริงขั้นต่ำก่อนคิดเทรนอัตโนมัติ
 MIN_TRAIN = 400
 MIN_SIGNALS_PER_CONF = 5
 CONF_GRID = [0.52, 0.55, 0.58, 0.60, 0.62, 0.65]
 STATE_FILE = ROOT / "data" / "auto_retrain_state.json"
-CHECK_INTERVAL_SEC = 6 * 3600   # ตรวจทุก 6 ชม. (เปลี่ยนได้ด้วย env AUTO_RETRAIN_INTERVAL_HOURS)
-MIN_NEW_SIGNALS = 5             # มีสัญญาณจริงใหม่ (resolved) ≥ นี้จึงเริ่มเทรน
+CHECK_INTERVAL_SEC = int(os.getenv("AUTO_RETRAIN_INTERVAL_SECONDS", str(6 * 3600)))
+DEFAULT_INTERVAL_HOURS = os.getenv("AUTO_RETRAIN_INTERVAL_HOURS")
+if DEFAULT_INTERVAL_HOURS:
+    try:
+        CHECK_INTERVAL_SEC = int(float(DEFAULT_INTERVAL_HOURS) * 3600)
+    except Exception:
+        pass
+MIN_NEW_SIGNALS = 5  # มีสัญญาณจริงใหม่ (resolved) ≥ นี้จึงเริ่มเทรน
 
 # ── Setup-context features (Hybrid): ML เรียนรู้บริบทเดียวกับ Rule-Based ──
 # (SETUP_FEATURE_COLUMNS / flatten_setup_dict import จาก setup_features.py)
@@ -88,8 +95,10 @@ def load_setup_features(timeframe: str = "M5") -> pd.DataFrame:
     df = pd.DataFrame(recs).set_index("ts").sort_index()
     return df[SETUP_FEATURE_COLUMNS].drop_duplicates(keep="last")
 
+
 try:
     import lightgbm as lgb
+
     HAS_LGB = True
 except ImportError:
     HAS_LGB = False
@@ -156,26 +165,42 @@ def _load_real_signals() -> list[dict]:
             continue
         if not feats:
             continue
-        out.append({
-            "signal_time": pd.to_datetime(r["signal_time"]),
-            "timeframe": r.get("timeframe", "M5"),
-            "direction": r.get("direction"),
-            "result": r.get("result"),
-            "features": feats,
-            "confidence": r.get("confidence"),
-        })
+        out.append(
+            {
+                "signal_time": pd.to_datetime(r["signal_time"]),
+                "timeframe": r.get("timeframe", "M5"),
+                "direction": r.get("direction"),
+                "result": r.get("result"),
+                "features": feats,
+                "confidence": r.get("confidence"),
+            }
+        )
     return out
 
 
 def _make_model():
     if HAS_LGB:
         return lgb.LGBMClassifier(
-            n_estimators=300, learning_rate=0.03, num_leaves=15, max_depth=4,
-            min_child_samples=50, subsample=0.8, colsample_bytree=0.8,
-            reg_alpha=0.1, reg_lambda=0.1, random_state=42, verbosity=-1,
+            n_estimators=300,
+            learning_rate=0.03,
+            num_leaves=15,
+            max_depth=4,
+            min_child_samples=50,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            reg_alpha=0.1,
+            reg_lambda=0.1,
+            random_state=42,
+            verbosity=-1,
         )
-    return _HG(max_iter=300, learning_rate=0.03, max_depth=4,
-               min_samples_leaf=50, l2_regularization=0.1, random_state=42)
+    return _HG(
+        max_iter=300,
+        learning_rate=0.03,
+        max_depth=4,
+        min_samples_leaf=50,
+        l2_regularization=0.1,
+        random_state=42,
+    )
 
 
 def _trade_outcome(row_ts, direction, df_tf, hold_bars):
@@ -189,8 +214,9 @@ def _trade_outcome(row_ts, direction, df_tf, hold_bars):
     return {"entry": entry, "exit": exit_px, "result": "WIN" if win else "LOSE"}
 
 
-def _walkforward_with_real(feat: pd.DataFrame, X_full, y_full, horizon: int,
-                           real_signals: list[dict]) -> dict:
+def _walkforward_with_real(
+    feat: pd.DataFrame, X_full, y_full, horizon: int, real_signals: list[dict]
+) -> dict:
     """Walk-forward + ผสานสัญญาณจริงเป็น feedback weight
     คืน dict {threshold: {n, wins, net_units, winrate_pct}, _auc_avg}"""
     n = len(feat)
@@ -236,9 +262,13 @@ def _walkforward_with_real(feat: pd.DataFrame, X_full, y_full, horizon: int,
 
         model = _make_model()
         if HAS_LGB:
-            model.fit(X_tr_f, y_tr_f, sample_weight=sw,
-                      eval_set=[(X_val, y_val)],
-                      callbacks=[lgb.early_stopping(30, verbose=False)])
+            model.fit(
+                X_tr_f,
+                y_tr_f,
+                sample_weight=sw,
+                eval_set=[(X_val, y_val)],
+                callbacks=[lgb.early_stopping(30, verbose=False)],
+            )
         else:
             model.fit(X_tr_f, y_tr_f, sample_weight=sw)
 
@@ -281,8 +311,10 @@ def _walkforward_with_real(feat: pd.DataFrame, X_full, y_full, horizon: int,
         wr = r["wins"] / n * 100 if n else 0.0
         net = r["wins"] * 0.82 - (n - r["wins"]) * 1.0 if n else 0.0
         summary[c] = {
-            "n": n, "wins": r["wins"],
-            "winrate_pct": round(wr, 2), "net_units": round(net, 2),
+            "n": n,
+            "wins": r["wins"],
+            "winrate_pct": round(wr, 2),
+            "net_units": round(net, 2),
             "breakeven": round(1 / 1.82 * 100, 2),
         }
     summary["_auc_avg"] = round(float(np.nanmean(aucs)), 4) if aucs else None
@@ -299,11 +331,17 @@ def run_auto_retrain(min_new_signals: int = 5) -> dict:
     print(f"  สัญญาณจริงทั้งหมด: {len(real)} (M5: {len(real_m5)})")
 
     if len(real_m5) < MIN_REAL_SIGNALS:
-        msg = (f"  ⏸️ มีสัญญาณจริง {len(real_m5)}/{MIN_REAL_SIGNALS} ยังไม่พอเทรนอัตโนมัติ "
-               f"— เก็บข้อมูลก่อน (เหลืออีก {MIN_REAL_SIGNALS - len(real_m5)} ไม้)")
+        msg = (
+            f"  ⏸️ มีสัญญาณจริง {len(real_m5)}/{MIN_REAL_SIGNALS} ยังไม่พอเทรนอัตโนมัติ "
+            f"— เก็บข้อมูลก่อน (เหลืออีก {MIN_REAL_SIGNALS - len(real_m5)} ไม้)"
+        )
         print(msg)
-        return {"trained": False, "reason": "not_enough_signals",
-                "n_real_m5": len(real_m5), "msg": msg}
+        return {
+            "trained": False,
+            "reason": "not_enough_signals",
+            "n_real_m5": len(real_m5),
+            "msg": msg,
+        }
 
     df_tf = _load_price_data()
     if len(df_tf) < 200:
@@ -313,6 +351,7 @@ def run_auto_retrain(min_new_signals: int = 5) -> dict:
 
     feat = pd.concat([df_tf, pd.DataFrame(index=df_tf.index)], axis=1)
     from backend.ml_forecaster.features_v2 import build_features_v2
+
     feat_df = build_features_v2(df_tf)
 
     y = pd.Series(np.nan, index=feat_df.index)
@@ -331,23 +370,29 @@ def run_auto_retrain(min_new_signals: int = 5) -> dict:
     setup_feats = load_setup_features(timeframe="M5")
     if not setup_feats.empty and len(X_full):
         merged = pd.merge_asof(
-            X_full.sort_index(), setup_feats.sort_index(),
-            left_index=True, right_index=True, direction="backward",
+            X_full.sort_index(),
+            setup_feats.sort_index(),
+            left_index=True,
+            right_index=True,
+            direction="backward",
             tolerance=pd.Timedelta(minutes=6),
         )
         n_hit = merged[SETUP_FEATURE_COLUMNS].notna().sum().sum()
         merged[SETUP_FEATURE_COLUMNS] = merged[SETUP_FEATURE_COLUMNS].fillna(0.0)
         X_full = merged
-        print(f"  [Hybrid] ผสาน setup features เข้า dataset: {n_hit} ค่า "
-              f"({len(setup_feats)} แถว setup)")
+        print(
+            f"  [Hybrid] ผสาน setup features เข้า dataset: {n_hit} ค่า ({len(setup_feats)} แถว setup)"
+        )
 
     MODEL_FEATURES = list(FEATURE_COLUMNS_V2)
     if not setup_feats.empty:
         MODEL_FEATURES = list(X_full.columns)
     MODEL_FEATURES = [c for c in MODEL_FEATURES if c in X_full.columns]
 
-    print(f"  Dataset M5: {len(X_full)} แถว | {df_tf.index[0]} → {df_tf.index[-1]} "
-          f"| features: {len(MODEL_FEATURES)} (price+setup)")
+    print(
+        f"  Dataset M5: {len(X_full)} แถว | {df_tf.index[0]} → {df_tf.index[-1]} "
+        f"| features: {len(MODEL_FEATURES)} (price+setup)"
+    )
     res = _walkforward_with_real(feat_df, X_full, y_full, HORIZON_M5, real_m5)
 
     print("\n" + "=" * 70)
@@ -356,8 +401,7 @@ def run_auto_retrain(min_new_signals: int = 5) -> dict:
     print("  " + "-" * 45)
     for c in CONF_GRID:
         s = res["summary"][c]
-        print(f"  {c:>6.2f} | {s['n']:>4} | {s['winrate_pct']:>7.2f}% | "
-              f"{s['net_units']:>+10.2f}")
+        print(f"  {c:>6.2f} | {s['n']:>4} | {s['winrate_pct']:>7.2f}% | {s['net_units']:>+10.2f}")
 
     # ── เทียบกับโมเดลปัจจุบัน ──
     current_conf = _conf_threshold("M5")
@@ -374,57 +418,75 @@ def run_auto_retrain(min_new_signals: int = 5) -> dict:
     if best_c is None:
         msg = "  ⏸️ ไม่พบ threshold ที่ทำกำไรบน walk-forward — ไม่แตะโมเดล production"
         print(msg)
-        return {"trained": False, "reason": "no_profitable_conf",
-                "summary": res["summary"], "msg": msg}
+        return {
+            "trained": False,
+            "reason": "no_profitable_conf",
+            "summary": res["summary"],
+            "msg": msg,
+        }
 
-    print(f"\n  ✅ เลือก conf={best_c} winrate={best_s['winrate_pct']}% "
-          f"net={best_s['net_units']} (n={best_s['n']})")
+    print(
+        f"\n  ✅ เลือก conf={best_c} winrate={best_s['winrate_pct']}% "
+        f"net={best_s['net_units']} (n={best_s['n']})"
+    )
 
     # ── เทรนโมเดล production ใหม่ด้วยชุดข้อมูลทั้งหมด ──
     final_model = _make_model()
     if HAS_LGB:
         cut = int(len(X_full) * 0.9)
         X_val, y_val = X_full.iloc[cut:], y_full.iloc[cut:]
-        final_model.fit(X_full, y_full, eval_set=[(X_val, y_val)],
-                        callbacks=[lgb.early_stopping(30, verbose=False)])
+        final_model.fit(
+            X_full,
+            y_full,
+            eval_set=[(X_val, y_val)],
+            callbacks=[lgb.early_stopping(30, verbose=False)],
+        )
     else:
         final_model.fit(X_full, y_full)
 
     import joblib
+
     old = None
     if MODEL_FILE_M5.exists():
         try:
             old = joblib.load(MODEL_FILE_M5)
-            print(f"  โมเดลเดิม: version={old.get('version')} conf={old.get('chosen_conf')} "
-                  f"auc_test={old.get('auc_test')}")
+            print(
+                f"  โมเดลเดิม: version={old.get('version')} conf={old.get('chosen_conf')} "
+                f"auc_test={old.get('auc_test')}"
+            )
         except Exception:
             old = None
 
-    joblib.dump({
-        "model": final_model,
-        "features": MODEL_FEATURES,
-        "horizon": HORIZON_M5,
-        "deadzone_atr_mult": DEADZONE,
-        "chosen_conf": float(best_c),
-        "auc_val": res["summary"]["_auc_avg"],
-        "auc_test": None,
-        "n_rows": len(X_full),
-        "n_real_signals": len(real_m5),
-        "n_setup_features": len(SETUP_FEATURE_COLUMNS) if "setup_feats" in dir() else 0,
-        "version": "auto_retrain_hybrid",
-        "feature_set": "v2_meanrev+setup_context",
-        "conf_grid": CONF_GRID,
-        "retrained_at": pd.Timestamp.now(tz="UTC").isoformat(),
-        "note": "auto_retrain — เรียนรู้จากสัญญาณจริง + setup context (Hybrid)",
-    }, MODEL_FILE_M5)
+    joblib.dump(
+        {
+            "model": final_model,
+            "features": MODEL_FEATURES,
+            "horizon": HORIZON_M5,
+            "deadzone_atr_mult": DEADZONE,
+            "chosen_conf": float(best_c),
+            "auc_val": res["summary"]["_auc_avg"],
+            "auc_test": None,
+            "n_rows": len(X_full),
+            "n_real_signals": len(real_m5),
+            "n_setup_features": len(SETUP_FEATURE_COLUMNS) if "setup_feats" in dir() else 0,
+            "version": "auto_retrain_hybrid",
+            "feature_set": "v2_meanrev+setup_context",
+            "conf_grid": CONF_GRID,
+            "retrained_at": pd.Timestamp.now(tz="UTC").isoformat(),
+            "note": "auto_retrain — เรียนรู้จากสัญญาณจริง + setup context (Hybrid)",
+        },
+        MODEL_FILE_M5,
+    )
     print(f"  💾 บันทึก {MODEL_FILE_M5.name} เรียบร้อย (conf={best_c})")
 
-    msg = (f"🤖 [AUTO-RETRAIN] ML model_m5 อัปเดตแล้ว\n"
-           f"• สัญญาณจริง: {len(real_m5)} ไม้ | Dataset: {len(X_full)} แถว\n"
-           f"• Walk-forward AUC: {res['summary']['_auc_avg']}\n"
-           f"• เลือก conf {best_c} → winrate {best_s['winrate_pct']}% "
-           f"net {best_s['net_units']:.2f} (n={best_s['n']})\n"
-           f"• model เดิม: {old.get('version') if old else 'N/A'}")
+    msg = (
+        f"🤖 [AUTO-RETRAIN] ML model_m5 อัปเดตแล้ว\n"
+        f"• สัญญาณจริง: {len(real_m5)} ไม้ | Dataset: {len(X_full)} แถว\n"
+        f"• Walk-forward AUC: {res['summary']['_auc_avg']}\n"
+        f"• เลือก conf {best_c} → winrate {best_s['winrate_pct']}% "
+        f"net {best_s['net_units']:.2f} (n={best_s['n']})\n"
+        f"• model เดิม: {old.get('version') if old else 'N/A'}"
+    )
     try:
         ok = send_telegram(msg)
         print(f"  Telegram: {'ส่งสำเร็จ' if ok else 'ส่งไม่สำเร็จ'}")
@@ -432,11 +494,16 @@ def run_auto_retrain(min_new_signals: int = 5) -> dict:
         print(f"  Telegram error: {e}")
 
     return {
-        "trained": True, "reason": "ok",
-        "chosen_conf": best_c, "winrate_pct": best_s["winrate_pct"],
-        "net_units": best_s["net_units"], "n_signals": best_s["n"],
-        "auc": res["summary"]["_auc_avg"], "n_real": len(real_m5),
-        "summary": res["summary"], "msg": msg,
+        "trained": True,
+        "reason": "ok",
+        "chosen_conf": best_c,
+        "winrate_pct": best_s["winrate_pct"],
+        "net_units": best_s["net_units"],
+        "n_signals": best_s["n"],
+        "auc": res["summary"]["_auc_avg"],
+        "n_real": len(real_m5),
+        "summary": res["summary"],
+        "msg": msg,
     }
 
 
@@ -471,27 +538,34 @@ def _save_state(state: dict) -> None:
     STATE_FILE.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
 
 
-def run_loop(min_new_signals: int = MIN_NEW_SIGNALS,
-             check_interval_sec: int = CHECK_INTERVAL_SEC) -> None:
+def run_loop(
+    min_new_signals: int = MIN_NEW_SIGNALS, check_interval_sec: int = CHECK_INTERVAL_SEC
+) -> None:
     """Worker อัตโนมัติ: ทุก N ชม. ตรวจสัญญาณจริงใหม่ → เทรน → อัปเดตโมเดล
     คล้ายโครงสร้าง thread ใน supervisor (กัน error ตายแล้ว restart)"""
-    print(f"=== Auto-Retrain worker เริ่ม (ตรวจทุก {check_interval_sec/3600:.0f} ชม., "
-          f"สัญญาณใหม่ขั้นต่ำ {min_new_signals} ไม้) ===")
+    print(
+        f"=== Auto-Retrain worker เริ่ม (ตรวจทุก {check_interval_sec / 3600:.0f} ชม., "
+        f"สัญญาณใหม่ขั้นต่ำ {min_new_signals} ไม้) ==="
+    )
     while True:
         try:
             state = _load_state()
             total, m5 = _count_resolved_since(state.get("last_id", 0))
-            print(f"[auto_retrain] ตรวจ: สัญญาณจริงใหม่ {total} ไม้ "
-                  f"(M5={m5}) ตั้งแต่ retrain ครั้งล่าสุด")
+            print(f"[auto_retrain] ตรวจ: สัญญาณจริงใหม่ {total} ไม้ (M5={m5}) ตั้งแต่ retrain ครั้งล่าสุด")
             if total >= min_new_signals:
                 res = run_auto_retrain(min_new_signals=0)
                 if res.get("trained"):
-                    _save_state({"last_id": state.get("last_id", 0) + total,
-                                 "last_run": pd.Timestamp.now(tz="UTC").isoformat()})
+                    _save_state(
+                        {
+                            "last_id": state.get("last_id", 0) + total,
+                            "last_run": pd.Timestamp.now(tz="UTC").isoformat(),
+                        }
+                    )
             else:
                 print(f"[auto_retrain] ยังไม่พอ ({total}/{min_new_signals}) — รอรอบถัดไป")
         except Exception:
             import traceback
+
             print("[auto_retrain] error ในรอบนี้:")
             traceback.print_exc()
 
@@ -500,18 +574,24 @@ def run_loop(min_new_signals: int = MIN_NEW_SIGNALS,
 
 def main():
     parser = argparse.ArgumentParser(description="Auto-Retrain ML จากสัญญาณจริง")
-    parser.add_argument("--min-signals", type=int, default=MIN_REAL_SIGNALS,
-                        help="สัญญาณจริงขั้นต่ำก่อนเริ่มเทรน")
-    parser.add_argument("--force", action="store_true",
-                        help="บังคับเทรนแม้สัญญาณจริงยังไม่พอ (ใช้กับข้อมูลจำลอง/ทดสอบ)")
-    parser.add_argument("--once", action="store_true",
-                        help="รันเทรนครั้งเดียวแล้วจบ (ไม่ใช่ worker loop)")
-    parser.add_argument("--interval-hours", type=float, default=CHECK_INTERVAL_SEC / 3600,
-                        help="ระยะเวลา (ชม.) ที่ตรวจสัญญาณใหม่ในโหมด worker")
+    parser.add_argument(
+        "--min-signals", type=int, default=MIN_REAL_SIGNALS, help="สัญญาณจริงขั้นต่ำก่อนเริ่มเทรน"
+    )
+    parser.add_argument(
+        "--force", action="store_true", help="บังคับเทรนแม้สัญญาณจริงยังไม่พอ (ใช้กับข้อมูลจำลอง/ทดสอบ)"
+    )
+    parser.add_argument("--once", action="store_true", help="รันเทรนครั้งเดียวแล้วจบ (ไม่ใช่ worker loop)")
+    parser.add_argument(
+        "--interval-hours",
+        type=float,
+        default=CHECK_INTERVAL_SEC / 3600,
+        help="ระยะเวลา (ชม.) ที่ตรวจสัญญาณใหม่ในโหมด worker",
+    )
     args = parser.parse_args()
 
     if args.force:
         import backend.ml_forecaster.auto_retrain as m
+
         m.MIN_REAL_SIGNALS = 0
 
     if args.once:
@@ -520,8 +600,10 @@ def main():
         print(json.dumps(res, indent=2, ensure_ascii=False, default=str))
         return
 
-    run_loop(min_new_signals=max(1, int(args.min_signals)),
-             check_interval_sec=int(args.interval_hours * 3600))
+    run_loop(
+        min_new_signals=max(1, int(args.min_signals)),
+        check_interval_sec=int(args.interval_hours * 3600),
+    )
 
 
 if __name__ == "__main__":

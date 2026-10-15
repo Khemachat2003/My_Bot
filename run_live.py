@@ -15,6 +15,7 @@ run_live.py — รันระบบ live ทั้ง 3 process ด้วย�
   - ถ้า process ไหนตาย → restart อัตโนมัติ (กันหลุดข้ามคืน)
   - กด Ctrl+C ปิดทุกตัวพร้อมกัน
 """
+
 from __future__ import annotations
 
 import os
@@ -36,27 +37,37 @@ except Exception:
 # จับ SIGTERM (docker stop / systemctl stop / kill) → ปิดทุก process เกลี้ยง
 # เหมือน Ctrl+C (Windows ไม่มี SIGTERM แบบนี้ แต่มี KeyboardInterrupt ปกติ)
 if os.name != "nt":
+
     def _on_sigterm(signum, frame):
         _print("supervisor", "รับ SIGTERM — กำลังปิดทุก process ...")
         global _stop
         _stop = True
+
     signal.signal(signal.SIGTERM, _on_sigterm)
 
-MAX_RESTART = 10                 # สูงสุดกี่ครั้งต่อ process ก่อนเลิก
-RESTART_WINDOW = 300             # ระยะเวลา (วินาที) ที่ใช้นับ restarts
+MAX_RESTART = 10  # สูงสุดกี่ครั้งต่อ process ก่อนเลิก
+RESTART_WINDOW = 300  # ระยะเวลา (วินาที) ที่ใช้นับ restarts
 
 PROCESSES = [
-    {"name": "api", "cmd": ["-m", "uvicorn", "backend.api:app", "--host", "0.0.0.0", "--port", "8000"],
-     "restart": True},
+    {
+        "name": "api",
+        "cmd": ["-m", "uvicorn", "backend.api:app", "--host", "0.0.0.0", "--port", "8000"],
+        "restart": True,
+    },
     {"name": "setup_feed", "cmd": ["-m", "backend.setup_feed"], "restart": True},
     {"name": "notifier", "cmd": ["-m", "backend.notifier"], "restart": True},
     # เรียนรู้จากสัญญาณจริง: ตรวจทุก N ชม. (env AUTO_RETRAIN_INTERVAL_HOURS)
     # ถ้ามีสัญญาณจริงใหม่พอ → เทรนใหม่ → ทับ model_m5 ถ้าดีกว่าโมเดลเดิม
-    {"name": "auto_retrain", "cmd": ["-m", "backend.ml_forecaster.auto_retrain"],
-     "restart": True},
-    # ข้อมูล macro (DXY รายชั่วโมง) — ใช้คำนวณ Regime-Gate ตอนยิงสัญญาณ FIRE
-    {"name": "macro_feed", "cmd": ["-m", "backend.macro_feed"], "restart": True},
 ]
+if os.getenv("AUTO_RETRAIN_DISABLED", "false").lower() not in ("1", "true", "yes", "on"):
+    PROCESSES.append(
+        {
+            "name": "auto_retrain",
+            "cmd": ["-m", "backend.ml_forecaster.auto_retrain"],
+            "restart": True,
+        }
+    )
+PROCESSES.append({"name": "macro_feed", "cmd": ["-m", "backend.macro_feed"], "restart": True})
 
 BACKUP_ENABLED = os.getenv("BACKUP_ENABLED", "true").lower() not in ("0", "false", "no")
 
@@ -119,6 +130,7 @@ def _assign_to_job(proc):
         return
     try:
         import ctypes
+
         kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
         kernel32.AssignProcessToJobObject(_job, ctypes.c_void_p(int(proc._handle)))
     except Exception:
@@ -195,8 +207,9 @@ def _terminate(proc):
     # fallback สุดท้ายสำหรับ Windows: ฆ่าต้นไม้ process ฟันธง
     if os.name == "nt" and proc.poll() is None:
         try:
-            subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)],
-                           capture_output=True, timeout=10)
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True, timeout=10
+            )
         except Exception:
             pass
 
@@ -215,6 +228,7 @@ def _start_backup_thread(stop_event):
         return None
     try:
         from backend.backup import backup_loop
+
         t = threading.Thread(target=backup_loop, args=(stop_event,), daemon=True)
         t.start()
         _print("backup", "thread สำรองข้อมูลเริ่มทำงานแล้ว (ทุก 6 ชม. + ตอนเปิดระบบ)")

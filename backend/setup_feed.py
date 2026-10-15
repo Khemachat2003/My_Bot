@@ -18,6 +18,7 @@ setup_feed.py — 🔵 System 1: Rule-Based Setup Engine (Sniper Reversion 9 Che
 ⚠️ ระบบนี้แยกขาดจาก 🟢 ML Model Engine (notifier.py) โดยสมบูรณ์:
    ไม่ใช้ตาราง ml_signals, ไม่ import โมดูล ml_forecaster ใดๆ
 """
+
 from __future__ import annotations
 
 import json
@@ -38,27 +39,33 @@ except Exception:
 import pandas as pd
 
 from backend import db, setup_db
+from backend.data_feed.deriv_feed import DEFAULT_SYMBOL, fetch_candles_history
 from backend.indicators import rsi
-from backend.telegram import send_telegram
-from backend.market_hours import is_forex_like, market_open_now, market_open_cooldown, symbol_label, get_session
+from backend.market_hours import (
+    get_session,
+    is_forex_like,
+    market_open_cooldown,
+    market_open_now,
+    symbol_label,
+)
 from backend.setup_scorer import score_setup
-
-from backend.data_feed.deriv_feed import fetch_candles_history, DEFAULT_SYMBOL
+from backend.telegram import send_telegram
 
 SYMBOL = DEFAULT_SYMBOL
-BUFFER_MAX = 5000
-FETCH_HISTORY_COUNT = 3500
+BUFFER_MAX = int(os.getenv("BUFFER_MAX", "5000"))
+FETCH_HISTORY_COUNT = int(
+    os.getenv("FETCH_HISTORY_COUNT", "1000")
+)  # 1000 เพียงพอ (ต้องการ SETUP_MIN_BARS=215)
 POLL_SECONDS = int(os.getenv("SETUP_POLL_SECONDS", "15"))
 
 # สัญลักษณ์ที่ระบบเทรดพร้อมกัน (คั่นด้วย ,) — default: ทอง + 7 คู่ major
 # ตั้งใน .env เช่น: TRADE_SYMBOLS=frxXAUUSD,frxEURUSD,frxGBPUSD
 _DEFAULT_TRADE_SYMBOLS = (
-    "frxXAUUSD,frxEURUSD,frxGBPUSD,frxUSDJPY,"
-    "frxAUDUSD,frxUSDCAD,frxUSDCHF,frxNZDUSD"
+    "frxXAUUSD,frxEURUSD,frxGBPUSD,frxUSDJPY,frxAUDUSD,frxUSDCAD,frxUSDCHF,frxNZDUSD"
 )
-TRADE_SYMBOLS = [s.strip() for s in
-                 os.getenv("TRADE_SYMBOLS", _DEFAULT_TRADE_SYMBOLS).split(",")
-                 if s.strip()]
+TRADE_SYMBOLS = [
+    s.strip() for s in os.getenv("TRADE_SYMBOLS", _DEFAULT_TRADE_SYMBOLS).split(",") if s.strip()
+]
 
 # Timeframe ที่รัน (label, hold_minutes, resample_minutes)
 #   ตั้งผ่าน env SETUP_TIMEFRAMES เช่น "M5:30:5" หรือ "M1:15:1,M5:30:5" (คั่นด้วย ,)
@@ -80,6 +87,7 @@ else:
 
 SETUP_MIN_BARS = 215
 
+
 # 🚦 กันสัญญาณถี่เกิน (เทคนิคจริงออกออเดอร์ไม่ถี่ — ตั้งค่าได้ใน setup_config.json / env)
 #   - cooldown: อย่างน้อยกี่นาทีระหว่างสัญญาณแต่ละตัวของ TF เดียวกัน
 #   - daily cap: สูงสุดกี่ไม้/วัน/ทั้งหมด (0 = ไม่จำกัด)
@@ -90,8 +98,10 @@ def _int_env(name: str, default: int) -> int:
     except ValueError:
         return default
 
+
 try:
     import json as _json
+
     _cfg_path = Path(__file__).resolve().parent / "setup_config.json"
     _cfg = _json.loads(_cfg_path.read_text(encoding="utf-8"))
     COOLDOWN_MIN = int(_cfg.get("cooldown_minutes", 30))
@@ -117,8 +127,7 @@ class SetupFeedEngine:
         self._last_seed_try: float = 0.0
 
         self._seed_buffer()
-        print(f"[SetupFeed:{self.symbol}] poll={POLL_SECONDS}s | "
-              f"buffer={len(self.buffer)} แท่ง")
+        print(f"[SetupFeed:{self.symbol}] poll={POLL_SECONDS}s | buffer={len(self.buffer)} แท่ง")
 
     # ── การจัดการข้อมูล ──────────────────────────────────────────────────────
 
@@ -126,8 +135,9 @@ class SetupFeedEngine:
         """เริ่ม buffer ใหม่จาก history ของ symbol นี้ (ดึงครั้งแรก/หลัง error)"""
         print(f"[SetupFeed:{self.symbol}] กำลังดึงข้อมูลย้อนหลัง {FETCH_HISTORY_COUNT} แท่ง (1m)...")
         try:
-            df_init = fetch_candles_history(symbol=self.symbol, granularity=60,
-                                            count=FETCH_HISTORY_COUNT)
+            df_init = fetch_candles_history(
+                symbol=self.symbol, granularity=60, count=FETCH_HISTORY_COUNT
+            )
             if df_init.index.tz is None:
                 df_init.index = df_init.index.tz_localize("UTC")
             self.buffer = df_init.tail(BUFFER_MAX).copy()
@@ -198,8 +208,10 @@ class SetupFeedEngine:
         last = self.buffer.iloc[-1]
         db.insert_price(
             pd.Timestamp(last.name).isoformat(),
-            float(last["open"]), float(last["high"]),
-            float(last["low"]), float(last["close"]),
+            float(last["open"]),
+            float(last["high"]),
+            float(last["low"]),
+            float(last["close"]),
             symbol=self.symbol,
         )
         db.insert_tick(now.isoformat(), self.last_price)
@@ -229,9 +241,13 @@ class SetupFeedEngine:
 
             bar = self.buffer.iloc[-1]
             from backend.setup_scorer import classify_ema200_touch
+
             touched, touch_case, touch_note, direction = classify_ema200_touch(
-                float(bar["open"]), float(bar["high"]),
-                float(bar["low"]), float(bar["close"]), e200,
+                float(bar["open"]),
+                float(bar["high"]),
+                float(bar["low"]),
+                float(bar["close"]),
+                e200,
             )
             if not touched:
                 return
@@ -246,7 +262,10 @@ class SetupFeedEngine:
             hold_min = 30
             target_time = (now + pd.Timedelta(minutes=hold_min)).isoformat()
             from backend.setup_scorer import score_setup
-            result = score_setup(self.buffer, timeframe="TICK", target_hold_minutes=hold_min, symbol=self.symbol)
+
+            result = score_setup(
+                self.buffer, timeframe="TICK", target_hold_minutes=hold_min, symbol=self.symbol
+            )
             # RESEARCH MODE: เก็บข้อมูลลง tick_touch_log — ไม่ส่งสัญญาณจริง
             # ไม่ลง setup_signals/trade_journal ไม่เข้า CFD
             db.insert_tick_touch_log(
@@ -261,9 +280,11 @@ class SetupFeedEngine:
                 conditions_json=json.dumps(result.conditions_log, ensure_ascii=False, default=str),
                 passed_count=result.conditions_passed,
             )
-            print(f"[SetupFeed:{self.symbol}] 🔬 RESEARCH [{touch_case}] {direction} → "
-                  f"EMA200 = {e200:.5f}, price = {self.last_price:.5f}, "
-                  f"checklist {result.conditions_passed}/10")
+            print(
+                f"[SetupFeed:{self.symbol}] 🔬 RESEARCH [{touch_case}] {direction} → "
+                f"EMA200 = {e200:.5f}, price = {self.last_price:.5f}, "
+                f"checklist {result.conditions_passed}/10"
+            )
         except Exception:
             pass
 
@@ -281,20 +302,30 @@ class SetupFeedEngine:
                 entry_price = row["entry_price"]
                 direction = row["direction"]
                 if direction == "CALL":
-                    res = "WIN" if exit_price > entry_price else (
-                        "LOSE" if exit_price < entry_price else "DRAW")
+                    res = (
+                        "WIN"
+                        if exit_price > entry_price
+                        else ("LOSE" if exit_price < entry_price else "DRAW")
+                    )
                 else:
-                    res = "WIN" if exit_price < entry_price else (
-                        "LOSE" if exit_price > entry_price else "DRAW")
+                    res = (
+                        "WIN"
+                        if exit_price < entry_price
+                        else ("LOSE" if exit_price > entry_price else "DRAW")
+                    )
 
                 db.update_setup_signal_result(row["id"], exit_price, res)
 
                 # mirror ลง trade_journal (เก็บ P&L จำลอง)
                 trade_id = db.insert_trade(
-                    signal_id=row["id"], signal_type="SETUP", timeframe=row["timeframe"],
+                    signal_id=row["id"],
+                    signal_type="SETUP",
+                    timeframe=row["timeframe"],
                     symbol=self.symbol,
-                    direction=direction, entry_price=entry_price,
-                    entry_time=row["signal_time"], hold_min=row["horizon_min"],
+                    direction=direction,
+                    entry_price=entry_price,
+                    entry_time=row["signal_time"],
+                    hold_min=row["horizon_min"],
                     confidence=row["confidence"],
                 )
                 db.update_trade_result(trade_id, exit_price, now.isoformat(), res)
@@ -325,7 +356,7 @@ class SetupFeedEngine:
             cfd_resolved = db.check_cfd_trades(self.last_price, now.isoformat(), symbol=self.symbol)
             for cr in cfd_resolved:
                 icon = {"SL": "🔴", "TP1": "🟢", "TP2": "🟢"}.get(cr["result"], "❓")
-                win_emoji = "WIN" if cr["result"] in ("TP1","TP2") else "LOSE"
+                win_emoji = "WIN" if cr["result"] in ("TP1", "TP2") else "LOSE"
                 msg = (
                     f"📊 [CFD RESOLVED] {icon} {win_emoji}\n"
                     f"{cr['signal_type']} #{cr['signal_id']} | {cr['direction']}\n"
@@ -335,7 +366,9 @@ class SetupFeedEngine:
                     f"P&L: ${cr.get('pnl', 0):+.2f} | Hold: {cr['hold_bars']} bars"
                 )
                 send_telegram(msg)
-                print(f"[SetupFeed:{self.symbol}] CFD #{cr['id']} → {cr['result']} P&L=${cr.get('pnl',0):+.2f}")
+                print(
+                    f"[SetupFeed:{self.symbol}] CFD #{cr['id']} → {cr['result']} P&L=${cr.get('pnl', 0):+.2f}"
+                )
         except Exception:
             pass
 
@@ -350,14 +383,22 @@ class SetupFeedEngine:
                 exit_price = self.last_price
                 entry_price = row["entry_price"]
                 if row["direction"] == "CALL":
-                    res = "WIN" if exit_price > entry_price else (
-                        "LOSE" if exit_price < entry_price else "DRAW")
+                    res = (
+                        "WIN"
+                        if exit_price > entry_price
+                        else ("LOSE" if exit_price < entry_price else "DRAW")
+                    )
                 else:
-                    res = "WIN" if exit_price < entry_price else (
-                        "LOSE" if exit_price > entry_price else "DRAW")
+                    res = (
+                        "WIN"
+                        if exit_price < entry_price
+                        else ("LOSE" if exit_price > entry_price else "DRAW")
+                    )
                 db.update_tick_touch_result(row["id"], exit_price, res, now.isoformat())
-                print(f"[SetupFeed:{self.symbol}] 🔬 Research #{row['id']} "
-                      f"[{row['touch_case']}] → {res}")
+                print(
+                    f"[SetupFeed:{self.symbol}] 🔬 Research #{row['id']} "
+                    f"[{row['touch_case']}] → {res}"
+                )
         except Exception:
             pass
 
@@ -381,8 +422,12 @@ class SetupFeedEngine:
             dxy_slope = (dxy.iloc[-1] - dxy.iloc[-25]) / dxy.iloc[-25] * 100.0
             dxy_rsi_v = float(rsi(dxy, 14).iloc[-1])
             agree = int((gold_slope > 0) == (dxy_slope > 0))
-            return (round(float(gold_slope), 4), round(float(dxy_slope), 4),
-                    round(dxy_rsi_v, 2), agree)
+            return (
+                round(float(gold_slope), 4),
+                round(float(dxy_slope), 4),
+                round(dxy_rsi_v, 2),
+                agree,
+            )
         except Exception:
             return None, None, None, None
 
@@ -400,15 +445,19 @@ class SetupFeedEngine:
             max_resample = max(m for _, _, m in SETUP_TIMEFRAMES)
             max_age_min = max_resample * 3 + 5
             if age_min > max_age_min:
-                print(f"[SetupFeed:{self.symbol}] ข้ามประเมิน — ข้อมูลค้าง {age_min:.0f} นาที "
-                      f"(เกิน {max_age_min}) ราคาสุดท้าย {last_ts} — รอ poll ราคาสด")
+                print(
+                    f"[SetupFeed:{self.symbol}] ข้ามประเมิน — ข้อมูลค้าง {age_min:.0f} นาที "
+                    f"(เกิน {max_age_min}) ราคาสุดท้าย {last_ts} — รอ poll ราคาสด"
+                )
                 return
 
         # 🚦 Market open cooldown: ข้าม FIRE信号ในช่วง N นาทีแรกหลังตลาดเปิดสัปดาห์
         #   กันสัญญาณถล่มตอน Monday open — spread กว้าง + whipsaw → LOSS ทุกไม้
         if is_forex_like(self.symbol) and market_open_cooldown(now, MARKET_OPEN_COOLDOWN_MIN):
-            print(f"[SetupFeed:{self.symbol}] ข้ามประเมิน — market open cooldown "
-                  f"({MARKET_OPEN_COOLDOWN_MIN} นาทีแรกหลังเปิดตลาดสัปดาห์)")
+            print(
+                f"[SetupFeed:{self.symbol}] ข้ามประเมิน — market open cooldown "
+                f"({MARKET_OPEN_COOLDOWN_MIN} นาทีแรกหลังเปิดตลาดสัปดาห์)"
+            )
             return
 
         for tf_label, hold_min, minutes in SETUP_TIMEFRAMES:
@@ -417,7 +466,9 @@ class SetupFeedEngine:
                 continue
 
             try:
-                result = score_setup(df_tf, timeframe=tf_label, target_hold_minutes=hold_min, symbol=self.symbol)
+                result = score_setup(
+                    df_tf, timeframe=tf_label, target_hold_minutes=hold_min, symbol=self.symbol
+                )
                 setup_db.insert_setup_score(now.isoformat(), result, symbol=self.symbol)
             except Exception:
                 print(f"[SetupFeed:{self.symbol}] setup_scorer error ({tf_label}):")
@@ -432,8 +483,10 @@ class SetupFeedEngine:
                     last_time = pd.to_datetime(last_sig["signal_time"])
                     elapsed = (now - last_time).total_seconds() / 60.0
                     if elapsed < COOLDOWN_MIN:
-                        print(f"[SetupFeed:{self.symbol}] ข้ามสัญญาณ [{tf_label}] — ยังอยู่ใน cooldown "
-                              f"{elapsed:.0f}/{COOLDOWN_MIN} นาที (ID#{last_sig['id']})")
+                        print(
+                            f"[SetupFeed:{self.symbol}] ข้ามสัญญาณ [{tf_label}] — ยังอยู่ใน cooldown "
+                            f"{elapsed:.0f}/{COOLDOWN_MIN} นาที (ID#{last_sig['id']})"
+                        )
                         self._last_entry_trigger[tf_label] = result.entry_trigger
                         continue
 
@@ -441,8 +494,10 @@ class SetupFeedEngine:
                 # CALL Night: 34.1% WR (41 trades), PUT Night: 45.9% WR (37 trades)
                 # ทั้งสองต่ำกว่า break-even 54.95% → ไม่เทรดช่วงนี้เลยดีกว่า
                 if get_session(now) == "Night":
-                    print(f"[SetupFeed:{self.symbol}] ข้ามสัญญาณ [{tf_label}] — "
-                          f"Night session (volume ต่ำ, CALL 34% PUT 46%)")
+                    print(
+                        f"[SetupFeed:{self.symbol}] ข้ามสัญญาณ [{tf_label}] — "
+                        f"Night session (volume ต่ำ, CALL 34% PUT 46%)"
+                    )
                     self._last_entry_trigger[tf_label] = result.entry_trigger
                     continue
 
@@ -452,9 +507,11 @@ class SetupFeedEngine:
                 # 🚦 gate inversion: CALL + gate_agree=1 → 35.5% WR (กลับหัว)
                 # ข้อมูล: gate_agree=1 CALL ชนะแค่ 11/31 = 35.5%
                 # เมื่อ DXY "เห็นพ้อง" กับ CALL ทอง → มักจะเป็น false signal
-                if (result.direction == "CALL" and gate_agree == 1):
-                    print(f"[SetupFeed:{self.symbol}] ข้าม CALL [{tf_label}] — "
-                          f"gate_agree=1 inverted (35.5% WR)")
+                if result.direction == "CALL" and gate_agree == 1:
+                    print(
+                        f"[SetupFeed:{self.symbol}] ข้าม CALL [{tf_label}] — "
+                        f"gate_agree=1 inverted (35.5% WR)"
+                    )
                     self._last_entry_trigger[tf_label] = result.entry_trigger
                     continue
 
@@ -481,17 +538,26 @@ class SetupFeedEngine:
                         gate_agree=gate_agree,
                         importance=result.importance,
                         conditions_passed=result.conditions_passed,
-                        conditions_log_json=json.dumps({
-                            "_touch_case": result.touch_case,
-                            **result.conditions_log,
-                        }, ensure_ascii=False, default=str),
+                        conditions_log_json=json.dumps(
+                            {
+                                "_touch_case": result.touch_case,
+                                **result.conditions_log,
+                            },
+                            ensure_ascii=False,
+                            default=str,
+                        ),
                     )
-                    print(f"[SetupFeed:{self.symbol}] บันทึกสัญญาณ ID #{new_sig_id} [{tf_label}] "
-                          f"ลง setup_signals (รอวัดผลในอีก {hold_min} นาที)")
+                    print(
+                        f"[SetupFeed:{self.symbol}] บันทึกสัญญาณ ID #{new_sig_id} [{tf_label}] "
+                        f"ลง setup_signals (รอวัดผลในอีก {hold_min} นาที)"
+                    )
                     db.insert_cfd_paper_trade(
-                        signal_id=new_sig_id, signal_type="SETUP",
-                        symbol=self.symbol, direction=result.direction,
-                        entry_price=self.last_price, entry_time=now.isoformat(),
+                        signal_id=new_sig_id,
+                        signal_type="SETUP",
+                        symbol=self.symbol,
+                        direction=result.direction,
+                        entry_price=self.last_price,
+                        entry_time=now.isoformat(),
                     )
                 except Exception:
                     print(f"[SetupFeed:{self.symbol}] ไม่สามารถบันทึกสัญญาณลง DB ได้:")
@@ -500,16 +566,19 @@ class SetupFeedEngine:
                 sym_text = symbol_label(self.symbol)
                 gate_txt = "n/a"
                 if gate_agree is not None:
-                    gate_txt = ("เห็นพ้อง ✅" if gate_agree == 1 else "ขัดแย้ง ⛔")
+                    gate_txt = "เห็นพ้อง ✅" if gate_agree == 1 else "ขัดแย้ง ⛔"
                     gate_txt += f" (gold1h {gold_slope:+.2f}% | DXY24 {dxy_slope:+.2f}%)"
-                passed_names = [k.replace("c","").replace("_"," ") 
-                                for k, v in result.conditions_log.items() if v.get("pass")]
+                passed_names = [
+                    k.replace("c", "").replace("_", " ")
+                    for k, v in result.conditions_log.items()
+                    if v.get("pass")
+                ]
                 checklist_txt = ", ".join(passed_names) if passed_names else "none"
 
                 # แสดง checklist values ทั้งหมด (pass + fail)
                 all_checks = []
                 for k, v in result.conditions_log.items():
-                    label = k.replace("c","").replace("_"," ")
+                    label = k.replace("c", "").replace("_", " ")
                     val = "✅" if v.get("pass") else "❌"
                     note = (v.get("note") or "")[:40]
                     all_checks.append(f"{val} {label}: {note}")
@@ -527,7 +596,11 @@ class SetupFeedEngine:
                 imp_label = f"Importance {result.importance}" if result.importance else ""
                 ps = db.get_pip_size(self.symbol)
                 spread = db.CFD_SPREAD_PIPS * ps
-                eff = self.last_price + spread/2 if result.direction == "CALL" else self.last_price - spread/2
+                eff = (
+                    self.last_price + spread / 2
+                    if result.direction == "CALL"
+                    else self.last_price - spread / 2
+                )
                 if result.direction == "CALL":
                     cfd_sl = eff - db.CFD_SL_PIPS * ps
                     cfd_tp1 = eff + db.CFD_TP1_PIPS * ps
@@ -558,8 +631,10 @@ class SetupFeedEngine:
                     f"─── รายการเงื่อนไข ───\n{all_checks_txt}"
                 )
                 ok = send_telegram(msg_trigger)
-                print(f"[SetupFeed:{self.symbol}] Telegram ALERT [{tf_label}] "
-                      f"{'ส่งสำเร็จ' if ok else 'ส่งไม่สำเร็จ (ดู log ด้านบน)'}")
+                print(
+                    f"[SetupFeed:{self.symbol}] Telegram ALERT [{tf_label}] "
+                    f"{'ส่งสำเร็จ' if ok else 'ส่งไม่สำเร็จ (ดู log ด้านบน)'}"
+                )
 
             self._last_entry_trigger[tf_label] = result.entry_trigger
 
@@ -579,15 +654,19 @@ class SetupFeedEngine:
         return out.dropna()
 
     def run(self):
-        print(f"[SetupFeed:{self.symbol}] 🔵 เริ่ม Rule-Based Setup Engine "
-              f"(polling {POLL_SECONDS}s) ...")
+        print(
+            f"[SetupFeed:{self.symbol}] 🔵 เริ่ม Rule-Based Setup Engine "
+            f"(polling {POLL_SECONDS}s) ..."
+        )
 
         now_ts = pd.Timestamp(datetime.now(timezone.utc))
         # 🐛 FIX (สัญญาณผีสุดสัปดาห์): ตอน restart ต้องไม่ประเมินสัญญาณทันทีถ้าตลาดปิด
         # (เดิมเรียก _check_setup_scorer ตรงๆ ไม่เช็ค market_open → ใช้ราคาค้างยิงสัญญาณผี)
         if is_forex_like(self.symbol) and not market_open_now(now_ts):
-            print(f"[SetupFeed:{self.symbol}] ตลาดปิดตอน start — ข้ามประเมิน "
-                  f"(จะเริ่มจริงเมื่อตลาดเปิด / poll ถัดไป)")
+            print(
+                f"[SetupFeed:{self.symbol}] ตลาดปิดตอน start — ข้ามประเมิน "
+                f"(จะเริ่มจริงเมื่อตลาดเปิด / poll ถัดไป)"
+            )
         else:
             self._check_setup_scorer(now_ts)
 
@@ -626,8 +705,10 @@ if __name__ == "__main__":
     else:
         import threading
 
-        print(f"[SetupFeed] เริ่ม Rule-Based สำหรับ {len(TRADE_SYMBOLS)} สัญลักษณ์: "
-              f"{', '.join(TRADE_SYMBOLS)}")
+        print(
+            f"[SetupFeed] เริ่ม Rule-Based สำหรับ {len(TRADE_SYMBOLS)} สัญลักษณ์: "
+            f"{', '.join(TRADE_SYMBOLS)}"
+        )
         threads = []
         for sym in TRADE_SYMBOLS:
             t = threading.Thread(target=_run_one_symbol, args=(sym,), daemon=True)
