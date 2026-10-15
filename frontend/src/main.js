@@ -11,6 +11,8 @@ import './features/chart/drawLwChart.js';
 import './shared/lib/indicators.js';
 import './features/gauges/gauges.js';
 import './app/tabs.js';
+import './app/mobileDrawer.js';
+import './app/mobileCardLabels.js';
 import './shared/ui/domText.js';
 import './features/overview/refreshOverview.js';
 import './shared/lib/equityData.js';

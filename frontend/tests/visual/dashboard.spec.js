@@ -31,14 +31,37 @@ async function openDashboard(page, viewport) {
   await page.goto('/');
   await page.waitForLoadState('networkidle');
   await page.waitForTimeout(1500); // ให้ refreshAll รอบแรก + วาดกราฟเสร็จ
+  // C-7: กัน chart canvas เบี่ยง 1-2px ระหว่าง session (ฟอนต์มาถึงช้า/เร็วไม่เท่ากัน →
+  //   legendbar สูงต่างกันตอนกราฟวัดขนาดครั้งแรก) — รอฟอนต์พร้อมแล้วบังคับ re-layout กราฟ 1 ครั้ง
+  //   เหมือนที่แอปทำเองตอนสลับแท็บ → ภาพ overview นิ่งทุก session (เทสต์ล้วน ไม่แตะโค้ดแอป)
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    window.dispatchEvent(new Event('resize'));
+  });
+  await page.waitForTimeout(400);
   return errors;
+}
+
+// C-7 mobile: sidebar เป็น drawer (ซ่อนนอกจอ) — ต้องกด hamburger เปิดก่อนคลิกแท็บทุกครั้ง
+//   เลือกแท็บแล้ว drawer ปิดเอง → ทุกภาพถ่ายตอน drawer ปิด (desktop คง flow เดิม)
+//   legacy (UI_TARGET=legacy) ไม่มี #navToggle → ข้ามได้ เพื่อให้ regen baseline จาก legacy ยังรันได้
+async function openTab(page, tab, isMobile) {
+  if (isMobile) {
+    const toggle = page.locator('#navToggle');
+    if ((await toggle.count()) && (await toggle.isVisible())) {
+      await toggle.click();
+      await page.waitForTimeout(350); // รอ transition ของ drawer (.2s)
+    }
+  }
+  await page.locator(`.nav-item[data-tab="${tab}"]`).click();
 }
 
 for (const [vpName, viewport] of Object.entries(VIEWPORTS)) {
   test(`ทุกแท็บเหมือนเดิม — ${vpName}`, async ({ page }) => {
     const errors = await openDashboard(page, viewport);
+    const isMobile = vpName === 'mobile';
     for (const tab of TABS) {
-      await page.locator(`.nav-item[data-tab="${tab}"]`).click();
+      await openTab(page, tab, isMobile);
       await page.waitForTimeout(800);
       await expect(page).toHaveScreenshot(`${vpName}-${tab}.png`);
       // sub-tab ของแท็บรวม (Phase C-2) — ภาพเฉพาะ sub-tab ที่ 2 ขึ้นไป (อันแรกอยู่ในภาพหลักแล้ว)
@@ -49,7 +72,7 @@ for (const [vpName, viewport] of Object.entries(VIEWPORTS)) {
       }
     }
     // พับ/ขยาย section (แทน inline onclick) ต้องทำงานเหมือนเดิม — อยู่ sub-tab journal ของ tab-performance
-    await page.locator('.nav-item[data-tab="performance"]').click();
+    await openTab(page, 'performance', isMobile);
     await page.locator('#tab-performance .subtab[data-subtab="journal"]').click();
     await page.locator('#jSecPeriod .j-section-head').click();
     await expect(page.locator('#jSecPeriod')).toHaveClass(/open/);

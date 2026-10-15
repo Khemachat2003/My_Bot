@@ -44,21 +44,71 @@
     .guide-action{font-size:11.5px;}
   }
 
-  /* ═══ MOBILE: sidebar → bottom bar ═══ */
+  /* บล็อกจอ ≤768px (Phase C-7: drawer + การ์ดตาราง) ย้ายไป styles/mobile.css —
+     ต้อง import "หลัง" report-layout.css / overview-bottom.css จึงจะชนะ cascade เดิมได้ */
+
+  /* ═══ MOBILE ≤768px (Phase C-7 — design_system 5.1–5.4 มือถือ): hamburger drawer + การ์ดตาราง ═══
+     หมายเหตุ: ไฟล์นี้ import ก่อน report-layout.css / overview-bottom.css กฎ strip จึงเขียน
+     selector แบบ .content ... (specificity 0,2,0) เพื่อชนะกฎหลังบ้าน (0,1,0) โดยไม่แตะลำดับไฟล์ */
   @media(max-width:768px){
     .shell{grid-template-columns:1fr;}
+
+    /* ── hamburger + drawer (แทน bottom bar เดิม — desktop ≥769px ไม่เห็นทั้งคู่) ── */
+    .nav-toggle{
+      display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+      width:32px; height:32px; padding:0; border:1px solid var(--border); border-radius:8px;
+      background:var(--card); color:var(--text); cursor:pointer; transition:.15s; font-size:16px;
+    }
+    .nav-toggle:hover{color:var(--accent); border-color:var(--accent);}
+    #drawerScrim{
+      position:fixed; inset:0; z-index:900; background:rgba(4,8,16,.55);
+      opacity:0; pointer-events:none; transition:opacity .2s ease;
+    }
+    body.drawer-open #drawerScrim{opacity:1; pointer-events:auto;}
     .sidebar{
-      position:fixed; bottom:0; left:0; right:0; z-index:100;
-      border-right:none; border-top:1px solid var(--border);
-      padding:0; display:flex; background:var(--panel);
+      /* คงสี/ฟอนต์/active-state จาก layout.css เดิมทุกอย่าง — แค่เลื่อนเข้าออกจากขอบซ้าย */
+      position:fixed; top:0; bottom:0; left:0; z-index:1000; width:min(78vw,300px);
+      background:var(--surface); transform:translateX(-105%); transition:transform .2s ease;
+      box-shadow:none;
     }
-    .nav-group{display:flex; margin-bottom:0; flex:1;}
-    .nav-group-label{display:none;}
-    .nav-item{
-      flex:1; justify-content:center; padding:10px 4px; font-size:11px;
-      border-left:none; border-top:2px solid transparent; text-align:center;
+    body.drawer-open .sidebar{transform:translateX(0); box-shadow:var(--shadow-panel);}
+
+    /* ── 5.1: ชาร์ตเต็มกว้างก่อน → Gauges|Mini Setup เลื่อนแนวนอน → watchlist ท้ายสุด ── */
+    .terminal{grid-template-columns:1fr; gap:12px;}
+    .terminal .chart-panel{order:-1;}
+    .terminal .wlist{order:9;}
+    .terminal .side-col{flex-direction:row; align-items:flex-start; overflow-x:auto; padding-bottom:4px;}
+    .terminal .side-col > .panel{flex:0 0 78%; max-width:78%;}
+
+    /* ── KPI/สถิติ + การ์ดสรุป → แถบเลื่อนแนวนอน (5.1 KPI strip / 5.2–5.3 มือถือ)
+         .content ... = ชนะ report-layout/overview-bottom ที่ import ทีหลัง ── */
+    .content .ov-status-bar{display:flex; overflow-x:auto; gap:8px;}
+    .content .ov-stat{flex:0 0 auto; min-width:112px; padding:4px 8px;}
+    .content .j-hero{display:flex; overflow-x:auto; gap:10px;}
+    .content .j-hero-card{flex:0 0 62%;}
+    .content .j-compare{display:flex; overflow-x:auto; gap:10px;}
+    .content .j-cmp-card{flex:0 0 80%;}
+
+    /* ── ตารางรายการ → การ์ดรายแถว (5.2/5.3/5.4 มือถือ) — opt-in ด้วย .tbl-cards
+         label มาจาก td[data-label] ที่ app/mobileCardLabels.js ใส่ให้จาก thead ── */
+    .tbl-cards thead{display:none;}
+    .tbl-cards tbody, .tbl-cards tr{display:block;}
+    .tbl-cards tr{background:var(--surface-alt); border:1px solid var(--border); border-radius:10px; padding:2px 10px 6px; margin:0 0 10px;}
+    .tbl-cards tr:last-child{margin-bottom:0;}
+    .tbl-cards td{
+      display:flex; justify-content:space-between; align-items:baseline; gap:12px;
+      white-space:normal; text-align:right; border-bottom:1px solid var(--grid); padding:6px 2px;
     }
-    .nav-item.active{border-left-color:transparent; border-top-color:var(--accent);}
-    .nav-group+.nav-group{border-left:1px solid var(--border);}
-    .content{padding-bottom:60px;}
+    .tbl-cards td::before{
+      content:attr(data-label); color:var(--muted); font-size:10px; font-weight:700;
+      text-transform:uppercase; letter-spacing:.06em; text-align:left; flex-shrink:0;
+    }
+    .tbl-cards td:last-child{border-bottom:none;}
+    .tbl-cards td[colspan]{display:block; text-align:center; padding:12px 2px; border-bottom:none;}
+    .tbl-cards td[colspan]::before{content:none;}
+  }
+  /* ≥769px: ไม่มี hamburger/drawer — desktop คง pixel เดิมจาก C-6 ทุกจุด */
+  @media(min-width:769px){
+    .nav-toggle{display:none;}
+    #drawerScrim{display:none;}
   }

@@ -15,13 +15,15 @@
 <script src="/static/vendor/lightweight-charts.standalone.production.js"></script>
 <link rel="stylesheet" href="/static/vendor/tabler/tabler-icons.min.css">
 <!-- CSS + JS ทั้งหมดอยู่ใน src/ (แยกตาม feature) — แผนที่ไฟล์: frontend/AGENTS.md / docs/code_map.md -->
-  <script type="module" crossorigin src="/static/dist/assets/index-D3LReT4c.js"></script>
-  <link rel="stylesheet" crossorigin href="/static/dist/assets/index-BpKvZKpu.css">
+  <script type="module" crossorigin src="/static/dist/assets/index-BDxPPdVs.js"></script>
+  <link rel="stylesheet" crossorigin href="/static/dist/assets/index-BL3nSZ6s.css">
 </head>
 <body>
 
 <!-- ═══════════ TOP BAR ═══════════ -->
 <div class="topbar">
+  <!-- C-7: hamburger เปิด drawer — โชว์เฉพาะจอ ≤768px (responsive.css); desktop display:none = pixel เดิม -->
+  <button type="button" class="nav-toggle" id="navToggle" aria-label="เปิดเมนู" aria-expanded="false"><i class="ti ti-menu"></i></button>
   <div class="brand">
     <div class="logo">X</div>
     <div>
@@ -245,7 +247,7 @@
     <div class="panel">
       <h3><span class="ph"></span>ประวัติสัญญาณ ML ทั้งหมด</h3>
       <div class="tbl-wrap" style="max-height:480px;overflow-y:auto;">
-        <table id="mlFullTable">
+        <table id="mlFullTable" class="tbl-cards">
           <thead><tr><th>เวลา</th><th>TF</th><th>ทิศทาง</th><th>Entry</th><th>SL</th><th>TP1/2</th><th>R:R</th><th>Exit</th><th>Win Prob</th><th>Thresh</th><th>Hold</th><th>Model</th><th>ผล</th></tr></thead>
           <tbody></tbody>
         </table>
@@ -309,7 +311,7 @@
           </select>
         </h3>
         <div class="tbl-wrap" style="max-height:420px;overflow-y:auto;">
-          <table id="setupTable">
+          <table id="setupTable" class="tbl-cards">
             <thead><tr><th>เวลา</th><th>คู่</th><th>TF</th><th>Imp</th><th>ทิศทาง</th><th>Entry</th><th>SL</th><th>TP1/2</th><th>R:R</th><th>Exit</th><th>Score</th><th>Tier</th><th>ผ่าน</th><th>ผล</th></tr></thead>
             <tbody></tbody>
           </table>
@@ -414,7 +416,7 @@
       </div>
       <div class="j-section-body">
         <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
-          <table id="dailyTable">
+          <table id="dailyTable" class="tbl-cards">
             <thead><tr><th>วัน</th><th>Trades</th><th>Wins</th><th>Winrate</th><th>P&amp;L</th></tr></thead>
             <tbody></tbody>
           </table>
@@ -434,7 +436,7 @@
           <button class="j-ptab" data-period="yearly">Yearly</button>
         </div>
         <div class="tbl-wrap" style="max-height:300px;overflow-y:auto;">
-          <table id="periodTable">
+          <table id="periodTable" class="tbl-cards">
             <thead>
               <tr>
                 <th>Period</th>
@@ -456,7 +458,7 @@
       </div>
       <div class="j-section-body">
         <div class="tbl-wrap">
-          <table id="modelTable">
+          <table id="modelTable" class="tbl-cards">
             <thead><tr><th>Key</th><th>Version</th><th>Horizon</th><th>n_rows</th><th>AUC</th><th>Conf</th><th>Feature Set</th></tr></thead>
             <tbody></tbody>
           </table>
@@ -504,7 +506,7 @@
           <div id="cfdOpenTrades" style="margin-top:12px;"></div>
           <div class="tbl-wrap" style="margin-top:12px;">
             <h4 style="color:var(--muted);font-size:11px;margin-bottom:6px;">Resolved Trades</h4>
-            <table id="cfdPaperTable">
+            <table id="cfdPaperTable" class="tbl-cards">
               <thead><tr>
                 <th>#</th><th>Time</th><th>System</th><th>Dir</th><th>Entry</th>
                 <th>SL</th><th>TP1</th><th>TP2</th><th>Result</th><th>Exit</th>
@@ -547,7 +549,7 @@
         </div>
         <div class="j-section-body">
           <div class="tbl-wrap">
-            <table id="cfdTradeTable">
+            <table id="cfdTradeTable" class="tbl-cards">
               <thead><tr>
                 <th>#</th><th>System</th><th>Dir</th><th>Entry</th>
                 <th>TP1</th><th>TP2</th><th>P&L (TP1)</th><th>P&L (TP2)</th>
@@ -577,7 +579,7 @@
         <span style="font-size:11px;color:var(--muted);font-weight:400;margin-left:8px;">จาก /api/ml/signals และ /api/signals — ยังไม่มีสถานะการส่งจริง</span>
       </h3>
       <div class="tbl-wrap" style="max-height:420px;overflow-y:auto;">
-        <table id="sigLogTable">
+        <table id="sigLogTable" class="tbl-cards">
           <thead><tr><th>เวลา</th><th>ชนิด</th><th>ทิศทาง</th><th>ราคา</th><th>Prob/Score</th><th>ผล</th></tr></thead>
           <tbody></tbody>
         </table>
@@ -599,7 +601,7 @@
           <div>
             <h4 style="color:var(--accent);font-size:12px;margin-bottom:6px;">Checklist Vote Weight (WR เมื่อ cond = true)</h4>
             <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
-              <table id="ttCondTable" style="font-size:11px;">
+              <table id="ttCondTable" class="tbl-cards" style="font-size:11px;">
                 <thead><tr><th>Condition</th><th>True</th><th>Win</th><th>WR</th><th>False WR</th></tr></thead>
                 <tbody></tbody>
               </table>
@@ -608,7 +610,7 @@
           <div>
             <h4 style="color:var(--accent);font-size:12px;margin-bottom:6px;">Recent Touches</h4>
             <div class="tbl-wrap" style="max-height:260px;overflow-y:auto;">
-              <table id="ttRecentTable" style="font-size:11px;">
+              <table id="ttRecentTable" class="tbl-cards" style="font-size:11px;">
                 <thead><tr><th>เวลา</th><th>คู่</th><th>Case</th><th>Dir</th><th>Entry</th><th>Exit</th><th>✓</th><th>ผล</th></tr></thead>
                 <tbody></tbody>
               </table>

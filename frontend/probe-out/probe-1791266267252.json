@@ -1,0 +1,65 @@
+{
+ "rects": {
+  "#candleChart": {
+   "x": 508,
+   "y": 220,
+   "width": 584,
+   "height": 320,
+   "top": 220,
+   "right": 1092,
+   "bottom": 540,
+   "left": 508
+  },
+  "#lwWrap": {
+   "x": 508,
+   "y": 220,
+   "width": 584,
+   "height": 590,
+   "top": 220,
+   "right": 1092,
+   "bottom": 810,
+   "left": 508
+  },
+  "#chartLegendBar": {
+   "x": 508,
+   "y": 192,
+   "width": 584,
+   "height": 28,
+   "top": 192,
+   "right": 1092,
+   "bottom": 220,
+   "left": 508
+  },
+  ".chart-toolbar": {
+   "x": 508,
+   "y": 118,
+   "width": 584,
+   "height": 66,
+   "top": 118,
+   "right": 1092,
+   "bottom": 184,
+   "left": 508
+  },
+  "#volChart": {
+   "x": 508,
+   "y": 540,
+   "width": 584,
+   "height": 78,
+   "top": 540,
+   "right": 1092,
+   "bottom": 618,
+   "left": 508
+  }
+ },
+ "fonts": "loaded",
+ "loaded": [
+  "tabler-icons 400",
+  "IBM Plex Mono 400",
+  "IBM Plex Mono 600",
+  "IBM Plex Sans Thai 400",
+  "IBM Plex Sans Thai 400",
+  "IBM Plex Sans Thai 500",
+  "IBM Plex Sans Thai 500",
+  "IBM Plex Sans Thai 600"
+ ]
+}
