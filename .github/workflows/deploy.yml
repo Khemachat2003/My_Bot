@@ -1,66 +1,106 @@
-# ── GitHub Actions: auto build + deploy ขึ้น VPS ─────────────────────────────
-# ทุกครั้งที่ push เข้า main → SSH เข้า VPS → git pull → docker compose up -d --build
+# ── GitHub Actions: auto build + deploy ขึ้น VPS (แบบ TAG) ──────────────────────
+# ออกแบบแบบ C: main ใช้ commit งานค้างได้อิสระ (ยังไม่ deploy)
+#              ขึ้น VPS เฉพาะตอน push tag v* — "tag = ปุ่มอนุมัติ deploy" ด้วยมือ
 #
-# ตั้งค่าใน GitHub repo → Settings → Secrets and variables → Actions:
-#   VPS_HOST      = IP หรือ domain ของ VPS
-#   VPS_USER      = user ที่ใช้ SSH เข้า VPS (เช่น linuxuser)
-#   SSH_KEY       = private key (ed25519) ที่ใช้ SSH เข้า VPS (paste ทั้งก้อน)
-#   VPS_DIR       = (ทางเลือก) path ที่ clone repo ไว้บน VPS
-#                   ไม่ตั้ง = ใช้ $HOME/My_Bot  ·· ตั้งไว้ = ใช้ค่านี้แทน
-#                   ⚠️ ต้องตรงกับ path จริงบน VPS ไม่งั้น workflow จะ cd ไม่เจอ
+# วิธีใช้:
+#   1) ทดสอบบนเครื่อง Local ให้ผ่านก่อนเสมอ
+#   2) git tag v1.0.1 && git push origin v1.0.1   → deploy อัตโนมัติ
+#   3) ถ้าต้องการรันมือ (หน้า Actions → Run workflow) ใส่ tag ที่มีอยู่แล้ว
+#   4) rollback = git tag v1.0.0 <commit เก่า> && git push origin v1.0.0
 #
-# ── ข้อกำหนดบน VPS (ต้องทำก่อน workflow จะทำงาน) ─────────────────────────────
-#   1. ติดตั้ง Docker + ตั้ง user ให้มีสิทธิ์ docker
-#        sudo usermod -aG docker $USER      # แล้ว logout/login ใหม่ (หรือ reboot)
-#      → ถ้าใช้ docker group ตรงๆ ต่อได้เลย อย่าใช้ sudo ในคำสั่ง (ssh ไม่มี TTY
-#        ให้พิมพ์ password)  workflow นี้เลยสั่ง docker ตรงๆ (ไม่ใช้ sudo)
-#   2. clone repo ไปไว้ที่ path ที่จะใช้จริง (ค่า default ของ workflow = $HOME/My_Bot):
-#        cd ~
-#        git clone https://github.com/Khemachat2003/My_Bot.git My_Bot
-#        cd My_Bot && cp .env.example .env && nano .env          # ตั้งค่า
-#        mkdir -p data && docker compose up -d --build            # ลองรันครั้งแรกด้วยมือ
-#        (ถ้าใช้ path อื่น เช่น /opt/xauusd-bot ให้ตั้ง secret VPS_DIR ให้ตรง path)
-#   3. ตรวจว่าคำสั่ง docker ผ่าน SSH โดยไม่ต้องพิมพ์รหัสผ่าน:
-#        ssh -i ~/.ssh/id_ed25519 linuxuser@<vps-ip> "docker ps"
-#      ถ้าได้ "permission denied" → logout แล้ว login ใหม่ (docker group มีผลตอน login เท่านั้น)
+# ── Secrets (repo → Settings → Secrets and variables → Actions) ────────────────
+#   VPS_HOST  = 207.148.123.201
+#   VPS_USER  = linuxuser
+#   SSH_KEY   = private key ที่ public key อยู่ใน ~/.ssh/authorized_keys ของ VPS
+#   (VPS_DIR  ไม่ต้องตั้ง — workflow ใช้ $HOME/My_Bot ซึ่งเป็น path clone จริง)
 #
-# หมายเหตุ: ถ้า deploy.yml ยังไม่แน่ใจ ช่วงทดสอบให้ deploy มือก่อน
-#   (git pull && docker compose up -d --build) แล้วค่อยเปิด auto-deploy
+# ── สิ่งที่ต้องทำครั้งเดียวบน VPS (ถ้ายังไม่ได้ทำ) ────────────────────────────
+#   mkdir -p ~/.ssh && chmod 700 ~/.ssh
+#   echo '<public key ของคีย์ใน SSH_KEY>' >> ~/.ssh/authorized_keys
+#   chmod 600 ~/.ssh/authorized_keys
+#   docker ps   # ต้องไม่ใช้ sudo; ถ้า permission denied → logout/login ใหม่
+#
+# หมายเหตุ: ขั้น deploy จะ git checkout -f <tag> ทำให้อยู่ในสถานะ detached HEAD
+#   → ครั้งหน้า workflow ข้าม branch ทิ้ง ใช้ tag เป็นตัวกำหนดเท่านั้น (ตั้งใจ)
 name: Deploy to VPS
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:      # ให้กด deploy ด้วยมือได้จากหน้า Actions
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag ที่จะ deploy (เช่น v1.0.0) — ต้องมีอยู่แล้วใน repo"
+        required: true
+        type: string
 
 jobs:
   deploy:
     name: Build & Deploy
     runs-on: ubuntu-latest
-    if: github.repository != ''
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: ตรวจว่า secrets ครบ (ข้อความผิดชัดเจนแทน ssh-keyscan ว่าง)
+        run: |
+          missing=""
+          [ -z "${{ secrets.VPS_HOST }}" ] && missing="$missing VPS_HOST"
+          [ -z "${{ secrets.VPS_USER }}" ] && missing="$missing VPS_USER"
+          [ -z "${{ secrets.SSH_KEY }}" ] && missing="$missing SSH_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::ยังไม่ได้ตั้ง secret(s):$missing — ไปตั้งที่ Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+
+      - name: เลือก tag ที่จะ deploy
+        id: ver
+        run: |
+          TAG="${{ github.event.inputs.tag }}"
+          [ -z "$TAG" ] && TAG="${GITHUB_REF_NAME}"
+          if ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error::ไม่พบ tag '$TAG' ใน repo"
+            exit 1
+          fi
+          SHA="$(git rev-parse --short "$TAG")"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "▶ deploy $TAG ($SHA)"
 
       - name: Install SSH key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Deploy over SSH
+      - name: Deploy tag ขึ้น VPS
         run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} '
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "
             set -e
-            DEPLOY_DIR="${VPS_DIR:-$HOME/My_Bot}"
-            cd "$DEPLOY_DIR" || { echo "PATH: ไม่พบ $DEPLOY_DIR — ตั้งค่า path ให้ตรง (ดู DEPLOY.md ข้อ 3)"; exit 1; }
-            git pull --ff-only
-            docker compose up -d --build --pull always
-            echo "--- commit ที่ deploy ---"
+            DEPLOY_DIR=\"\$HOME/My_Bot\"
+            cd \"\$DEPLOY_DIR\" || { echo \"PATH: ไม่พบ \$DEPLOY_DIR\"; exit 1; }
+            git fetch --tags --force origin
+            git checkout -f '${{ steps.ver.outputs.tag }}'
+            docker compose up -d --build
+            echo '--- deployed commit (ต้องตรงกับ tag) ---'
             git rev-parse --short HEAD
-            echo "--- ตรวจ healthcheck ---"
+            echo '--- healthcheck (หน่วงเวลา 8 วิ รอ boot) ---'
             sleep 8
-            curl -s -f http://127.0.0.1:8000/api/health || echo "WARNING: health ยังไม่ตอบ (อาจยัง boot) — ดู logs ด้วย docker compose logs -f"
+            curl -s -f http://127.0.0.1:8000/api/health || { echo 'HEALTH FAILED — ดู log ด้านล่าง'; docker compose logs --tail=60; exit 1; }
             docker compose ps
-          '
+          "
+
+      - name: รายงานผล
+        if: always()
+        run: |
+          {
+            echo "## Deploy result"
+            echo "| ฟิลด์ | ค่า |"
+            echo "|---|---|"
+            echo "| tag | ${{ steps.ver.outputs.tag || '(ไม่ทราบ)' }} |"
+            echo "| commit | ${{ steps.ver.outputs.sha || '-' }} |"
+            echo "| ผล | ${{ job.status }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
