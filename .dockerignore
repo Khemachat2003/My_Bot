@@ -4,11 +4,11 @@
 venv
 __pycache__
 *.pyc
-data/*.db
-data/*.db-wal
-data/*.db-shm
-data/*.csv
+data/*
 !data/.gitkeep
+*.db
+*.db-wal
+*.db-shm
 # ข้อมูลย้อนหลัง dev (90วัน ฯลฯ) — ไม่พาเข้า image
 XAU-USD_1Minute_BID_*.csv
 deriv_*_60s_90d.csv
