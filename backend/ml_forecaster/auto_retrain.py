@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 import warnings
@@ -48,14 +49,13 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from backend import db, setup_db
-from backend.ml_forecaster.features_v2 import FEATURE_COLUMNS_V2
-from backend.ml_forecaster.setup_features import (
+from backend import db, setup_db  # noqa: E402
+from backend.ml_forecaster.features_v2 import FEATURE_COLUMNS_V2  # noqa: E402
+from backend.ml_forecaster.setup_features import (  # noqa: E402
     SETUP_FEATURE_COLUMNS,
     flatten_setup_dict,
 )
-from backend.notifier import _conf_threshold
-from backend.telegram import send_telegram
+from backend.telegram import send_telegram  # noqa: E402
 
 MODEL_DIR = Path(__file__).resolve().parent
 MODEL_FILE_M5 = MODEL_DIR / "model_m5.joblib"
@@ -104,7 +104,7 @@ except ImportError:
     HAS_LGB = False
     from sklearn.ensemble import HistGradientBoostingClassifier as _HG
 
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score  # noqa: E402
 
 
 def _load_price_data() -> pd.DataFrame:
@@ -139,10 +139,10 @@ def _load_price_data() -> pd.DataFrame:
     rule = "5min"
     o = raw["open"].resample(rule, label="left", closed="left").first()
     h = raw["high"].resample(rule, label="left", closed="left").max()
-    l = raw["low"].resample(rule, label="left", closed="left").min()
+    lo = raw["low"].resample(rule, label="left", closed="left").min()
     c = raw["close"].resample(rule, label="left", closed="left").last()
     v = raw["volume"].resample(rule, label="left", closed="left").sum()
-    out = pd.concat([o, h, l, c, v], axis=1).dropna()
+    out = pd.concat([o, h, lo, c, v], axis=1).dropna()
     out.columns = ["open", "high", "low", "close", "volume"]
     print(f"  [auto_retrain] resample → M5: {len(out)} แท่ง")
     return out
@@ -349,7 +349,6 @@ def run_auto_retrain(min_new_signals: int = 5) -> dict:
         print(msg)
         return {"trained": False, "reason": "not_enough_price", "msg": msg}
 
-    feat = pd.concat([df_tf, pd.DataFrame(index=df_tf.index)], axis=1)
     from backend.ml_forecaster.features_v2 import build_features_v2
 
     feat_df = build_features_v2(df_tf)
@@ -404,8 +403,6 @@ def run_auto_retrain(min_new_signals: int = 5) -> dict:
         print(f"  {c:>6.2f} | {s['n']:>4} | {s['winrate_pct']:>7.2f}% | {s['net_units']:>+10.2f}")
 
     # ── เทียบกับโมเดลปัจจุบัน ──
-    current_conf = _conf_threshold("M5")
-    current = res["summary"].get(current_conf)
     best_c, best_s = None, None
     for c in CONF_GRID:
         s = res["summary"][c]
@@ -457,6 +454,9 @@ def run_auto_retrain(min_new_signals: int = 5) -> dict:
         except Exception:
             old = None
 
+    # เขียนลงไฟล์ชั่วคราวแล้ว rename ทับ — atomic บนไฟล์ระบบเดียวกัน
+    # กัน notifier โหลดไฟล์ครึ่งเดียวถ้า retrain ตาย/ถูก kill กลาง dump
+    tmp_path = MODEL_FILE_M5.with_suffix(".joblib.tmp")
     joblib.dump(
         {
             "model": final_model,
@@ -475,8 +475,9 @@ def run_auto_retrain(min_new_signals: int = 5) -> dict:
             "retrained_at": pd.Timestamp.now(tz="UTC").isoformat(),
             "note": "auto_retrain — เรียนรู้จากสัญญาณจริง + setup context (Hybrid)",
         },
-        MODEL_FILE_M5,
+        tmp_path,
     )
+    os.replace(tmp_path, MODEL_FILE_M5)
     print(f"  💾 บันทึก {MODEL_FILE_M5.name} เรียบร้อย (conf={best_c})")
 
     msg = (

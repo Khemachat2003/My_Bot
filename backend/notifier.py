@@ -21,6 +21,7 @@ notifier.py — 🟢 System 2: ML Research & Confidence Model Engine
 ⚠️ ระบบนี้แยกขาดจาก 🔵 Rule-Based Setup Engine (setup_feed.py) โดยสมบูรณ์:
    ไม่ใช้ตาราง setup_signals/setup_scores, ไม่ import setup_scorer
 """
+
 from __future__ import annotations
 
 import os
@@ -43,16 +44,19 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-import joblib
-import pandas as pd
+import joblib  # noqa: E402
+import pandas as pd  # noqa: E402
 
-from backend import db
-from backend.telegram import send_telegram
-from backend.market_hours import is_forex_like, market_open_now, symbol_label, get_session
-from backend.ml_forecaster.features_v2 import get_latest_features
-from backend.ml_forecaster.setup_features import (
-    SETUP_FEATURE_COLUMNS, flatten_setup_result,
+from backend import db  # noqa: E402
+from backend.market_hours import (  # noqa: E402
+    get_session,
+    is_forex_like,
+    market_open_now,
+    symbol_label,
 )
+from backend.ml_forecaster.features_v2 import get_latest_features  # noqa: E402
+from backend.ml_forecaster.setup_features import flatten_setup_result  # noqa: E402
+from backend.telegram import send_telegram  # noqa: E402
 
 MODEL_DIR = Path(__file__).resolve().parent / "ml_forecaster"
 DATA_DIR = ROOT_DIR / "data"
@@ -64,14 +68,26 @@ BACKUP_SYMBOL = os.getenv("DERIV_SYMBOL_BACKUP", "R_100")
 
 # แต่ละ timeframe: ถือออเดอร์กี่นาที / resample กี่นาที / ใช้โมเดลไฟล์ไหน / เทรน horizon กี่แท่ง
 ML_TIMEFRAMES = [
-    {"label": "M1", "hold_min": 15, "resample_min": 1,
-     "model_file": "model_m1.joblib", "train_horizon": 15, "min_bars": 150},
-    {"label": "M5", "hold_min": 30, "resample_min": 5,
-     "model_file": "model_m5.joblib", "train_horizon": 6, "min_bars": 60},
+    {
+        "label": "M1",
+        "hold_min": 15,
+        "resample_min": 1,
+        "model_file": "model_m1.joblib",
+        "train_horizon": 15,
+        "min_bars": 150,
+    },
+    {
+        "label": "M5",
+        "hold_min": 30,
+        "resample_min": 5,
+        "model_file": "model_m5.joblib",
+        "train_horizon": 6,
+        "min_bars": 60,
+    },
 ]
 
 # ── Guards (เหมือนฝั่ง rulebase) ──
-ML_DAILY_CAP = int(os.getenv("ML_DAILY_CAP", "20"))     # ไม่เกิน 20 ไม้/วัน
+ML_DAILY_CAP = int(os.getenv("ML_DAILY_CAP", "20"))  # ไม่เกิน 20 ไม้/วัน
 ML_COOLDOWN_MIN = float(os.getenv("ML_COOLDOWN_MIN", "60"))  # 60 นาที/direction
 
 
@@ -80,20 +96,31 @@ def _load_model_bundle(cfg: dict) -> dict:
     model_path = MODEL_DIR / cfg["model_file"]
     if model_path.exists():
         bundle = joblib.load(model_path)
-        print(f"🚀 Loaded {cfg['model_file']} | horizon={bundle.get('horizon')} | "
-              f"conf={bundle.get('chosen_conf')}")
-        return {"model": bundle["model"], "features": bundle.get("features"),
-                "horizon": bundle.get("horizon", cfg["train_horizon"]),
-                "chosen_conf": bundle.get("chosen_conf", 0.55)}
+        print(
+            f"🚀 Loaded {cfg['model_file']} | horizon={bundle.get('horizon')} | "
+            f"conf={bundle.get('chosen_conf')}"
+        )
+        return {
+            "model": bundle["model"],
+            "features": bundle.get("features"),
+            "horizon": bundle.get("horizon", cfg["train_horizon"]),
+            "chosen_conf": bundle.get("chosen_conf", 0.55),
+        }
 
     legacy = MODEL_DIR / "model_v2.joblib"
     if legacy.exists():
         bundle = joblib.load(legacy)
-        print(f"⚠️ ไม่พบ {cfg['model_file']} — ใช้ model_v2.joblib (horizon={bundle.get('horizon')}) แทน "
-              f"โปรดรัน `python -m backend.ml_forecaster.train_live_models` เพื่อให้ confidence ตรงกับ "
-              f"เวลาถือ {cfg['hold_min']} นาทีของ TF {cfg['label']}")
-        return {"model": bundle["model"], "features": bundle.get("features"),
-                "horizon": bundle.get("horizon"), "chosen_conf": bundle.get("chosen_conf", 0.55)}
+        print(
+            f"⚠️ ไม่พบ {cfg['model_file']} — ใช้ model_v2.joblib (horizon={bundle.get('horizon')}) แทน "
+            f"โปรดรัน `python -m backend.ml_forecaster.train_live_models` เพื่อให้ confidence ตรงกับ "
+            f"เวลาถือ {cfg['hold_min']} นาทีของ TF {cfg['label']}"
+        )
+        return {
+            "model": bundle["model"],
+            "features": bundle.get("features"),
+            "horizon": bundle.get("horizon"),
+            "chosen_conf": bundle.get("chosen_conf", 0.55),
+        }
 
     raise FileNotFoundError(
         f"ไม่พบโมเดล {cfg['model_file']} หรือ model_v2.joblib ใน {MODEL_DIR}\n"
@@ -105,6 +132,7 @@ def _conf_threshold(label: str) -> float:
     """ลำดับ: .env ML_CONF_THRESHOLD (อ่านสดทุกครั้ง — แก้ .env แล้วไม่มีผลทันที
     โดยไม่ต้อง restart) > chosen_conf จากโมเดล > 0.55"""
     import os as _os
+
     raw = _os.getenv("ML_CONF_THRESHOLD")
     if raw and raw.strip():
         try:
@@ -123,8 +151,10 @@ def _load_models_safe() -> dict:
         try:
             loaded[cfg["label"]] = _load_model_bundle(cfg)
         except Exception as e:
-            print(f"❌ [MLFeed] ไม่สามารถโหลดโมเดล TF:{cfg['label']} ({e}) — "
-                  f"ข้าม TF นี้ไป (Dashboard Prob Gauge ของ TF นี้จะว่าง)")
+            print(
+                f"❌ [MLFeed] ไม่สามารถโหลดโมเดล TF:{cfg['label']} ({e}) — "
+                f"ข้าม TF นี้ไป (Dashboard Prob Gauge ของ TF นี้จะว่าง)"
+            )
     return loaded
 
 
@@ -138,6 +168,7 @@ def fetch_live_or_cache_candles(symbol: str, count: int = 500, retries: int = 3)
     for attempt in range(1, retries + 1):
         try:
             from backend.data_feed.deriv_feed import fetch_candles_history
+
             df = fetch_candles_history(symbol=symbol, granularity=60, count=count)
             if df is not None and not df.empty:
                 return _ensure_utc(df)
@@ -170,10 +201,14 @@ def _resample(df: pd.DataFrame, minutes: int) -> pd.DataFrame:
     rule = f"{minutes}min"
     o = df["open"].resample(rule, closed="left", label="left", origin="epoch").first()
     h = df["high"].resample(rule, closed="left", label="left", origin="epoch").max()
-    l = df["low"].resample(rule, closed="left", label="left", origin="epoch").min()
+    lo = df["low"].resample(rule, closed="left", label="left", origin="epoch").min()
     c = df["close"].resample(rule, closed="left", label="left", origin="epoch").last()
-    v = df["volume"].resample(rule, closed="left", label="left", origin="epoch").sum() if "volume" in df else None
-    parts = [o, h, l, c] + ([v] if v is not None else [])
+    v = (
+        df["volume"].resample(rule, closed="left", label="left", origin="epoch").sum()
+        if "volume" in df
+        else None
+    )
+    parts = [o, h, lo, c] + ([v] if v is not None else [])
     out = pd.concat(parts, axis=1)
     out.columns = ["open", "high", "low", "close"] + (["volume"] if v is not None else [])
     return out.dropna()
@@ -182,10 +217,51 @@ def _resample(df: pd.DataFrame, minutes: int) -> pd.DataFrame:
 class MLFeedEngine:
     def __init__(self):
         db.init_db()
-        self._last_signal_state: dict[str, str] = {}
+        # sync สถานะกันสแปมจาก DB — กัน restart แล้วยิงสัญญาณทิศเดิมซ้ำทันที
+        # (เดิมเริ่มว่าง + reset ทุกรอบ → กลไกกันสแปมไม่เคยทำงาน)
+        self._last_signal_state: dict[str, str] = {
+            r["timeframe"]: r["direction"]
+            for r in db.fetch_recent_ml_signals(limit=10)
+            if r.get("direction") in ("CALL", "PUT")
+        }
         self._active_symbol: str | None = None
         self._symbol_switch_notified = False
         self._last_price: float | None = None
+        # hot-reload: จำ mtime ของไฟล์โมเดลตอนโหลดครั้งแรก (auto_retrain เขียนทับแล้วรู้ตัว)
+        self._model_mtimes: dict[str, float] = {
+            label: self._model_mtime(cfg.get("model_file")) for label, cfg in MODELS.items()
+        }
+
+    @staticmethod
+    def _model_mtime(model_file: str | None) -> float:
+        if not model_file:
+            return 0.0
+        p = MODEL_DIR / model_file
+        try:
+            return p.stat().st_mtime if p.exists() else 0.0
+        except OSError:
+            return 0.0
+
+    def _reload_models_if_changed(self):
+        """ถ้า auto_retrain เขียนโมเดลทับ → โหลดใหม่ทันที (เดิมต้อง restart ทั้ง process)
+
+        โหลดก่อนแล้วค่อยสลับ pointer — ถ้าโหลดพัง คงใช้โมเดลเดิมที่ยังใช้ได้
+        """
+        for label, cfg in list(MODELS.items()):
+            m = self._model_mtime(cfg.get("model_file"))
+            if m and m != self._model_mtimes.get(label):
+                try:
+                    new_bundle = _load_model_bundle(cfg)
+                except Exception as e:
+                    print(f"[MLFeed] reload โมเดล {label} ไม่สำเร็จ ({e}) — คงใช้โมเดลเดิม")
+                    self._model_mtimes[label] = m  # กันลองซ้ำทุกรอบ
+                    continue
+                MODELS[label] = new_bundle
+                self._model_mtimes[label] = m
+                print(
+                    f"[MLFeed] 🔄 Hot-reload โมเดล {label} สำเร็จ "
+                    f"(conf={new_bundle.get('chosen_conf')})"
+                )
 
     def _evaluate_timeframe(self, df_tf: pd.DataFrame, cfg: dict) -> dict | None:
         """ทำนาย probability ของแท่งล่าสุดด้วยโมเดลของ timeframe นี้"""
@@ -205,8 +281,10 @@ class MLFeedEngine:
         if has_setup:
             try:
                 from backend.setup_scorer import score_setup
+
                 setup_result = score_setup(
-                    df_tf, timeframe=cfg["label"],
+                    df_tf,
+                    timeframe=cfg["label"],
                     target_hold_minutes=cfg["hold_min"],
                 )
                 setup_vec = flatten_setup_result(setup_result)
@@ -217,6 +295,7 @@ class MLFeedEngine:
                         features_df.loc[features_df.index[-1], c] = setup_vec.get(c, 0.0)
             except Exception:
                 import traceback
+
                 print("[MLFeed] setup features error:")
                 traceback.print_exc()
                 # ถ้าคำนวณ setup ไม่ได้ → กัน prediction ผิด ให้ข้ามรอบนี้
@@ -248,9 +327,12 @@ class MLFeedEngine:
         }
 
         return {
-            "signal": signal, "confidence": confidence,
-            "prob_up": prob_up, "prob_down": prob_down,
-            "threshold": thresh, "model_version": cfg["model_file"],
+            "signal": signal,
+            "confidence": confidence,
+            "prob_up": prob_up,
+            "prob_down": prob_down,
+            "threshold": thresh,
+            "model_version": cfg["model_file"],
             "features": features,
         }
 
@@ -267,25 +349,38 @@ class MLFeedEngine:
                 entry_price = row["entry_price"]
                 direction = row["direction"]
                 if direction == "CALL":
-                    res = "WIN" if last_price > entry_price else (
-                        "LOSE" if last_price < entry_price else "DRAW")
+                    res = (
+                        "WIN"
+                        if last_price > entry_price
+                        else ("LOSE" if last_price < entry_price else "DRAW")
+                    )
                 else:
-                    res = "WIN" if last_price < entry_price else (
-                        "LOSE" if last_price > entry_price else "DRAW")
+                    res = (
+                        "WIN"
+                        if last_price < entry_price
+                        else ("LOSE" if last_price > entry_price else "DRAW")
+                    )
 
                 db.update_ml_signal_result(row["id"], last_price, res)
 
                 # mirror ลง trade_journal (เก็บ P&L จำลอง)
                 trade_id = db.insert_trade(
-                    signal_id=row["id"], signal_type="ML", timeframe=row["timeframe"],
+                    signal_id=row["id"],
+                    signal_type="ML",
+                    timeframe=row["timeframe"],
                     symbol=self._active_symbol or DERIV_SYMBOL,
-                    direction=direction, entry_price=entry_price,
-                    entry_time=row["signal_time"], hold_min=row["horizon_min"],
-                    confidence=row["confidence"], model_version=row["model_version"],
+                    direction=direction,
+                    entry_price=entry_price,
+                    entry_time=row["signal_time"],
+                    hold_min=row["horizon_min"],
+                    confidence=row["confidence"],
+                    model_version=row["model_version"],
                 )
                 db.update_trade_result(trade_id, last_price, now.isoformat(), res)
 
-                pips_diff = abs(last_price - entry_price)
+                # แสดงเป็นหน่วย pip จริง (เดิมเป็นส่วนต่างราคาดิบ เช่น 0.50 ทั้งที่คือ 50 pips)
+                pip = db.get_pip_size(self._active_symbol or DERIV_SYMBOL) or 0.01
+                pips_diff = abs(last_price - entry_price) / pip
                 if res == "WIN":
                     result_icon = "🟢 WIN"
                 elif res == "LOSE":
@@ -296,7 +391,7 @@ class MLFeedEngine:
                     f"🏁 [RESULT] [ML MODEL] | ID #{row['id']} | TF: {row['timeframe']}\n"
                     f"ทิศทาง: {direction} | ผลลัพธ์: {result_icon}\n"
                     f"Entry: {entry_price:.2f} ➔ Exit: {last_price:.2f} "
-                    f"({'+' if res == 'WIN' else '-'}{pips_diff:.2f})\n"
+                    f"({'+' if res == 'WIN' else '-'}{pips_diff:.0f} pips)\n"
                     f"ระยะเวลาที่ถือ: {row['horizon_min']} นาที\n"
                     f"เวลาสรุปผล: {now.strftime('%H:%M:%S')} UTC"
                 )
@@ -310,7 +405,7 @@ class MLFeedEngine:
             cfd_resolved = db.check_cfd_trades(last_price, now.isoformat(), symbol=DERIV_SYMBOL)
             for cr in cfd_resolved:
                 icon = {"SL": "🔴", "TP1": "🟢", "TP2": "🟢"}.get(cr["result"], "❓")
-                win_emoji = "WIN" if cr["result"] in ("TP1","TP2") else "LOSE"
+                win_emoji = "WIN" if cr["result"] in ("TP1", "TP2") else "LOSE"
                 msg = (
                     f"📊 [CFD RESOLVED] {icon} {win_emoji}\n"
                     f"{cr['signal_type']} #{cr['signal_id']} | {cr['direction']}\n"
@@ -320,7 +415,7 @@ class MLFeedEngine:
                     f"P&L: ${cr.get('pnl', 0):+.2f} | Hold: {cr['hold_bars']} bars"
                 )
                 send_telegram(msg)
-                print(f"[MLFeed] CFD #{cr['id']} → {cr['result']} P&L=${cr.get('pnl',0):+.2f}")
+                print(f"[MLFeed] CFD #{cr['id']} → {cr['result']} P&L=${cr.get('pnl', 0):+.2f}")
         except Exception:
             pass
 
@@ -336,14 +431,23 @@ class MLFeedEngine:
 
     def run_once(self):
         # ML เทรนจากข้อมูล XAUUSD เท่านั้น → เทรดเฉพาะ symbol หลัก ไม่สลับไป R_100
-        # (R_100 เป็นสินทรัพย์สังเคราะห์คนละประเภท — ยกเลิกการสลับตามที่ตกลง)
+        # (R_100 เป็นสินทรัพย์สังคราะห์คนละประเภท — ยกเลิกการสลับตามที่ตกลง)
         symbol = DERIV_SYMBOL
         if is_forex_like(symbol) and not market_open_now():
             now = pd.Timestamp.now(tz="UTC")
-            self._resolve_pending(now, self._last_price or 0.0)
+            # 🚫 ห้ามสรุปผลด้วยราคา 0.0 — ถ้ายังไม่เคยมีราคา (restart ตอนตลาดปิด)
+            # ดึงราคาสุดท้ายจากตาราง prices ก่อน ไม่มีจริงๆ ถึงข้าม (pending ค้างได้ ไม่พัง)
+            if self._last_price is None:
+                recent = db.fetch_recent_prices(limit=1, symbol=symbol)
+                if recent:
+                    self._last_price = float(recent[-1]["close"])
+                    print(f"[MLFeed] ตลาดปิด — ใช้ราคาล่าสุดจาก DB: {self._last_price}")
+            if self._last_price is not None:
+                self._resolve_pending(now, self._last_price)
             return
         self._active_symbol = symbol
-        self._last_signal_state = {}   # รีเซ็ตกันสแปม
+        # กันสแปมทำงานจริง: state คงอยู่ข้ามรอบ (sync จาก DB ตอน __init__ แล้ว)
+        # ห้าม reset ที่นี่ — เดิม reset ทุกรอบทำให้เงื่อนไข signal != prev ผ่านหมด
 
         raw_df = fetch_live_or_cache_candles(symbol, count=500)
         if raw_df.empty or len(raw_df) < 100:
@@ -355,13 +459,18 @@ class MLFeedEngine:
         candle_time = raw_df.index[-1]
         now = pd.Timestamp.now(tz="UTC")
 
+        # auto_retrain เขียนโมเดลทับ → โหลดใหม่ถ้าไฟล์เปลี่ยน (ไม่ต้อง restart)
+        self._reload_models_if_changed()
+
         # เก็บแท่งล่าสุดลง prices (ตารางร่วมสำหรับกราฟ Dashboard) — แยก symbol
         # กัน XAUUSD ปนกับ R_100 (สำรอง) ในตารางเดียวจนกราฟ scale เพี้ยน
         last_row = raw_df.iloc[-1]
         db.insert_price(
             pd.Timestamp(candle_time).isoformat(),
-            float(last_row["open"]), float(last_row["high"]),
-            float(last_row["low"]), float(last_row["close"]),
+            float(last_row["open"]),
+            float(last_row["high"]),
+            float(last_row["low"]),
+            float(last_row["close"]),
             symbol=symbol,
         )
         # backfill ราคาย้อนหลัง (เฉพาะครั้งแรก/ครั้งแรกของ symbol ใหม่)
@@ -388,9 +497,12 @@ class MLFeedEngine:
                 continue
 
             db.upsert_ml_latest(
-                timeframe=cfg["label"], ts=now.isoformat(),
-                prob_up=res["prob_up"], prob_down=res["prob_down"],
-                signal=res["signal"], confidence=res["confidence"],
+                timeframe=cfg["label"],
+                ts=now.isoformat(),
+                prob_up=res["prob_up"],
+                prob_down=res["prob_down"],
+                signal=res["signal"],
+                confidence=res["confidence"],
                 threshold_used=res["threshold"],
             )
 
@@ -404,38 +516,54 @@ class MLFeedEngine:
             if res["signal"] in ("CALL", "PUT") and res["signal"] != prev_state:
                 # 🚦 Night block: 18-24 UTC volume ต่ำ (rulebase พิสูจน์แล้ว WR 34-46%)
                 if get_session(now) == "Night":
-                    print(f"[MLFeed] ข้ามสัญญาณ [{cfg['label']}] — Night session "
-                          f"(volume ต่ำ, WR ต่ำกว่า breakeven)")
+                    print(
+                        f"[MLFeed] ข้ามสัญญาณ [{cfg['label']}] — Night session "
+                        f"(volume ต่ำ, WR ต่ำกว่า breakeven)"
+                    )
                     continue
                 # 🚦 daily cap: ไม่เกิน 20 ไม้/วัน
-                start_of_day = pd.Timestamp(
-                    now.tz_localize(None) if now.tz is not None else now
-                ).normalize().isoformat()
+                start_of_day = (
+                    pd.Timestamp(now.tz_localize(None) if now.tz is not None else now)
+                    .normalize()
+                    .isoformat()
+                )
                 day_count = db.count_ml_signals_since(start_iso=start_of_day)
                 if day_count >= ML_DAILY_CAP:
-                    print(f"[MLFeed] ข้ามสัญญาณ [{cfg['label']}] — ถึง daily cap "
-                          f"{ML_DAILY_CAP} แล้ว ({day_count} ไม้)")
+                    print(
+                        f"[MLFeed] ข้ามสัญญาณ [{cfg['label']}] — ถึง daily cap "
+                        f"{ML_DAILY_CAP} แล้ว ({day_count} ไม้)"
+                    )
                     continue
                 # 🚦 cooldown: 60 นาที/direction (กันยิงซ้ำทิศเดิมถี่ๆ)
-                recent_same_dir = [s for s in db.fetch_recent_ml_signals(limit=10)
-                                   if s.get("direction") == res["signal"]]
+                recent_same_dir = [
+                    s
+                    for s in db.fetch_recent_ml_signals(limit=10)
+                    if s.get("direction") == res["signal"]
+                ]
                 if recent_same_dir:
-                    age_min = (now - pd.to_datetime(
-                        recent_same_dir[0]["signal_time"])).total_seconds() / 60.0
+                    age_min = (
+                        now - pd.to_datetime(recent_same_dir[0]["signal_time"])
+                    ).total_seconds() / 60.0
                     if age_min < ML_COOLDOWN_MIN:
-                        print(f"[MLFeed] ข้ามสัญญาณ [{cfg['label']}] — cooldown "
-                              f"{res['signal']} {age_min:.0f}/{ML_COOLDOWN_MIN} นาที")
+                        print(
+                            f"[MLFeed] ข้ามสัญญาณ [{cfg['label']}] — cooldown "
+                            f"{res['signal']} {age_min:.0f}/{ML_COOLDOWN_MIN} นาที"
+                        )
                         continue
                 # 🚦 loss-streak cooldown: แพ้ 2 ไม้ติด → พัก 1 ชม.
-                recent_ml = [s for s in db.fetch_recent_ml_signals(limit=4)
-                             if s.get("result") in ("WIN", "LOSE")]
-                if (len(recent_ml) >= 2
-                        and all(s["result"] == "LOSE" for s in recent_ml[:2])):
+                recent_ml = [
+                    s
+                    for s in db.fetch_recent_ml_signals(limit=4)
+                    if s.get("result") in ("WIN", "LOSE")
+                ]
+                if len(recent_ml) >= 2 and all(s["result"] == "LOSE" for s in recent_ml[:2]):
                     last_loss_time = pd.to_datetime(recent_ml[0]["signal_time"])
                     loss_age_min = (now - last_loss_time).total_seconds() / 60.0
                     if loss_age_min < 60.0:
-                        print(f"[MLFeed] ข้ามสัญญาณ [{cfg['label']}] — "
-                              f"แพ้ 2 ไม้ติด หยุด 1 ชม. (เหลือ {60 - loss_age_min:.0f} นาที)")
+                        print(
+                            f"[MLFeed] ข้ามสัญญาณ [{cfg['label']}] — "
+                            f"แพ้ 2 ไม้ติด หยุด 1 ชม. (เหลือ {60 - loss_age_min:.0f} นาที)"
+                        )
                         continue
                 if cfg["label"] in pending_tfs:
                     print(f"[MLFeed] ข้าม TF:{cfg['label']} — ยังมีสัญญาณ PENDING รอสรุปผล (กันซ้อน)")
@@ -457,12 +585,17 @@ class MLFeedEngine:
                             model_version=res["model_version"],
                             features=res.get("features"),
                         )
-                        print(f"[MLFeed] บันทึกสัญญาณ ID #{new_sig_id} [{cfg['label']}] ลง ml_signals "
-                              f"(รอวัดผลในอีก {hold_min} นาที)")
+                        print(
+                            f"[MLFeed] บันทึกสัญญาณ ID #{new_sig_id} [{cfg['label']}] ลง ml_signals "
+                            f"(รอวัดผลในอีก {hold_min} นาที)"
+                        )
                         db.insert_cfd_paper_trade(
-                            signal_id=new_sig_id, signal_type="ML",
-                            symbol=symbol, direction=res["signal"],
-                            entry_price=last_price, entry_time=now.isoformat(),
+                            signal_id=new_sig_id,
+                            signal_type="ML",
+                            symbol=symbol,
+                            direction=res["signal"],
+                            entry_price=last_price,
+                            entry_time=now.isoformat(),
                         )
                     except Exception:
                         print("[MLFeed] ไม่สามารถบันทึกสัญญาณลง DB ได้:")
@@ -473,7 +606,11 @@ class MLFeedEngine:
                         sym_text = f"{sym_text} (สำรอง — ตลาดทองปิด)"
                     ps = db.get_pip_size(symbol)
                     spread = db.CFD_SPREAD_PIPS * ps
-                    eff = last_price + spread/2 if res["signal"] == "CALL" else last_price - spread/2
+                    eff = (
+                        last_price + spread / 2
+                        if res["signal"] == "CALL"
+                        else last_price - spread / 2
+                    )
                     if res["signal"] == "CALL":
                         cfd_sl = eff - db.CFD_SL_PIPS * ps
                         cfd_tp1 = eff + db.CFD_TP1_PIPS * ps
@@ -497,14 +634,18 @@ class MLFeedEngine:
                         f"TP2 Reward: ${db.CFD_TP2_PIPS * pv * lot:.2f}"
                     )
                     ok = send_telegram(msg)
-                    print(f"[MLFeed] Telegram ALERT [{cfg['label']}] {'ส่งสำเร็จ' if ok else 'ส่งไม่สำเร็จ (ดู log ด้านบน)'}")
+                    print(
+                        f"[MLFeed] Telegram ALERT [{cfg['label']}] {'ส่งสำเร็จ' if ok else 'ส่งไม่สำเร็จ (ดู log ด้านบน)'}"
+                    )
 
             self._last_signal_state[cfg["label"]] = res["signal"]
 
     def run(self):
         print("=== 🟢 เริ่มต้นระบบ ML Model Engine (Real-time Context 500 แท่ง, M1/M5) ===")
-        print(f"    poll={POLL_SECONDS}s | threshold={_conf_threshold('M1')} "
-              f"| symbol={DERIV_SYMBOL} (backup={BACKUP_SYMBOL})")
+        print(
+            f"    poll={POLL_SECONDS}s | threshold={_conf_threshold('M1')} "
+            f"| symbol={DERIV_SYMBOL} (backup={BACKUP_SYMBOL})"
+        )
         errors = 0
         while True:
             try:

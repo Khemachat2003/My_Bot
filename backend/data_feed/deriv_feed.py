@@ -14,17 +14,16 @@ backend/deriv_feed.py เวอร์ชันแก้บั๊ก กับ ba
 ใช้งาน:
     from backend.data_feed.deriv_feed import fetch_candles_history
 """
+
 from __future__ import annotations
 
 import json
+import os
+import threading
 import time
 import traceback
-import threading
-from datetime import datetime, timezone
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional
-
-import os
 
 import pandas as pd
 import websocket  # pip install websocket-client
@@ -32,6 +31,7 @@ import websocket  # pip install websocket-client
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 try:
     from dotenv import load_dotenv
+
     load_dotenv(ROOT_DIR / ".env")
 except Exception:
     pass
@@ -42,32 +42,41 @@ except Exception:
 # — โปรโตคอล message เดิมใช้ได้เหมือนกันทุกอย่าง (ticks_history / style / granularity / subscribe / ping)
 DERIV_WS_URLS = [
     os.getenv("DERIV_WS_URL_OVERRIDE", "") or "wss://api.derivws.com/trading/v1/options/ws/public",
-    "wss://ws.derivws.com/websockets/v3?app_id=1089",   # fallback: endpoint เดิม (กันไว้ถ้า Deriv เปิดกลับ)
+    "wss://ws.derivws.com/websockets/v3?app_id=1089",  # fallback: endpoint เดิม (กันไว้ถ้า Deriv เปิดกลับ)
 ]
-DERIV_WS_URL = DERIV_WS_URLS[0]     # เก็บชื่อตัวแปรเดิมไว้ให้โค้ด/สคริปต์อื่นที่ import ไปใช้/print
+DERIV_WS_URL = DERIV_WS_URLS[0]  # เก็บชื่อตัวแปรเดิมไว้ให้โค้ด/สคริปต์อื่นที่ import ไปใช้/print
 
 
 # 🚨 Watchdog: ถ้าเชื่อม Deriv ไม่ได้ติดต่อกันหลายรอบ → แจ้ง Telegram เอง
 # (บทเรียน 21 ก.ย. 2026: Deriv ปิด endpoint เดิม ระบบเงียบ 8 วันโดยไม่มีใครรู้)
-FEED_DOWN_ALERT_AFTER = int(os.getenv("FEED_DOWN_ALERT_AFTER", "20"))          # จำนวนครั้งที่ fail ติดกันก่อนแจ้ง
-FEED_DOWN_ALERT_INTERVAL = int(os.getenv("FEED_DOWN_ALERT_INTERVAL_MIN", "30")) * 60   # เว้นช่วงแจ้งซ้ำ (วินาที)
+FEED_DOWN_ALERT_AFTER = int(os.getenv("FEED_DOWN_ALERT_AFTER", "20"))  # จำนวนครั้งที่ fail ติดกันก่อนแจ้ง
+FEED_DOWN_ALERT_INTERVAL = (
+    int(os.getenv("FEED_DOWN_ALERT_INTERVAL_MIN", "30")) * 60
+)  # เว้นช่วงแจ้งซ้ำ (วินาที)
 _FAIL_STREAK = {"n": 0, "alerted_at": 0.0}
+_FAIL_LOCK = threading.Lock()  # setup_feed สร้าง 8 threads เรียก connect_ws พร้อมกัน — กัน race
 
 
 def _alert_feed_down(last_err) -> None:
-    """แจ้ง Telegram เมื่อต่อ Deriv ไม่ได้ติดกันหลายรอบ (ครั้งเดียวต่อ FEED_DOWN_ALERT_INTERVAL)"""
+    """แจ้ง Telegram เมื่อต่อ Deriv ไม่ได้ติดกันหลายรอบ (ครั้งเดียวต่อ FEED_DOWN_ALERT_INTERVAL)
+
+    ⚠️ ต้องถือ _FAIL_LOCK อยู่แล้วเมื่อเรียก (check-then-set ต้องเป็น atomic)
+    """
     if _FAIL_STREAK["n"] < FEED_DOWN_ALERT_AFTER:
         return
     if time.time() - _FAIL_STREAK["alerted_at"] < FEED_DOWN_ALERT_INTERVAL:
         return
     _FAIL_STREAK["alerted_at"] = time.time()
-    msg = (f"🚨 Deriv data feed ใช้ไม่ได้ติดกัน {_FAIL_STREAK['n']} ครั้ง\n"
-           f"endpoint ที่ลอง: {', '.join(DERIV_WS_URLS)}\n"
-           f"error ล่าสุด: {type(last_err).__name__}: {str(last_err)[:150]}\n"
-           f"→ ระบบจะไม่ได้รับราคา/ไม่ยิงสัญญาณจนกว่าจะต่อได้ "
-           f"(ตรวจ https://developers.deriv.com ว่ามีการเปลี่ยน endpoint หรือไม่)")
+    msg = (
+        f"🚨 Deriv data feed ใช้ไม่ได้ติดกัน {_FAIL_STREAK['n']} ครั้ง\n"
+        f"endpoint ที่ลอง: {', '.join(DERIV_WS_URLS)}\n"
+        f"error ล่าสุด: {type(last_err).__name__}: {str(last_err)[:150]}\n"
+        f"→ ระบบจะไม่ได้รับราคา/ไม่ยิงสัญญาณจนกว่าจะต่อได้ "
+        f"(ตรวจ https://developers.deriv.com ว่ามีการเปลี่ยน endpoint หรือไม่)"
+    )
     try:
         from backend.telegram import send_telegram
+
         send_telegram(msg)
     except Exception:
         pass
@@ -79,19 +88,23 @@ def connect_ws(timeout: int = 15):
 
     คืน connection ที่ handshake สำเร็จ; ถ้าทุกตัวล้มเหลว raise exception ตัวสุดท้าย
     """
-    last_err: Optional[Exception] = None
+    last_err: Exception | None = None
     for url in DERIV_WS_URLS:
         try:
             ws = websocket.create_connection(
-                url, timeout=timeout, header=["Origin: https://app.deriv.com"])
-            _FAIL_STREAK["n"] = 0        # ต่อได้ → รีเซ็ตตัวนับ fail
+                url, timeout=timeout, header=["Origin: https://app.deriv.com"]
+            )
+            with _FAIL_LOCK:
+                _FAIL_STREAK["n"] = 0  # ต่อได้ → รีเซ็ตตัวนับ fail
             return ws
         except Exception as e:
             last_err = e
             print(f"[DerivFeed] connect ล้มเหลว: {url} → {type(e).__name__}: {str(e)[:120]}")
-    _FAIL_STREAK["n"] += 1
-    _alert_feed_down(last_err)
+    with _FAIL_LOCK:
+        _FAIL_STREAK["n"] += 1
+        _alert_feed_down(last_err)
     raise last_err
+
 
 # 🟢 ปรับ symbol ผ่าน .env ได้ (DERIV_SYMBOL=R_100 เช่น) โดยไม่ต้องแก้โค้ด
 # หมายเหตุ: frxXAUUSD คือราคาทองจริง ตลาดปิดวันเสาร์-อาทิตย์ (และช่วงปิดตลาด Forex)
@@ -107,12 +120,13 @@ DATA_DIR.mkdir(exist_ok=True)
 
 # ─── 1. ดึงแท่งเทียนย้อนหลัง (historical candles) ────────────────────────────
 
+
 def _fetch_candles_once(
     symbol: str = DEFAULT_SYMBOL,
-    granularity: int = 60,     # วินาทีต่อแท่ง: 60=1m, 300=5m, 900=15m
+    granularity: int = 60,  # วินาทีต่อแท่ง: 60=1m, 300=5m, 900=15m
     count: int = 1000,
     timeout: int = 15,
-    end: str = "latest",       # "latest" หรือ epoch (string) ไว้ขยับย้อนหลังตอน pagination
+    end: str = "latest",  # "latest" หรือ epoch (string) ไว้ขยับย้อนหลังตอน pagination
 ) -> pd.DataFrame:
     req = {
         "ticks_history": symbol,
@@ -157,7 +171,7 @@ MAX_HISTORY_PAGES = int(os.getenv("DERIV_MAX_HISTORY_PAGES", "12"))
 
 def fetch_candles_history(
     symbol: str = DEFAULT_SYMBOL,
-    granularity: int = 60,     # วินาทีต่อแท่ง: 60=1m, 300=5m, 900=15m
+    granularity: int = 60,  # วินาทีต่อแท่ง: 60=1m, 300=5m, 900=15m
     count: int = 1000,
     timeout: int = 15,
 ) -> pd.DataFrame:
@@ -165,15 +179,16 @@ def fetch_candles_history(
     frames: list[pd.DataFrame] = []
     rows = 0
     end: str = "latest"
-    earliest_seen: "pd.Timestamp | None" = None
+    earliest_seen: pd.Timestamp | None = None
 
     for page in range(MAX_HISTORY_PAGES):
         want = min(count - rows, MAX_CANDLES_PER_REQUEST)
         if want <= 0:
             break
         try:
-            batch = _fetch_candles_once(symbol=symbol, granularity=granularity,
-                                        count=want, timeout=timeout, end=end)
+            batch = _fetch_candles_once(
+                symbol=symbol, granularity=granularity, count=want, timeout=timeout, end=end
+            )
         except Exception as e:
             print(f"[DerivFeed] ดึงหน้า {page + 1} ล้มเหลว: {type(e).__name__}: {str(e)[:120]}")
             break
@@ -187,10 +202,10 @@ def fetch_candles_history(
         # หมายเหตุ: endpoint ใหม่อาจคืนมาน้อยกว่าที่ขอ (มีเพดาน ~1,000 แท่ง/รอบ)
         # จึงไม่หยุดด้วยเงื่อนไข len(batch) < want — ใช้ตัวกันลูปด้านล่างแทน
         if earliest_seen is not None and first_ts >= earliest_seen:
-            break                    # ช่วงเวลาไม่ขยับย้อนหลัง — กันลูปค้าง
+            break  # ช่วงเวลาไม่ขยับย้อนหลัง — กันลูปค้าง
         earliest_seen = first_ts
-        end = str(int(first_ts.timestamp()) - granularity)   # ย้อนไปก่อนแท่งเก่าสุด
-        time.sleep(0.3)              # กัน rate-limit
+        end = str(int(first_ts.timestamp()) - granularity)  # ย้อนไปก่อนแท่งเก่าสุด
+        time.sleep(0.3)  # กัน rate-limit
 
     if not frames:
         raise RuntimeError(f"ดึงแท่งเทียนไม่ได้เลย ({symbol}, {granularity}s)")
@@ -203,11 +218,13 @@ def fetch_candles_history(
     # ทับแคชเดิมที่มีแท่งเยอะกว่า — ไม่งั้น fallback cache/auto_retrain จะได้ข้อมูลไม่ครบ
     try:
         if cache_path.exists():
-            with open(cache_path, "r", encoding="utf-8", errors="ignore") as _f:
+            with open(cache_path, encoding="utf-8", errors="ignore") as _f:
                 existing_rows = max(0, sum(1 for _ in _f) - 1)
             if len(df) < existing_rows:
-                print(f"[DerivFeed] ดึง {len(df)} แท่ง ({symbol}, {granularity}s) — "
-                      f"ไม่ทับแคชเดิม ({existing_rows} แท่ง)")
+                print(
+                    f"[DerivFeed] ดึง {len(df)} แท่ง ({symbol}, {granularity}s) — "
+                    f"ไม่ทับแคชเดิม ({existing_rows} แท่ง)"
+                )
                 return df
     except Exception:
         pass
@@ -218,15 +235,16 @@ def fetch_candles_history(
 
 # ─── 2. Live tick stream + auto-aggregate เป็นแท่งเทียน ──────────────────────
 
+
 class DerivTickStream:
     def __init__(
         self,
         symbol: str = DEFAULT_SYMBOL,
         candle_seconds: int = 60,
-        on_candle_close: Optional[Callable[[dict], None]] = None,
-        on_tick: Optional[Callable[[float, float], None]] = None,
-        fallback_symbol: Optional[str] = None,
-        on_symbol_switch: Optional[Callable[[str, str], None]] = None,
+        on_candle_close: Callable[[dict], None] | None = None,
+        on_tick: Callable[[float, float], None] | None = None,
+        fallback_symbol: str | None = None,
+        on_symbol_switch: Callable[[str, str], None] | None = None,
     ):
         self.symbol = symbol
         self.candle_seconds = candle_seconds
@@ -236,16 +254,16 @@ class DerivTickStream:
         self.on_symbol_switch = on_symbol_switch
 
         self._ws = None
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._running = False
 
-        self._cur_candle: Optional[dict] = None
-        self._cur_bucket: Optional[int] = None
+        self._cur_candle: dict | None = None
+        self._cur_bucket: int | None = None
 
         # สัญลักษณ์ที่กำลังใช้จริง (อาจเปลี่ยนเป็น fallback เมื่อตลาดหลักปิด)
         self._active_symbol = symbol
         self._switched = False
-        self._last_tick_time: Optional[float] = None
+        self._last_tick_time: float | None = None
 
     def _handle_tick(self, price: float, epoch: float):
         self._last_tick_time = time.time()
@@ -254,8 +272,11 @@ class DerivTickStream:
         if self._cur_bucket is None:
             self._cur_bucket = bucket
             self._cur_candle = {
-                "epoch": bucket, "open": price, "high": price,
-                "low": price, "close": price,
+                "epoch": bucket,
+                "open": price,
+                "high": price,
+                "low": price,
+                "close": price,
             }
         elif bucket == self._cur_bucket:
             c = self._cur_candle
@@ -272,8 +293,11 @@ class DerivTickStream:
                     traceback.print_exc()
             self._cur_bucket = bucket
             self._cur_candle = {
-                "epoch": bucket, "open": price, "high": price,
-                "low": price, "close": price,
+                "epoch": bucket,
+                "open": price,
+                "high": price,
+                "low": price,
+                "close": price,
             }
 
         if self.on_tick:
@@ -284,7 +308,9 @@ class DerivTickStream:
         if self._switched or not self.fallback_symbol:
             return False
         if self.fallback_symbol == self._active_symbol:
-            print(f"[DerivFeed] fallback symbol ซ้ำกับ symbol ปัจจุบัน ({self.fallback_symbol}) — สลับไม่ได้")
+            print(
+                f"[DerivFeed] fallback symbol ซ้ำกับ symbol ปัจจุบัน ({self.fallback_symbol}) — สลับไม่ได้"
+            )
             self._switched = True
             return False
         old = self._active_symbol
@@ -331,10 +357,12 @@ class DerivTickStream:
 
                 while self._running:
                     # watchdog: ตลาดหลักปิด (ไม่มี tick มาเลย) → สลับไปตัวสำรอง
-                    if (self._last_tick_time is None
-                            and time.time() - self._connected_at > 120
-                            and self.fallback_symbol
-                            and not self._switched):
+                    if (
+                        self._last_tick_time is None
+                        and time.time() - self._connected_at > 120
+                        and self.fallback_symbol
+                        and not self._switched
+                    ):
                         self._rotate_symbol(f"ไม่มี tick มาเลยเกิน 120 วิ (ตลาด {symbol} อาจปิด)")
                         # restart loop เพื่อ connect กับ symbol ใหม่
                         break
@@ -352,8 +380,10 @@ class DerivTickStream:
 
                     if data.get("error"):
                         err = data["error"]
-                        print(f"[DerivFeed] Deriv ตอบ error: code={err.get('code')} "
-                              f"message={err.get('message')}")
+                        print(
+                            f"[DerivFeed] Deriv ตอบ error: code={err.get('code')} "
+                            f"message={err.get('message')}"
+                        )
                         if err.get("code") == "InvalidSymbol":
                             invalid_symbol_count += 1
                             if self._rotate_symbol("InvalidSymbol"):

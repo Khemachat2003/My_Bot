@@ -153,16 +153,29 @@ class SetupFeedEngine:
             self.buffer = pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
 
     def _merge_candles(self, df: pd.DataFrame):
-        """รวมแท่งใหม่จาก poll เข้ากับ buffer (อัปเดตแท่งที่กำลังก่อตัว, เพิ่มแท่งใหม่)"""
+        """รวมแท่งใหม่จาก poll เข้ากับ buffer (อัปเดตแท่งที่กำลังก่อตัว, เพิ่มแท่งใหม่)
+
+        ⚠️ max/min ใช้ได้เฉพาะ "แท่งกำลังก่อตัว" (แท่งสุดท้ายของ buffer) —
+        ถ้า Deriv ส่งข้อมูลแท่งที่ปิดแล้วซ้ำ (overlap ตอน re-seed/revision)
+        การ max/min จะทำ high/low เพี้ยนถาวร (drift ขึ้น/ลงเรื่อยๆ ไม่มีทางกลับ)
+        → แท่งปิดแล้ว: เขียนทับด้วยค่าใหม่ตรงๆ / แท่งก่อตัวอยู่: รวม high/low
+        """
         if self.buffer.empty:
             self.buffer = df.copy()
         else:
+            last_ts = self.buffer.index[-1]
             for ts, row in df.iterrows():
                 if ts in self.buffer.index:
-                    self.buffer.loc[ts, "high"] = max(self.buffer.loc[ts, "high"], row["high"])
-                    self.buffer.loc[ts, "low"] = min(self.buffer.loc[ts, "low"], row["low"])
-                    self.buffer.loc[ts, "close"] = row["close"]
-                    self.buffer.loc[ts, "volume"] = row.get("volume", 0)
+                    if ts == last_ts:  # แท่งกำลังก่อตัว → รวม high/low สะสม
+                        self.buffer.loc[ts, "high"] = max(self.buffer.loc[ts, "high"], row["high"])
+                        self.buffer.loc[ts, "low"] = min(self.buffer.loc[ts, "low"], row["low"])
+                        self.buffer.loc[ts, "close"] = row["close"]
+                        self.buffer.loc[ts, "volume"] = row.get("volume", 0)
+                    else:  # แท่งปิดแล้ว → เขียนทับด้วยค่าล่าสุดจาก feed
+                        self.buffer.loc[ts, ["open", "high", "low", "close"]] = row[
+                            ["open", "high", "low", "close"]
+                        ]
+                        self.buffer.loc[ts, "volume"] = row.get("volume", 0)
                 else:
                     self.buffer.loc[ts] = row
         self.buffer = self.buffer.sort_index().iloc[-BUFFER_MAX:]
@@ -258,7 +271,6 @@ class SetupFeedEngine:
                 if (now - sig_time).total_seconds() < 1800:
                     return
 
-            bias = "EMA200_" + touch_case
             hold_min = 30
             target_time = (now + pd.Timedelta(minutes=hold_min)).isoformat()
             from backend.setup_scorer import score_setup
@@ -330,7 +342,9 @@ class SetupFeedEngine:
                 )
                 db.update_trade_result(trade_id, exit_price, now.isoformat(), res)
 
-                pips_diff = abs(exit_price - entry_price)
+                # แสดงเป็นหน่วย pip จริง (เดิมเป็นส่วนต่างราคาดิบ เช่น 0.50 ทั้งที่คือ 50 pips)
+                pip = db.get_pip_size(self.symbol) or 0.01
+                pips_diff = abs(exit_price - entry_price) / pip
                 if res == "WIN":
                     result_icon = "🟢 WIN"
                 elif res == "LOSE":
@@ -342,7 +356,7 @@ class SetupFeedEngine:
                     f"🏁 [RESULT] [RULE-BASED] | ID #{row['id']} | TF: {row['timeframe']}\n"
                     f"Symbol: {sym_text} | ทิศทาง: {direction} | ผลลัพธ์: {result_icon}\n"
                     f"Entry: {entry_price:.5f} ➔ Exit: {exit_price:.5f} "
-                    f"({'+' if res == 'WIN' else '-'}{pips_diff:.5f})\n"
+                    f"({'+' if res == 'WIN' else '-'}{pips_diff:.0f} pips)\n"
                     f"ระยะเวลาที่ถือ: {row['horizon_min']} นาที\n"
                     f"เวลาสรุปผล: {now.strftime('%H:%M:%S')} UTC"
                 )
@@ -645,11 +659,11 @@ class SetupFeedEngine:
         rule = f"{minutes}min"
         o = self.buffer["open"].resample(rule, closed="left", label="left", origin="epoch").first()
         h = self.buffer["high"].resample(rule, closed="left", label="left", origin="epoch").max()
-        l = self.buffer["low"].resample(rule, closed="left", label="left", origin="epoch").min()
+        lo = self.buffer["low"].resample(rule, closed="left", label="left", origin="epoch").min()
         c = self.buffer["close"].resample(rule, closed="left", label="left", origin="epoch").last()
         v = self.buffer["volume"].resample(rule, closed="left", label="left", origin="epoch").sum()
 
-        out = pd.concat([o, h, l, c, v], axis=1)
+        out = pd.concat([o, h, lo, c, v], axis=1)
         out.columns = ["open", "high", "low", "close", "volume"]
         return out.dropna()
 

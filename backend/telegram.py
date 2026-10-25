@@ -14,6 +14,7 @@ v2 (แก้บั๊ก "Telegram ไม่เคยขึ้น"):
   - log รายละเอียด HTTP status + response body ชัดเจน (401 = token ผิด,
     400 chat not found = chat_id ผิด) — เดิม error ถูกกลืนเงียบ
 """
+
 from __future__ import annotations
 
 import os
@@ -46,10 +47,13 @@ def send_telegram(message: str, retries: int = 3) -> bool:
     (ถ้าไม่ได้ตั้งค่า TOKEN/CHAT_ID จะ print ออก console แทนและคืน False)"""
     bot_token, chat_id = _get_config()
     if not bot_token or not chat_id:
-        print(f"\n[Telegram - DEV MODE, ยังไม่ได้ตั้งค่า TELEGRAM_BOT_TOKEN/CHAT_ID ใน .env]\n{message}\n")
+        print(
+            f"\n[Telegram - DEV MODE, ยังไม่ได้ตั้งค่า TELEGRAM_BOT_TOKEN/CHAT_ID ใน .env]\n{message}\n"
+        )
         return False
 
     import requests
+
     url = f"{_TELEGRAM_API}/bot{bot_token}/sendMessage"
     last_err: str = ""
     for attempt in range(1, retries + 1):
@@ -80,26 +84,36 @@ def send_telegram(message: str, retries: int = 3) -> bool:
     return False
 
 
-def send_telegram_document(file_path, caption: str = "") -> bool:
-    """ส่งไฟล์ (เช่น backup zip) เข้า Telegram ผ่าน sendDocument
+def send_telegram_document(file_path, caption: str = "", retries: int = 3) -> bool:
+    """ส่งไฟล์ (เช่น backup zip) เข้า Telegram ผ่าน sendDocument — ลองใหม่ 3 ครั้ง
+    (เดิมไม่มี retry → network กระตุกครั้งเดียว = backup หายทั้งรอบ 6 ชม.)
     คืน True/False ว่าส่งสำเร็จหรือไม่"""
     bot_token, chat_id = _get_config()
     if not bot_token or not chat_id:
         print(f"\n[Telegram - DEV MODE, ยังไม่ได้ตั้งค่า .env] (จะส่งไฟล์ {file_path})\n{caption}\n")
         return False
-    try:
-        import requests
-        url = f"{_TELEGRAM_API}/bot{bot_token}/sendDocument"
-        fname = str(file_path).replace("\\", "/").rsplit("/", 1)[-1]
-        with open(file_path, "rb") as f:
-            resp = requests.post(
-                url,
-                data={"chat_id": chat_id, "caption": caption},
-                files={"document": (fname, f)},
-                timeout=120,
-            )
-        resp.raise_for_status()
-        return True
-    except Exception as e:
-        print(f"[Telegram] ส่งไฟล์ไม่สำเร็จ: {e} ({file_path})")
-        return False
+    import time as _time
+
+    import requests
+
+    url = f"{_TELEGRAM_API}/bot{bot_token}/sendDocument"
+    fname = str(file_path).replace("\\", "/").rsplit("/", 1)[-1]
+    last_err: Exception | None = None
+    for attempt in range(1, retries + 1):
+        try:
+            with open(file_path, "rb") as f:
+                resp = requests.post(
+                    url,
+                    data={"chat_id": chat_id, "caption": caption},
+                    files={"document": (fname, f)},
+                    timeout=120,
+                )
+            resp.raise_for_status()
+            return True
+        except Exception as e:
+            last_err = e
+            print(f"[Telegram] ส่งไฟล์ครั้งที่ {attempt}/{retries} ไม่สำเร็จ: {e} ({file_path})")
+            if attempt < retries:
+                _time.sleep(5 * attempt)
+    print(f"[Telegram] ส่งไฟล์ไม่สำเร็จหลังลอง {retries} ครั้ง: {last_err}")
+    return False
