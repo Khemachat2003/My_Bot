@@ -51,5 +51,8 @@ NUL
 _fix_*.py
 _check_*.py
 
+# ── สมุดบันทึกงาน — local เท่านั้น ห้ามขึ้น git/VPS ────────────────────────
+WORKLOG.md
+
 # ── git repo ที่ clone ซ้อนในโปรเจกต์ (กัน commit ผิด) ─────────────────
 My_Bot/

@@ -44,6 +44,9 @@ cd frontend && npm run test:visual          # ภาพ + network ต้อง�
 5. **ห้ามเปลี่ยน shape/response ของ `/api/*` เดิม** — ต้องเพิ่มได้ต่อท้ายเท่านั้น (ดู `docs/api_contract.md`)
 6. **`frontend/dist/` ต้อง commit** เพราะ VPS ไม่มี Node — แก้ `src/**` แล้วต้อง `npm run build` ใหม่ทุกครั้ง
 7. Commit เล็ก ข้อความชัด รัน pytest ผ่านก่อน commit (pre-commit hook จะบล็อกให้เอง)
+8. **บันทึกงานทุกครั้งใน `WORKLOG.md`** — agent ทุกตัวเริ่มงานต้องอ่าน `WORKLOG.md` ก่อน (ประวัติแก้ไข +
+   สถานะ VPS + playbook ดิสก์เต็ม) และ**จบงานต้อง append log ใหม่ที่ท้ายไฟล์** ตาม template ในนั้น
+   — ไฟล์นี้อยู่ LOCAL เท่านั้น (ถูก .gitignore ไว้ ห้าม commit/push/deploy ขึ้น VPS)
 
 ## อยากแก้อะไร → ไปที่ไหน
 
