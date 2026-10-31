@@ -107,9 +107,61 @@ except ImportError:
 from sklearn.metrics import roc_auc_score  # noqa: E402
 
 
-def _load_price_data() -> pd.DataFrame:
-    """รวมข้อมูล M5 จาก CSV/cache ในเครื่อง (frxXAUUSD ก่อน, สำรอง R_100)"""
-    data_dir = ROOT / "data"
+def _load_prices_from_db(symbol: str = "frxXAUUSD", limit: int = 50000) -> pd.DataFrame:
+    """ดึงแท่งราคา M1 ล่าสุดจากตาราง prices ใน bot.db (ข้อมูลสด — setup_feed อัปเดตทุก poll)
+
+    ตาราง prices เก็บได้สูงสุด MAX_PRICE_ROWS (50,000) แถว/symbol ≈ 34 วันของแท่ง M1
+    — ใช้เป็นแหล่งข้อมูลหลักล่าสุด เพราะ CSV cache ใน data/ จะค้างเมื่อไม่มีใครเขียนทับ
+    """
+    empty = pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
+    try:
+        conn = db.get_conn()
+        rows = conn.execute(
+            """SELECT ts, open, high, low, close FROM prices
+               WHERE symbol = ? ORDER BY ts DESC LIMIT ?""",
+            (symbol, limit),
+        ).fetchall()
+        conn.close()
+    except Exception as e:
+        print(f"  [auto_retrain] อ่าน prices จาก DB ไม่สำเร็จ → ข้าม ({e})")
+        return empty
+
+    if not rows:
+        return empty
+
+    recs = []
+    for r in rows:
+        try:
+            ts = pd.to_datetime(r["ts"], errors="coerce", utc=True)
+            if ts is pd.NaT or pd.isna(ts):
+                continue
+            o, h, lo, c = (
+                float(r["open"]),
+                float(r["high"]),
+                float(r["low"]),
+                float(r["close"]),
+            )
+        except Exception:
+            continue
+        recs.append((ts, o, h, lo, c))
+
+    if not recs:
+        return empty
+    df = pd.DataFrame(recs, columns=["datetime", "open", "high", "low", "close"])
+    df = df.set_index("datetime")
+    df["volume"] = 0.0
+    return df[~df.index.duplicated(keep="last")]
+
+
+def _load_price_data(data_dir: Path | None = None) -> pd.DataFrame:
+    """รวมข้อมูล M5 จาก CSV/cache ในเครื่อง (frxXAUUSD ก่อน, สำรอง R_100) + ตาราง prices ใน DB
+
+    🛡️ กันแถวขยะ CSV: เดิม parse_dates=["datetime"] ตรง ๆ — ถ้าไฟล์มีแถวเสียแม้แถวเดียว
+    (เช่น เคสจริงบน VPS: แถว "0" ใน deriv_R_100_60s.csv ตั้งแต่ 10 ต.ค. 2026) index จะกลายเป็น
+    object แล้ว `df.index.tz` crash เป็น AttributeError → auto_retrain ตายทุกรอบ
+    → ตอนนี้ coerce เป็น NaT แล้ว dropna ทิ้งเอง + ตัวเลขเพี้ยนก็ถูกกรองด้วย to_numeric
+    """
+    data_dir = data_dir or ROOT / "data"
     candidates = [
         data_dir / "deriv_frxXAUUSD_300s_120d.csv",
         data_dir / "deriv_frxXAUUSD_60s_90d.csv",
@@ -118,16 +170,36 @@ def _load_price_data() -> pd.DataFrame:
     ]
     parts = []
     for p in candidates:
-        if p.exists():
-            df = pd.read_csv(p, parse_dates=["datetime"]).set_index("datetime")
-            if df.index.tz is None:
-                df.index = df.index.tz_localize("UTC")
+        if not p.exists():
+            continue
+        try:
+            raw_csv = pd.read_csv(p)
+        except Exception as e:
+            print(f"  [auto_retrain] อ่าน {p.name} ไม่สำเร็จ → ข้าม ({e})")
+            continue
+        if raw_csv.empty or "datetime" not in raw_csv.columns:
+            continue
+        ts = pd.to_datetime(raw_csv["datetime"], errors="coerce", utc=True)
+        raw_csv["datetime"] = ts
+        raw_csv = raw_csv.dropna(subset=["datetime"])
+        for col in ("open", "high", "low", "close", "volume"):
+            if col not in raw_csv.columns:
+                raw_csv[col] = 0.0
             else:
-                df.index = df.index.tz_convert("UTC")
-            if "volume" not in df.columns:
-                df["volume"] = 0.0
-            parts.append(df[["open", "high", "low", "close", "volume"]].astype(float))
-            print(f"  [auto_retrain] ใช้ข้อมูล {p.name} → {len(df)} แท่ง")
+                raw_csv[col] = pd.to_numeric(raw_csv[col], errors="coerce")
+        raw_csv = raw_csv.dropna(subset=["open", "high", "low", "close"])
+        if raw_csv.empty:
+            continue
+        df = raw_csv.set_index("datetime")
+        parts.append(df[["open", "high", "low", "close", "volume"]].astype(float))
+        print(f"  [auto_retrain] ใช้ข้อมูล {p.name} → {len(df)} แท่ง")
+
+    # แหล่งที่ 2: DB prices (ข้อมูลสดจาก setup_feed) — ใส่ท้ายสุดเพื่อให้ทับแท่งซ้ำ
+    # จาก CSV เก่าตอน dedupe keep="last" ด้านล่าง
+    df_db = _load_prices_from_db()
+    if not df_db.empty:
+        parts.append(df_db)
+        print(f"  [auto_retrain] ใช้ข้อมูล DB prices → {len(df_db)} แท่ง")
 
     if not parts:
         return pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
