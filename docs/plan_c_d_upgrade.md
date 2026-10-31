@@ -24,10 +24,18 @@
     `prices` ใน bot.db มารวมกับ CSV cache (DB ใส่ท้าย → ทับแท่งซ้ำเก่าตอน dedupe keep="last")
     → ข้อมูลเทรนไม่ค้างที่ 2 ต.ค. อีกต่อไป (cache CSV เดิมถูก "กัน count เล็กทับ" ทำให้ไม่เคยอัปเดต)
 - **เทสต์:** `tests/test_auto_retrain_price_data.py` (4 เคส: แถวขยะ/ไฟล์ว่าง/ตัวเลขเพี้ยน/อ่าน DB)
-- **ตรวจหลัง deploy:** รอ auto_retrain รอบถัดไป (ทุก 6 ชม.) แล้วเช็ค `docker logs xauusd-bot`
-  ต้องไม่มี `AttributeError: 'Index' object has no attribute 'tz'` อีก และ mtime ของ
-  `backend/ml_forecaster/model_m5.joblib` บน VPS ต้องเปลี่ยน + มี Telegram [AUTO-RETRAIN]
-- แถวขยะใน CSV บน VPS แก้ด้วยมือแล้ว (ถ้ายัง: `sed -i '/^0$/d' data/deriv_R_100_60s.csv`)
+- **ตรวจหลัง deploy (ยืนยันแล้ว 31 ต.ค. 10:05 UTC):** trigger `run_auto_retrain(min_new_signals=0)`
+  ใน container ผ่านครบวงจร:
+  - โหลดข้อมูล: CSV XAU 3,500 แท่ง + R_100 300 แท่ง (แถวขยะถูกข้ามเงียบ ๆ) +
+    **DB prices 50,000 แท่ง (สดถึง 2026-10-31 10:00)** → resample M5 = 10,358 แท่ง
+  - Dataset 9,009 แถว (1 ก.ย. → 31 ต.ค.) · Hybrid setup features 2,575 ค่า · Walk-forward
+    **AUC 0.5881**
+  - ผล: ไม่มี threshold ที่ทำกำไรบน walk-forward (48-49% ทุก conf) → เกตป้องกันทำงานถูกต้อง
+    **ไม่แตะโมเดล production** (model_m5.joblib ยังเป็นไฟล์ 2 ส.ค. — by design)
+  - รอบถัดไป (ทุก 6 ชม.) จะลองใหม่เอง — ตรวจผลด้วย `docker logs xauusd-bot | grep auto_retrain`
+- **ประเด็นที่พบตอนตรวจ:** backup zip (DB+models+candles) ส่ง Telegram ติด 413
+  (Request Entity Too Large > 50MB) — pre-existing; หลัง VACUUM DB เล็กลงจะช่วย แต่ถ้า
+  DB โตกลับ ต้องเปลี่ยนแนวทาง backup (เช่น เก็บเฉพาะ models + ตารางสำคัญ หรือ scp ไปเครื่อง local)
 
 ---
 
