@@ -20,4 +20,7 @@ def index(_auth=Depends(require_auth)):
     # กันลืม build: ถ้า dist หาย ให้เสิร์ฟไฟล์เดิมจาก _archive แทน (หน้าขาวดีกว่า 500)
     _dist = FRONTEND_DIR / "dist" / "index.html"
     _legacy = ROOT_DIR / "_archive" / "index.legacy.html"
-    return FileResponse(_dist if _dist.exists() else _legacy)
+    # กันแคช browser ยึด index.html/JS bundle เก่า (อาการ sub-tab แรกไม่แสดง ต้อง hard refresh) —
+    # index.html เสมอ revalidate ส่วน /static/dist/assets ชื่อมี hash อยู่แล้ว เปลี่ยนไฟล์ = URL ใหม่
+    headers = {"Cache-Control": "no-cache, must-revalidate"}
+    return FileResponse(_dist if _dist.exists() else _legacy, headers=headers)
