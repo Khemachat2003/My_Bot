@@ -11,6 +11,10 @@
   .nav-item:hover{color:var(--text); background:rgba(255,255,255,.02);}
   .nav-item.active{color:var(--text); border-left-color:var(--accent); background:rgba(255,255,255,.03);}
   .nav-item .count{margin-left:auto; font-family:var(--num); font-size:10.5px; color:var(--muted);}
+  /* C-7 UX (append-only): icon sidebar — ปกติ --dim, active เป็น --accent ตาม design_system */
+  .nav-item .ti{font-size:16px; color:var(--dim); transition:.15s; flex-shrink:0;}
+  .nav-item:hover .ti{color:var(--muted);}
+  .nav-item.active .ti{color:var(--accent);}
 
   /* ═══ SUB-TABS (Phase C-2 — design_system: active = --accent) ═══ */
   .subtabs{display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap;}

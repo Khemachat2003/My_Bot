@@ -33,3 +33,6 @@
   }
   .panel h3 .ph{width:3px;height:12px;border-radius:2px;display:inline-block;background:var(--accent);margin-right:8px;}
   .panel h3 .ph.cyan,.panel h3 .ph.green,.panel h3 .ph.blue,.panel h3 .ph.purple,.panel h3 .ph.red{background:var(--accent);}
+  /* C-7 UX (append-only): เพิ่มความลึกให้ panel — เงานุ่ม + เส้น highlight บน 1px, hover ขอบสว่างขึ้นเล็กน้อย (ไม่เปลี่ยน layout) */
+  .panel{box-shadow:var(--shadow-panel), inset 0 1px 0 rgba(255,255,255,.04);}
+  .panel:hover{border-color:var(--border2);}
