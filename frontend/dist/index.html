@@ -15,8 +15,8 @@
 <script src="/static/vendor/lightweight-charts.standalone.production.js"></script>
 <link rel="stylesheet" href="/static/vendor/tabler/tabler-icons.min.css">
 <!-- CSS + JS ทั้งหมดอยู่ใน src/ (แยกตาม feature) — แผนที่ไฟล์: frontend/AGENTS.md / docs/code_map.md -->
-  <script type="module" crossorigin src="/static/dist/assets/index-CD_BxLVG.js"></script>
-  <link rel="stylesheet" crossorigin href="/static/dist/assets/index-BSiowEVq.css">
+  <script type="module" crossorigin src="/static/dist/assets/index-RLn9Z4CJ.js"></script>
+  <link rel="stylesheet" crossorigin href="/static/dist/assets/index-Dk7ekrTi.css">
 </head>
 <body>
 
@@ -213,21 +213,31 @@
 
 <!-- ─── ML ─── (Phase C-2: กลายเป็น sub-tab pane ของ tab-signals) -->
   <div class="subtab-pane" id="pane-ml" data-pane="ml" style="display:none;">
-    <div class="j-hero">
-      <div class="j-hero-card wr">
-        <div class="jh-lbl">ML Winrate</div>
-        <div class="jh-val" id="mlWr">–</div>
-        <div class="jh-sub" id="mlWrSub">–</div>
+    <!-- C-8: ticker strip — แถบเรียบแนวนอน ไอคอน chip ซ้าย (ต่างจาก stat-board ของ Journal) -->
+    <div class="ticker-strip">
+      <div class="tk">
+        <span class="tk-ic"><i class="ti ti-target"></i></span>
+        <div class="tk-body">
+          <div class="tk-lbl">ML Winrate</div>
+          <div class="val" id="mlWr">–</div>
+          <div class="tk-sub" id="mlWrSub">–</div>
+        </div>
       </div>
-      <div class="j-hero-card pnl">
-        <div class="jh-lbl">Resolved / Pending</div>
-        <div class="jh-val" id="mlN">–</div>
-        <div class="jh-sub" id="mlNsub">–</div>
+      <div class="tk">
+        <span class="tk-ic warn"><i class="ti ti-activity"></i></span>
+        <div class="tk-body">
+          <div class="tk-lbl">Resolved / Pending</div>
+          <div class="val" id="mlN">–</div>
+          <div class="tk-sub" id="mlNsub">–</div>
+        </div>
       </div>
-      <div class="j-hero-card bal">
-        <div class="jh-lbl">Confidence</div>
-        <div class="jh-val" id="mlCi" style="font-size:20px;">–</div>
-        <div class="jh-sub">BE <b id="mlBe">–</b> · Margin <b id="mlMargin">–</b></div>
+      <div class="tk">
+        <span class="tk-ic up"><i class="ti ti-gauge"></i></span>
+        <div class="tk-body">
+          <div class="tk-lbl">Confidence</div>
+          <div class="val" id="mlCi">–</div>
+          <div class="tk-sub">BE <b id="mlBe">–</b> · Margin <b id="mlMargin">–</b></div>
+        </div>
       </div>
     </div>
     <div class="j-compare" style="margin-bottom:14px;">
@@ -378,26 +388,27 @@
       </div>
     </div>
 
-    <div class="j-hero">
-      <div class="j-hero-card pnl">
-        <div class="jh-lbl">Total P&amp;L</div>
-        <div class="jh-val" id="mPnlAll">–</div>
-        <div class="jh-sub" id="mPnlAllSub">–</div>
+    <!-- C-8: แถบรายงานเดียว (stat-board) แทน 4 กล่องซ้ำ ๆ — เซลล์คั่นเส้นบาง + glow ประจำช่อง -->
+    <div class="stat-board">
+      <div class="cell g-pnl">
+        <div class="c-lbl">Total P&amp;L</div>
+        <div class="val" id="mPnlAll">–</div>
+        <div class="c-sub" id="mPnlAllSub">–</div>
       </div>
-      <div class="j-hero-card wr">
-        <div class="jh-lbl">Winrate</div>
-        <div class="jh-val" id="jWr">–</div>
-        <div class="jh-sub" id="jWrSub">–</div>
+      <div class="cell g-wr">
+        <div class="c-lbl">Winrate</div>
+        <div class="val" id="jWr">–</div>
+        <div class="c-sub" id="jWrSub">–</div>
       </div>
-      <div class="j-hero-card bal">
-        <div class="jh-lbl">Option Balance</div>
-        <div class="jh-val" id="mBalance">–</div>
-        <div class="jh-sub" id="mBalanceSub">–</div>
+      <div class="cell g-bal">
+        <div class="c-lbl">Option Balance</div>
+        <div class="val" id="mBalance">–</div>
+        <div class="c-sub" id="mBalanceSub">–</div>
       </div>
-      <div class="j-hero-card bal" style="border-left:2px solid var(--accent);">
-        <div class="jh-lbl">CFD Balance</div>
-        <div class="jh-val" id="mCfdBalance">–</div>
-        <div class="jh-sub" id="mCfdBalanceSub">–</div>
+      <div class="cell g-accent">
+        <div class="c-lbl">CFD Balance</div>
+        <div class="val" id="mCfdBalance">–</div>
+        <div class="c-sub" id="mCfdBalanceSub">–</div>
       </div>
     </div>
 
@@ -599,13 +610,9 @@
       <h3><span class="ph"></span>สัญญาณล่าสุด (ML + Rule-Based)
         <span style="font-size:11px;color:var(--muted);font-weight:400;margin-left:8px;">จาก /api/ml/signals และ /api/signals — ยังไม่มีสถานะการส่งจริง</span>
       </h3>
-      <div class="tbl-wrap" style="max-height:420px;overflow-y:auto;">
-        <table id="sigLogTable" class="tbl-cards">
-          <thead><tr><th>เวลา</th><th>ชนิด</th><th>ทิศทาง</th><th>ราคา</th><th>Prob/Score</th><th>ผล</th></tr></thead>
-          <tbody></tbody>
-        </table>
-        <div id="sigLogEmpty" class="empty" style="display:none;">ยังไม่มีสัญญาณ — รอระบบยิงสัญญาณแรก</div>
-      </div>
+      <!-- C-8: timeline ledger — เส้นเวลา + จุดสีตามระบบ (ML=accent, Rule-Based=bull) แทนตาราง -->
+      <div id="sigLogFeed" class="tl-feed" style="max-height:480px;overflow-y:auto;"></div>
+      <div id="sigLogEmpty" class="empty" style="display:none;">ยังไม่มีสัญญาณ — รอระบบยิงสัญญาณแรก</div>
     </div>
   </div>
 

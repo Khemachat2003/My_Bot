@@ -24,26 +24,27 @@
       </div>
     </div>
 
-    <div class="j-hero">
-      <div class="j-hero-card pnl">
-        <div class="jh-lbl">Total P&amp;L</div>
-        <div class="jh-val" id="mPnlAll">–</div>
-        <div class="jh-sub" id="mPnlAllSub">–</div>
+    <!-- C-8: แถบรายงานเดียว (stat-board) แทน 4 กล่องซ้ำ ๆ — เซลล์คั่นเส้นบาง + glow ประจำช่อง -->
+    <div class="stat-board">
+      <div class="cell g-pnl">
+        <div class="c-lbl">Total P&amp;L</div>
+        <div class="val" id="mPnlAll">–</div>
+        <div class="c-sub" id="mPnlAllSub">–</div>
       </div>
-      <div class="j-hero-card wr">
-        <div class="jh-lbl">Winrate</div>
-        <div class="jh-val" id="jWr">–</div>
-        <div class="jh-sub" id="jWrSub">–</div>
+      <div class="cell g-wr">
+        <div class="c-lbl">Winrate</div>
+        <div class="val" id="jWr">–</div>
+        <div class="c-sub" id="jWrSub">–</div>
       </div>
-      <div class="j-hero-card bal">
-        <div class="jh-lbl">Option Balance</div>
-        <div class="jh-val" id="mBalance">–</div>
-        <div class="jh-sub" id="mBalanceSub">–</div>
+      <div class="cell g-bal">
+        <div class="c-lbl">Option Balance</div>
+        <div class="val" id="mBalance">–</div>
+        <div class="c-sub" id="mBalanceSub">–</div>
       </div>
-      <div class="j-hero-card bal" style="border-left:2px solid var(--accent);">
-        <div class="jh-lbl">CFD Balance</div>
-        <div class="jh-val" id="mCfdBalance">–</div>
-        <div class="jh-sub" id="mCfdBalanceSub">–</div>
+      <div class="cell g-accent">
+        <div class="c-lbl">CFD Balance</div>
+        <div class="val" id="mCfdBalance">–</div>
+        <div class="c-sub" id="mCfdBalanceSub">–</div>
       </div>
     </div>
 

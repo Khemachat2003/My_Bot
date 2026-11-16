@@ -48,7 +48,7 @@ async function refreshRecentSignalsLog() {
     ]);
     const mlRows = ml.status === 'fulfilled' ? ml.value : [];
     const setupRows = setup.status === 'fulfilled' ? setup.value : [];
-    const body = document.querySelector('#sigLogTable tbody');
+    const body = document.getElementById('sigLogFeed');
     const empty = document.getElementById('sigLogEmpty');
     if (!body) return;
     const rows = mergeRows(mlRows, setupRows);
@@ -58,14 +58,20 @@ async function refreshRecentSignalsLog() {
       return;
     }
     if (empty) empty.style.display = 'none';
-    body.innerHTML = rows.map((r) => `<tr>
-      <td>${fmtTime(r.t)}</td>
-      <td><b>${r.kind}</b></td>
-      <td>${dirBadge(r.dir)}</td>
-      <td class="mono">${r.price != null ? r.price.toFixed(2) : '–'}</td>
-      <td class="mono">${r.strength}</td>
-      <td>${pill(r.result)}</td>
-    </tr>`).join('');
+    // C-8: timeline ledger — จุดสีตามระบบ (ML=accent, Rule-Based=bull) + การ์ดย่อยต่อเหตุการณ์
+    body.innerHTML = rows.map((r) => `<div class="tl-row">
+      <span class="tl-time">${fmtTime(r.t)}</span>
+      <span class="tl-dot ${r.kind === 'ML' ? 'ml' : 'setup'}"></span>
+      <div class="tl-card">
+        <div class="tl-head">
+          <span class="tl-kind ${r.kind === 'ML' ? 'ml' : 'setup'}">${r.kind}</span>
+          ${dirBadge(r.dir)}
+          <span class="tl-price">${r.price != null ? r.price.toFixed(2) : '–'}</span>
+          ${pill(r.result)}
+        </div>
+        <div class="tl-sub">${r.kind === 'ML' ? 'Prob' : 'Score'} <b>${r.strength}</b></div>
+      </div>
+    </div>`).join('');
   } catch (e) { /* API ล่ม — แผงนี้ว่าง, stale badge (statusbar) จะบอกเอง */ }
 }
 

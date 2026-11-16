@@ -19,6 +19,7 @@
 @import '../shared/ui/tables.css';
 @import '../features/setup-signals/setup-guide.css';
 @import '../features/ml-signals/feed.css';
+@import '../features/notifications/history.css'; /* C-8: timeline ledger หน้าประวัติ — class ใหม่ tl-… ต่อท้าย */
 @import '../features/cfd/open-trades.css';
 @import '../features/cfd/cfd.css'; /* C-8: CFD pane redesign — class ใหม่ cfd-… / ot-… ต่อท้าย */
 @import './responsive.css';

@@ -64,3 +64,42 @@
     .j-compare{grid-template-columns:1fr;}
     .j-cmp-stats{grid-template-columns:repeat(2,1fr);}
   }
+
+  /* ═══ C-8: stat-board — แถบรายงานเดียวคั่นเส้นบาง (แทนกล่องซ้ำ ๆ) ═══ */
+  .stat-board{display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
+    background:linear-gradient(180deg,var(--panel),var(--card)); border:1px solid var(--border);
+    border-radius:12px; overflow:hidden; margin-bottom:14px;}
+  .stat-board .cell{padding:15px 18px; position:relative; min-width:0;}
+  .stat-board .cell+.cell::before{content:''; position:absolute; left:0; top:16px; bottom:16px; width:1px; background:var(--border-subtle);}
+  .stat-board .c-lbl{font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.09em; font-weight:700; margin-bottom:5px;}
+  .stat-board .val{font-family:var(--num); font-variant-numeric:tabular-nums; font-size:23px; font-weight:800; line-height:1.1;}
+  .stat-board .c-sub{font-size:10.5px; color:var(--muted); margin-top:5px;}
+  .stat-board .c-sub b{color:var(--text);}
+  /* glow ประจำช่อง (จางมุมขวาบน — ให้แต่ละตัวเลขมี "อารมณ์" ต่างกันเล็กน้อย) */
+  .stat-board .cell::after{content:''; position:absolute; right:-28px; top:-28px; width:104px; height:104px;
+    border-radius:50%; pointer-events:none; opacity:.6; background:radial-gradient(closest-side, var(--glow, transparent), transparent);}
+  .stat-board .g-pnl{--glow:rgba(240,70,92,.10);}
+  .stat-board .g-wr{--glow:rgba(76,141,255,.10);}
+  .stat-board .g-bal{--glow:rgba(232,163,61,.08);}
+  .stat-board .g-accent{--glow:rgba(76,141,255,.13);}
+  @media(max-width:900px){
+    .stat-board{grid-template-columns:1fr 1fr;}
+    .stat-board .cell+.cell::before{display:none;}
+    .stat-board .cell:nth-child(n+3){border-top:1px solid var(--border-subtle);}
+  }
+
+  /* ═══ C-8: ticker-strip — แถบเรียบแนวนอนไอคอน chip (ML tab — คนละอารมณ์กับ stat-board) ═══ */
+  .ticker-strip{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-bottom:14px;}
+  .ticker-strip .tk{display:flex; gap:11px; align-items:center; background:var(--surface-alt);
+    border:1px solid var(--border-subtle); border-radius:12px; padding:12px 14px; transition:.15s;}
+  .ticker-strip .tk:hover{border-color:var(--border2);}
+  .tk .tk-ic{width:36px; height:36px; border-radius:10px; display:grid; place-items:center; font-size:16px;
+    flex-shrink:0; background:var(--accent-dim); color:var(--accent);}
+  .tk .tk-ic.up{background:var(--bull-dim); color:var(--bull);}
+  .tk .tk-ic.warn{background:var(--warn-dim); color:var(--warn);}
+  .tk-body{min-width:0; flex:1;}
+  .tk .tk-lbl{font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; font-weight:700;}
+  .tk .val{font-family:var(--num); font-variant-numeric:tabular-nums; font-size:19px; font-weight:800; margin-top:2px;}
+  .tk .tk-sub{font-size:10px; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .tk .tk-sub b{color:var(--text);}
+  @media(max-width:700px){.ticker-strip{grid-template-columns:1fr;}}

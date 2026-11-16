@@ -1,0 +1,24 @@
+/* history.css — timeline ledger ของ sub-tab ประวัติสัญญาณ (C-8) — class tl-* ใหม่ทั้งหมด
+   (import ต่อท้าย feed.css ใน styles/index.css) */
+
+.tl-feed{position:relative;}
+.tl-row{display:flex; gap:12px; align-items:flex-start; padding:9px 0; position:relative;}
+/* เส้นเวลาเชื่อมจุด (จาง หยุดที่แถวสุดท้าย) */
+.tl-row:not(:last-child)::after{content:''; position:absolute; left:69px; top:34px; bottom:-9px; width:2px; background:var(--border-subtle);}
+.tl-time{font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:10.5px; color:var(--muted); width:52px; flex-shrink:0; padding-top:4px; text-align:right;}
+.tl-dot{width:12px; height:12px; border-radius:50%; flex-shrink:0; margin-top:5px; background:var(--accent); box-shadow:0 0 0 3px var(--accent-dim); z-index:1;}
+.tl-dot.setup{background:var(--bull); box-shadow:0 0 0 3px var(--bull-dim);}
+.tl-card{flex:1; min-width:0; background:var(--surface-alt); border:1px solid var(--border-subtle); border-radius:10px; padding:8px 12px; transition:.15s;}
+.tl-card:hover{border-color:var(--border2);}
+.tl-head{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.tl-kind{font-size:9px; font-weight:800; letter-spacing:.5px; padding:2px 8px; border-radius:99px;}
+.tl-kind.ml{background:var(--accent-dim); color:var(--accent);}
+.tl-kind.setup{background:var(--bull-dim); color:var(--bull);}
+.tl-price{margin-left:auto; font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:12px; color:var(--text);}
+.tl-sub{font-size:10.5px; color:var(--muted); margin-top:4px;}
+.tl-sub b{color:var(--text); font-family:var(--font-mono);}
+
+@media(max-width:600px){
+  .tl-time{width:40px; font-size:9.5px;}
+  .tl-row:not(:last-child)::after{left:57px;}
+}

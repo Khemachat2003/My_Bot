@@ -1,20 +1,30 @@
 <!-- ─── ML ─── (Phase C-2: กลายเป็น sub-tab pane ของ tab-signals) -->
   <div class="subtab-pane" id="pane-ml" data-pane="ml" style="display:none;">
-    <div class="j-hero">
-      <div class="j-hero-card wr">
-        <div class="jh-lbl">ML Winrate</div>
-        <div class="jh-val" id="mlWr">–</div>
-        <div class="jh-sub" id="mlWrSub">–</div>
+    <!-- C-8: ticker strip — แถบเรียบแนวนอน ไอคอน chip ซ้าย (ต่างจาก stat-board ของ Journal) -->
+    <div class="ticker-strip">
+      <div class="tk">
+        <span class="tk-ic"><i class="ti ti-target"></i></span>
+        <div class="tk-body">
+          <div class="tk-lbl">ML Winrate</div>
+          <div class="val" id="mlWr">–</div>
+          <div class="tk-sub" id="mlWrSub">–</div>
+        </div>
       </div>
-      <div class="j-hero-card pnl">
-        <div class="jh-lbl">Resolved / Pending</div>
-        <div class="jh-val" id="mlN">–</div>
-        <div class="jh-sub" id="mlNsub">–</div>
+      <div class="tk">
+        <span class="tk-ic warn"><i class="ti ti-activity"></i></span>
+        <div class="tk-body">
+          <div class="tk-lbl">Resolved / Pending</div>
+          <div class="val" id="mlN">–</div>
+          <div class="tk-sub" id="mlNsub">–</div>
+        </div>
       </div>
-      <div class="j-hero-card bal">
-        <div class="jh-lbl">Confidence</div>
-        <div class="jh-val" id="mlCi" style="font-size:20px;">–</div>
-        <div class="jh-sub">BE <b id="mlBe">–</b> · Margin <b id="mlMargin">–</b></div>
+      <div class="tk">
+        <span class="tk-ic up"><i class="ti ti-gauge"></i></span>
+        <div class="tk-body">
+          <div class="tk-lbl">Confidence</div>
+          <div class="val" id="mlCi">–</div>
+          <div class="tk-sub">BE <b id="mlBe">–</b> · Margin <b id="mlMargin">–</b></div>
+        </div>
       </div>
     </div>
     <div class="j-compare" style="margin-bottom:14px;">
