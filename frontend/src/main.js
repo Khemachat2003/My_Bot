@@ -15,6 +15,7 @@ import './app/mobileDrawer.js';
 import './app/mobileCardLabels.js';
 import './shared/ui/domText.js';
 import './features/overview/refreshOverview.js';
+import './features/hero/hero.js'; /* C-8 ชุด B: Hero Signal Card (countdown เดินในตัว, fetch ผ่าน refreshLoop) */
 import './shared/lib/equityData.js';
 import './features/overview/drawEquity.js';
 import './features/chart/lwChartInit.js';

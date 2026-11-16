@@ -1,0 +1,44 @@
+/* hero.css — Hero Signal Card (C-8 ชุด B) — สีใช้ token เดิมทั้งหมด, class ใหม่ทั้งหมด (hero-… / hbar)
+   (ไฟล์ import ต่อท้าย gauges.css ใน styles/index.css — append-only ตามข้อควรระวัง cascade) */
+
+.hero-signal{padding:14px 15px;}
+.hero-top{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+.hero-label{font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.09em; font-weight:700; display:flex; align-items:center; gap:7px;}
+.hero-src{color:var(--dim); font-weight:600; letter-spacing:.02em; text-transform:none; font-size:10px;}
+
+/* จุด LIVE — pulse เบา ๆ (ไม่สั่นเลย์เอาต์) */
+.live-dot{width:7px; height:7px; border-radius:50%; background:var(--bull); display:inline-block; animation:heroPulse 2s ease-in-out infinite;}
+@keyframes heroPulse{0%,100%{opacity:1;} 50%{opacity:.35;}}
+
+/* ป้ายเกต */
+.hero-gate{font-size:9.5px; font-weight:800; padding:3px 9px; border-radius:99px; letter-spacing:.3px; white-space:nowrap;}
+.hero-gate.pass{background:var(--bull-dim); color:var(--bull);}
+.hero-gate.low{background:var(--warn-dim); color:var(--warn);}
+.hero-gate.off{background:var(--surface-alt); color:var(--muted);}
+
+/* ทิศ + ความมั่นใจ */
+.hero-main{display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:10px;}
+.hero-dir{font-family:var(--font-display); font-size:26px; font-weight:800; line-height:1; letter-spacing:-.01em;}
+.hero-dir.bull{color:var(--bull);}
+.hero-dir.bear{color:var(--bear);}
+.hero-dir.muted{color:var(--muted);}
+.hero-conf{font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:26px; font-weight:700; color:var(--text);}
+.hero-conf::after{content:' conf'; font-size:9px; color:var(--dim); font-weight:600; margin-left:4px; letter-spacing:.08em;}
+
+/* แถบ prob_up / prob_down */
+.hero-bars{display:grid; gap:6px; margin-bottom:10px;}
+.hero-bar-row{display:flex; align-items:center; gap:8px; font-size:10px;}
+.hero-bar-row>span{color:var(--dim); width:10px; text-align:center;}
+.hero-bar-row b{font-family:var(--font-mono); font-variant-numeric:tabular-nums; width:34px; text-align:right; color:var(--muted); font-size:10px; font-weight:600;}
+.hbar{flex:1; height:6px; border-radius:4px; background:var(--surface-alt); overflow:hidden;}
+.hbar i{display:block; height:100%; border-radius:4px; background:var(--accent); transition:width .5s ease;}
+.hbar.up i{background:var(--bull);}
+.hbar.dn i{background:var(--bear);}
+
+/* แถวล่าง: countdown M1/M5 + แถวรอง M5 */
+.hero-cd{display:flex; gap:12px; font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:11px; color:var(--muted); border-top:1px solid var(--border-subtle); padding-top:9px;}
+.hero-cd .cd-lbl{color:var(--dim); font-size:9px; letter-spacing:.08em; text-transform:uppercase; margin-right:5px;}
+.hero-cd b{color:var(--text); font-weight:600;}
+.h-sub{font-size:10.5px; color:var(--muted);}
+.h-sub.bull{color:var(--bull);} .h-sub.bear{color:var(--bear);}
+.h-sub.muted{color:var(--muted);}

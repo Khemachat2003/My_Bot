@@ -6,6 +6,7 @@
 import { refreshCFDPaper } from '../features/cfd/index.js';
 import { refreshPrice } from '../features/chart/index.js';
 import { refreshGauges } from '../features/gauges/index.js';
+import { refreshHero } from '../features/hero/index.js';
 import { refreshJournalMoney, refreshJournalTab } from '../features/journal/index.js';
 import { refreshMlTab } from '../features/ml-signals/index.js';
 import { checkNewSignals, refreshRecentSignalsLog } from '../features/notifications/index.js';
@@ -29,7 +30,7 @@ async function refreshAll(){
   // allSettled: แผงหนึ่งพัง ห้ามลากทั้งรอบ (เดิม Promise.all → reject ทิ้ง → รอบถัดไปก็พังตาม)
   const results = await Promise.allSettled([
     refreshOverview(),refreshPrice(),refreshGauges(),refreshHeaderSignals(),
-    refreshMlTab(),refreshSetupTab(),refreshSetupMini(),refreshSetupAll(),
+    refreshHero(),refreshMlTab(),refreshSetupTab(),refreshSetupMini(),refreshSetupAll(),
     refreshJournalTab(),refreshJournalMoney(),refreshCFDPaper(),
   ]);
   // stale badge: มีแผงไหนตอบสำเร็จถือว่าข้อมูลสด — ถ้าทุกแผงล่ม (API ล่ม) จะไม่ mark → badge ขึ้น

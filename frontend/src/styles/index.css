@@ -15,6 +15,7 @@
 @import '../features/status-bar/statusbar.css';
 @import '../features/chart/chart-fullscreen.css';
 @import '../features/gauges/gauges.css';
+@import '../features/hero/hero.css'; /* C-8 ชุด B: Hero Signal Card — class ใหม่ทั้งหมด ต่อท้ายกัน override */
 @import '../shared/ui/tables.css';
 @import '../features/setup-signals/setup-guide.css';
 @import '../features/ml-signals/feed.css';

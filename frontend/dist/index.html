@@ -15,8 +15,8 @@
 <script src="/static/vendor/lightweight-charts.standalone.production.js"></script>
 <link rel="stylesheet" href="/static/vendor/tabler/tabler-icons.min.css">
 <!-- CSS + JS ทั้งหมดอยู่ใน src/ (แยกตาม feature) — แผนที่ไฟล์: frontend/AGENTS.md / docs/code_map.md -->
-  <script type="module" crossorigin src="/static/dist/assets/index-DruCywAT.js"></script>
-  <link rel="stylesheet" crossorigin href="/static/dist/assets/index-Bvis6yDy.css">
+  <script type="module" crossorigin src="/static/dist/assets/index-DXlvVJ6u.js"></script>
+  <link rel="stylesheet" crossorigin href="/static/dist/assets/index-BlTIYXkV.css">
 </head>
 <body>
 
@@ -149,6 +149,27 @@
 
       <!-- Right side column -->
       <div class="side-col">
+<!-- Hero Signal Card (C-8 ชุด B) — สัญญาณ M1 ตัวใหญ่ + เกต + prob bars + countdown M1/M5
+     ข้อมูลจาก /api/ml/latest (endpoint เดิม) — ถูก render โดย features/hero/hero.js -->
+<div class="panel hero-signal">
+  <div class="hero-top">
+    <span class="hero-label"><span class="live-dot"></span>สัญญาณตอนนี้<span class="hero-src">ML · M1</span></span>
+    <span class="hero-gate off" id="heroGate">–</span>
+  </div>
+  <div class="hero-main">
+    <span class="hero-dir muted" id="heroDir">○ รอสัญญาณ</span>
+    <span class="hero-conf" id="heroConf">–</span>
+  </div>
+  <div class="hero-bars">
+    <div class="hero-bar-row"><span>▲</span><div class="hbar up"><i id="heroBarUp" style="width:0%"></i></div><b id="heroUpPct">–</b></div>
+    <div class="hero-bar-row"><span>▼</span><div class="hbar dn"><i id="heroBarDn" style="width:0%"></i></div><b id="heroDnPct">–</b></div>
+  </div>
+  <div class="hero-cd">
+    <span><span class="cd-lbl">M1 ปิด</span><b id="heroCdM1">–</b></span>
+    <span><span class="cd-lbl">M5 ปิด</span><b id="heroCdM5">–</b></span>
+    <span class="h-sub muted" id="heroM5" style="margin-left:auto;">รอข้อมูล</span>
+  </div>
+</div>
         <div class="panel">
           <h3><span class="ph green"></span>Probability Gauges</h3>
           <div id="gaugePanel"></div>
