@@ -1,20 +1,24 @@
-<!-- ─── SETUP ─── (Phase C-2: กลายเป็น sub-tab pane ของ tab-signals; Tick-Touch ย้ายไปหน้า Log/Alert) -->
+<!-- ─── SETUP ─── (Phase C-2: กลายเป็น sub-tab pane ของ tab-signals; Tick-Touch ย้ายไปหน้า Log/Alert)
+     C-8: j-hero → meter-board (ตัวเลข + แถบวัด + marker จุดคุ้มทุน) + history กินแถวเต็มล่าง -->
   <div class="subtab-pane" id="pane-setup" data-pane="setup" style="display:none;">
-    <div class="j-hero">
-      <div class="j-hero-card wr">
-        <div class="jh-lbl">Setup Winrate</div>
-        <div class="jh-val" id="setWr">–</div>
-        <div class="jh-sub" id="setWrSub">–</div>
+    <div class="meter-board">
+      <div class="mb-cell c-wr">
+        <div class="mb-lbl">Setup Winrate</div>
+        <div class="val" id="setWr">–</div>
+        <div class="mb-sub" id="setWrSub">–</div>
+        <div class="mb-bar"><span class="mk"></span><i id="setWrBar" style="width:0%"></i></div>
       </div>
-      <div class="j-hero-card pnl">
-        <div class="jh-lbl">Resolved / Pending</div>
-        <div class="jh-val" id="setN">–</div>
-        <div class="jh-sub" id="setNsub">–</div>
+      <div class="mb-cell c-n">
+        <div class="mb-lbl">Resolved / Pending</div>
+        <div class="val" id="setN">–</div>
+        <div class="mb-sub" id="setNsub">–</div>
+        <div class="mb-bar"><i id="setNBar" style="width:0%"></i></div>
       </div>
-      <div class="j-hero-card bal">
-        <div class="jh-lbl">Confidence</div>
-        <div class="jh-val" id="setCi" style="font-size:20px;">–</div>
-        <div class="jh-sub">BE <b id="setBe">–</b> · Margin <b id="setMargin">–</b></div>
+      <div class="mb-cell c-ci">
+        <div class="mb-lbl">Confidence (CI)</div>
+        <div class="val" id="setCi">–</div>
+        <div class="mb-sub">BE <b id="setBe">–</b> · Margin <b id="setMargin">–</b></div>
+        <div class="mb-bar"><span class="mk"></span><i id="setCiBar" style="width:0%"></i></div>
       </div>
     </div>
     <div class="j-compare" style="margin-bottom:14px;">
@@ -35,30 +39,31 @@
         </div>
       </div>
     </div>
-    <div class="cols l3">
+    <!-- C-8: การ์ด M5/M1 คู่บน, ตารางประวัติกินเต็มแถวล่าง (เดิมบีบ 3 คอลัมน์ อ่านลำบาก) -->
+    <div class="cols setup-cols">
       <div class="panel"><h3><span class="ph"></span>Setup — M5</h3><div id="setupAllM5"></div></div>
       <div class="panel"><h3><span class="ph"></span>Setup — M1</h3><div id="setupAllM1"></div></div>
-      <div class="panel">
-        <h3><span class="ph"></span>ประวัติสัญญาณ Rule-Based
-          <select id="setupSymFilter" style="background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:800;font-family:inherit;float:right;">
-            <option value="">ทั้งหมด</option>
-            <option value="frxXAUUSD">XAUUSD</option>
-            <option value="frxEURUSD">EURUSD</option>
-            <option value="frxGBPUSD">GBPUSD</option>
-            <option value="frxUSDJPY">USDJPY</option>
-            <option value="frxAUDUSD">AUDUSD</option>
-            <option value="frxUSDCAD">USDCAD</option>
-            <option value="frxUSDCHF">USDCHF</option>
-            <option value="frxNZDUSD">NZDUSD</option>
-          </select>
-        </h3>
-        <div class="tbl-wrap" style="max-height:420px;overflow-y:auto;">
-          <table id="setupTable" class="tbl-cards">
-            <thead><tr><th>เวลา</th><th>คู่</th><th>TF</th><th>Imp</th><th>ทิศทาง</th><th>Entry</th><th>SL</th><th>TP1/2</th><th>R:R</th><th>Exit</th><th>Score</th><th>Tier</th><th>ผ่าน</th><th>ผล</th></tr></thead>
-            <tbody></tbody>
-          </table>
-          <div id="setEmpty" class="empty" style="display:none;">ยังไม่มีสัญญาณ — รอ setup_feed.py ทำงาน</div>
-        </div>
+    </div>
+    <div class="panel" style="margin-top:14px;">
+      <h3><span class="ph"></span>ประวัติสัญญาณ Rule-Based
+        <select id="setupSymFilter" style="background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:800;font-family:inherit;float:right;">
+          <option value="">ทั้งหมด</option>
+          <option value="frxXAUUSD">XAUUSD</option>
+          <option value="frxEURUSD">EURUSD</option>
+          <option value="frxGBPUSD">GBPUSD</option>
+          <option value="frxUSDJPY">USDJPY</option>
+          <option value="frxAUDUSD">AUDUSD</option>
+          <option value="frxUSDCAD">USDCAD</option>
+          <option value="frxUSDCHF">USDCHF</option>
+          <option value="frxNZDUSD">NZDUSD</option>
+        </select>
+      </h3>
+      <div class="tbl-wrap" style="max-height:420px;overflow-y:auto;">
+        <table id="setupTable" class="tbl-cards">
+          <thead><tr><th>เวลา</th><th>คู่</th><th>TF</th><th>Imp</th><th>ทิศทาง</th><th>Entry</th><th>SL</th><th>TP1/2</th><th>R:R</th><th>Exit</th><th>Score</th><th>Tier</th><th>ผ่าน</th><th>ผล</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div id="setEmpty" class="empty" style="display:none;">ยังไม่มีสัญญาณ — รอ setup_feed.py ทำงาน</div>
       </div>
     </div>
   </div>

@@ -21,6 +21,17 @@ async function refreshSetupTab(){
     document.getElementById('setBe').textContent=s.breakeven+'%';
     document.getElementById('setMargin').textContent=s.n_resolved?fmtMargin(s.margin):'–';
     document.getElementById('setCi').textContent=s.n_resolved?`[${s.ci_low}%, ${s.ci_high}%]`:'–';
+    // C-8: meter bars — เติมตามค่าจริง + marker จุดคุ้มทุน (BE) บนแถบ WR/CI
+    const setBar=(id,fill,mark)=>{const b=document.getElementById(id);if(!b)return;
+      b.style.width=(fill!=null?Math.max(Math.min(fill,100),0):0)+'%';
+      const cell=b.parentElement?.querySelector('.mk');
+      if(cell) cell.style.left=(mark!=null?Math.max(Math.min(mark,100),0):0)+'%';};
+    if(s.n_resolved){
+      setBar('setWrBar',s.winrate,s.breakeven);
+      setBar('setCiBar',s.ci_high!=null?s.ci_high:s.winrate,s.breakeven);
+    }else{ setBar('setWrBar',0,0); setBar('setCiBar',0,0); }
+    const tot=(s.n_resolved||0)+(s.n_pending||0);
+    setBar('setNBar',tot?Math.round((s.n_resolved||0)/tot*100):0);
     const byTf=await fetchJSON('/api/stats/by_timeframe');
     const t1=byTf['M1']||{}, t5=byTf['M5']||{};
     const setWin=(id,v)=>{const el=document.getElementById(id);

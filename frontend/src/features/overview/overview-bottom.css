@@ -1,10 +1,15 @@
 /* แถบสถิติ + equity/ฟีด ล่างของภาพรวม — ย้ายจาก index.html เดิม บรรทัด 546–556 */
   /* ═══ OVERVIEW BOTTOM ═══ */
-  .ov-status-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 14px;}
-  .ov-stat{display:flex;flex-direction:column;gap:2px;text-align:center;padding:4px 6px;}
+  .ov-status-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0;margin-bottom:14px;background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;padding:0;}
+  /* C-8 readout: ช่องชิดกันมีเส้นคั่นบาง + แถบสีบน แยกกลุ่ม ML(ฟ้า)/Setup(เขียว)/Model(ม่วง) */
+  .ov-stat{display:flex;flex-direction:column;gap:2px;text-align:left;padding:10px 14px 9px;position:relative;}
+  .ov-stat+.ov-stat::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:1px;background:var(--border-subtle);}
+  .ov-stat::after{content:'';position:absolute;left:0;right:0;top:0;height:2px;background:var(--tick,transparent);opacity:.85;}
+  .ov-stat:nth-child(-n+2){--tick:var(--accent);}
+  .ov-stat:nth-child(n+3):nth-child(-n+4){--tick:var(--bull);}
+  .ov-stat:nth-child(n+5){--tick:var(--purple);}
   .ov-stat-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;}
-  .ov-stat-val{font-family:var(--num);font-size:18px;font-weight:800;line-height:1.1;}
-  .ov-stat-val.purple{color:var(--purple);}
+  .ov-stat .val{font-family:var(--num);font-variant-numeric:tabular-nums;font-size:18px;font-weight:800;line-height:1.2;}
   .ov-stat-sub{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .ov-bottom{display:grid;grid-template-columns:1.6fr 1fr;gap:14px;margin-bottom:14px;}
   @media(max-width:1000px){.ov-bottom{grid-template-columns:1fr;}}

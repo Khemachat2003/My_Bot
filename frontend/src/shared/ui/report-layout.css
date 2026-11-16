@@ -103,3 +103,21 @@
   .tk .tk-sub{font-size:10px; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .tk .tk-sub b{color:var(--text);}
   @media(max-width:700px){.ticker-strip{grid-template-columns:1fr;}}
+
+  /* ═══ C-8: meter-board (แท็บ Rule-Based) — ตัวเลข + แถบวัด + marker จุดคุ้มทุน ═══ */
+  .meter-board{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-bottom:14px;}
+  .mb-cell{background:linear-gradient(180deg,var(--panel),var(--card)); border:1px solid var(--border);
+    border-radius:12px; padding:13px 16px 14px; position:relative; overflow:hidden;}
+  .mb-cell::before{content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--tick,var(--accent));}
+  .mb-cell.c-wr{--tick:var(--accent);}
+  .mb-cell.c-n{--tick:var(--bull);}
+  .mb-cell.c-ci{--tick:var(--warn);}
+  .mb-lbl{font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.09em; font-weight:700;}
+  .mb-cell .val{font-family:var(--num); font-variant-numeric:tabular-nums; font-size:22px; font-weight:800; margin-top:4px;}
+  .mb-sub{font-size:10.5px; color:var(--muted); margin-top:3px;}
+  .mb-sub b{color:var(--text);}
+  .mb-bar{margin-top:10px; height:5px; background:var(--surface-alt); border-radius:3px; position:relative;}
+  .mb-bar i{display:block; height:100%; border-radius:3px; background:var(--tick,var(--accent)); transition:width .5s ease;}
+  .mb-bar .mk{position:absolute; top:-3px; width:2px; height:11px; border-radius:1px; background:var(--text); opacity:.55; left:0%;}
+  .setup-cols{grid-template-columns:1fr 1fr;}
+  @media(max-width:900px){.meter-board{grid-template-columns:1fr;} .setup-cols{grid-template-columns:1fr;}}
