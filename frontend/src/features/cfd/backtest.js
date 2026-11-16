@@ -28,17 +28,24 @@ async function runCFDBacktest(){
 function renderCFDSummary(d){
   const el=document.getElementById('cfdSummary');
   const p=d.params;
-  // C-5 (design_system): token ใหม่ + P&L คู่เครื่องหมาย/ศูนย์ → muted (5.3) — threshold WR คงเดิม (TP1 54.95, TP2 40)
-  const items=[
-    {label:'Signals',val:d.total,color:'var(--text)'},
-    {label:'Lot Size',val:p.lot_size,color:'var(--accent)'},
-    {label:'Risk/Trade',val:'$'+p.risk_per_trade,color:'var(--warn)'},
-    {label:'TP1 WR',val:d.tp1.wr+'%',color:'var(--'+wrColor(d.tp1.wr,54.95)+')'},
-    {label:'TP1 P&L',val:pnlText(d.tp1.pnl,{fixed:true,digits:2,prefix:'$'}),color:'var(--'+pnlColor(d.tp1.pnl)+')'},
-    {label:'TP2 WR',val:d.tp2.wr+'%',color:'var(--'+wrColor(d.tp2.wr,40)+')'},
-    {label:'TP2 P&L',val:pnlText(d.tp2.pnl,{fixed:true,digits:2,prefix:'$'}),color:'var(--'+pnlColor(d.tp2.pnl)+')'},
-  ];
-  el.innerHTML=items.map(i=>`<div class="j-card"><div class="j-card-label">${i.label}</div><div class="val" style="color:${i.color};font-size:16px;font-weight:800;">${i.val}</div></div>`).join('');
+  // C-8 redesign: 3 hero cards (ภาษาเดียวกับ Journal j-hero-card) — TP1/TP2/ความเสี่ยง
+  const wr1=`var(--${wrColor(d.tp1.wr,54.95)})`, wr2=`var(--${wrColor(d.tp2.wr,40)})`;
+  el.innerHTML=`
+    <div class="j-hero-card wr">
+      <div class="jh-lbl">TP1 · R:R 1:2</div>
+      <div class="jh-val" style="color:var(--${pnlColor(d.tp1.pnl)})">${pnlText(d.tp1.pnl,{fixed:true,digits:2,prefix:'$'})}</div>
+      <div class="jh-sub">WR <b style="color:${wr1}">${d.tp1.wr}%</b> · ${d.tp1.total} ไม้</div>
+    </div>
+    <div class="j-hero-card wr">
+      <div class="jh-lbl">TP2 · R:R 1:3</div>
+      <div class="jh-val" style="color:var(--${pnlColor(d.tp2.pnl)})">${pnlText(d.tp2.pnl,{fixed:true,digits:2,prefix:'$'})}</div>
+      <div class="jh-sub">WR <b style="color:${wr2}">${d.tp2.wr}%</b> · ${d.tp2.total} ไม้</div>
+    </div>
+    <div class="j-hero-card bal">
+      <div class="jh-lbl">ความเสี่ยง / ไม้</div>
+      <div class="jh-val">$${p.risk_per_trade}</div>
+      <div class="jh-sub">Lot <b>${p.lot_size}</b> · สัญญาณ <b>${d.total}</b> ไม้</div>
+    </div>`;
 }
 function renderCFDCompare(d){
   const tbody=document.querySelector('#cfdCompareTable tbody');

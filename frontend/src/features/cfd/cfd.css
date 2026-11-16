@@ -1,0 +1,40 @@
+/* cfd.css — CFD pane redesign (C-8) — design language เดียวกับ Journal (j-hero/j-settings/btn)
+   class ใหม่ทั้งหมด (cfd-… / ot-…) — import ต่อท้าย open-trades.css (append-only) */
+
+/* หัวตารางย่อยของ section (แทน h4 inline เดิม) */
+.cfd-tbl-h{color:var(--muted); font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em;}
+
+/* select ใน j-settings (report-layout.css style ไว้เฉพาะ input — เติม select ให้เหมือนกัน) */
+.j-settings-body select{
+  background:var(--card); border:1px solid var(--border); color:var(--text); border-radius:8px;
+  font-family:var(--font-body); font-size:12px; font-weight:600; padding:7px 9px; cursor:pointer;
+}
+.j-settings-body select:focus{outline:none; border-color:var(--accent);}
+
+/* ═══ Open trade card (แทนกล่อง inline style เดิม) ═══ */
+.ot-card{
+  background:linear-gradient(180deg,var(--surface-alt),var(--card));
+  border:1px solid var(--border); border-left:3px solid var(--accent);
+  border-radius:10px; padding:11px 13px; margin-bottom:8px; transition:.15s;
+}
+.ot-card:hover{border-color:var(--border2);}
+.ot-card.ot-tp1hit{border-left-color:var(--warn);}
+.ot-head{display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap;}
+.ot-dir{font-weight:800; font-size:13px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
+.ot-chip{font-size:9px; font-weight:700; padding:2px 7px; border-radius:99px;
+  background:var(--bg); border:1px solid var(--border); color:var(--muted); letter-spacing:.4px;}
+.ot-chip.warn{background:var(--warn-dim); color:var(--warn); border-color:transparent;}
+.ot-meta{font-size:10.5px; color:var(--muted); font-family:var(--font-mono);}
+.ot-foot{margin-top:9px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;}
+.ot-pnl{font-size:12px; white-space:nowrap;}
+
+/* progress entry→TP2 พร้อม marker TP1 (เส้นเหลืองตั้ง) */
+.ot-prog{flex:1 1 130px; max-width:280px; height:7px; background:var(--bg); border-radius:4px; position:relative; overflow:visible;}
+.ot-prog i{display:block; height:100%; border-radius:4px; transition:width 1s;}
+.ot-prog .tp1mark{position:absolute; top:-3px; width:2px; height:13px; background:var(--warn); border-radius:1px; z-index:1;}
+
+/* จอเล็ก: grid ราคา 5 ช่อง → 3 ช่อง ไม่บีบ */
+@media(max-width:600px){
+  .open-trade-grid{grid-template-columns:repeat(3,1fr);}
+  .ot-prog{flex-basis:100%; max-width:none;}
+}
