@@ -14,10 +14,10 @@ function untilCandle(tfSec) {
 }
 
 function setDir(el, sig) {
-  el.classList.remove('bull', 'bear', 'muted');
+  el.classList.remove('bull', 'bear', 'muted', 'wait');
   if (sig === 'CALL') { el.textContent = '▲ CALL'; el.classList.add('bull'); }
   else if (sig === 'PUT') { el.textContent = '▼ PUT'; el.classList.add('bear'); }
-  else { el.textContent = '○ รอสัญญาณ'; el.classList.add('muted'); }
+  else { el.textContent = '○ รอสัญญาณ'; el.classList.add('muted', 'wait'); }
 }
 
 function render(g, el = {}) {
@@ -30,11 +30,14 @@ function render(g, el = {}) {
   el.barDn.style.width = Math.min(dn, 100) + '%';
   el.upPct.textContent = up + '%';
   el.dnPct.textContent = dn + '%';
-  // เกต: confidence >= threshold → ผ่าน (bull) / ไม่ผ่าน (warn) / NEUTRAL (muted)
+  // เกต: confidence >= threshold → ผ่าน (bull) / ไม่ผ่าน (warn) / NEUTRAL → บอกระยะเกต (muted)
   const th = (g.env_threshold != null ? g.env_threshold : g.threshold_used);
   const pass = g.signal !== 'NEUTRAL' && th != null && g.confidence >= th;
   el.gate.className = 'hero-gate ' + (g.signal === 'NEUTRAL' ? 'off' : pass ? 'pass' : 'low');
-  el.gate.textContent = g.signal === 'NEUTRAL' ? '○ NEUTRAL' : pass ? '✓ ผ่านเกต ' + Math.round(th * 100) + '%' : 'ต่ำกว่าเกต ' + Math.round(th * 100) + '%';
+  const thPct = th != null ? Math.round(th * 100) : null;
+  el.gate.textContent = g.signal === 'NEUTRAL'
+    ? (thPct != null ? 'เกต ≥' + thPct + '%' : '○ NEUTRAL')
+    : pass ? '✓ ผ่านเกต ' + thPct + '%' : 'ต่ำกว่าเกต ' + thPct + '%';
 }
 
 async function refreshHero() {
