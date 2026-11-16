@@ -25,10 +25,25 @@
   .gauge-svg{flex:1 1 150px; min-width:140px; max-width:220px; margin:0;}
   .gauge-svg svg{width:100%; height:auto; display:block;}
   .gauge .gempty{color:var(--muted); text-align:center; padding:16px 0; font-size:12px;}
-  /* มือถือ (≤600px): info แถวบน, arc เต็มความกว้างการ์ด — อ่านง่ายไม่บีบ */
+
+  /* ═══ GAUGE v3 — RING (พรีเมียม: วงแหวนเต็ม + glow + sweep) — C-8 ═══ */
+  .gauge{display:flex; flex-direction:column; gap:10px; padding:12px 12px 13px;}
+  .gauge:hover{border-color:var(--border2);}
+  .g-top{display:flex; align-items:center; justify-content:space-between;}
+  .g-ring{position:relative; width:128px; margin:0 auto;}
+  .g-ring svg{width:100%; height:auto; display:block;}
+  /* เส้น progress มี glow นุ่ม + กวาดจาก 0 ถึงค่าจริง (ไม่ระบุ to → วิ่งไปค่า attribute เอง) */
+  .g-ring .g-arc{filter:drop-shadow(0 0 5px rgba(76,141,255,.45)); animation:gSweep .7s cubic-bezier(.2,.7,.3,1);}
+  @keyframes gSweep{from{stroke-dashoffset:326.73;}}
+  /* ตัวเลขกลางวง — วาง absolute ทับ svg */
+  .g-val{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:26px; font-weight:800; color:var(--text);}
+  .g-val small{font-size:11px; color:var(--dim); font-weight:700; margin-top:8px;}
+  .g-chips{display:flex; gap:6px; width:100%;}
+  .g-chip{flex:1; text-align:center; font-family:var(--font-mono); font-variant-numeric:tabular-nums;
+    font-size:10px; font-weight:700; padding:4px 4px; border-radius:7px; background:var(--surface-alt); white-space:nowrap;}
+  .g-chip.up{color:var(--bull);} .g-chip.dn{color:var(--bear);} .g-chip.th{color:var(--warn);}
+  /* มือถือ: วงขยายตามการ์ดที่กว้างขึ้น */
   @media(max-width:600px){
-    .g-row{flex-direction:column; align-items:flex-start; gap:8px;}
-    .g-info{flex-direction:row; align-items:center; gap:8px; width:100%;}
-    .g-thresh{margin-left:auto;}
-    .gauge-svg{width:100%; max-width:none; flex-basis:auto;}
+    .g-ring{width:140px;}
   }

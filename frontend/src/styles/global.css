@@ -12,3 +12,12 @@
   ::-webkit-scrollbar-thumb{background:#24304f; border-radius:6px; border:2px solid transparent; background-clip:content-box;}
   ::-webkit-scrollbar-thumb:hover{background:#34446c;}
   .mono{font-family:var(--num); font-variant-numeric:tabular-nums;}
+
+  /* C-8 premium: ambient glow — แสงนวลมุมบน (accent) + ขอบล่างซ้าย (bull) ให้พื้นหลังมีมิติ
+     pointer-events:none + z-index ต่ำ → ไม่บังคลิก/ไม่ทับเนื้อหา, append-only */
+  body::before{content:''; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background:
+      radial-gradient(620px 320px at 88% -60px, rgba(76,141,255,.09), transparent 62%),
+      radial-gradient(520px 280px at -80px 35%, rgba(22,199,132,.05), transparent 60%),
+      radial-gradient(700px 380px at 50% 120%, rgba(76,141,255,.05), transparent 65%);
+  }
