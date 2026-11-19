@@ -15,7 +15,7 @@
 <script src="/static/vendor/lightweight-charts.standalone.production.js"></script>
 <link rel="stylesheet" href="/static/vendor/tabler/tabler-icons.min.css">
 <!-- CSS + JS ทั้งหมดอยู่ใน src/ (แยกตาม feature) — แผนที่ไฟล์: frontend/AGENTS.md / docs/code_map.md -->
-  <script type="module" crossorigin src="/static/dist/assets/index-CU3npcDJ.js"></script>
+  <script type="module" crossorigin src="/static/dist/assets/index-CS1FIbb-.js"></script>
   <link rel="stylesheet" crossorigin href="/static/dist/assets/index-CMrz9CSc.css">
 </head>
 <body>
@@ -267,23 +267,31 @@
         </div>
       </div>
     </div>
-    <div class="guide-card">
-      <div class="gname">แนวทางสัญญาณ ML ที่ความมั่นใจสูง (conf ≥ 0.70)</div>
-      <div class="guide-steps" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">
-        <div class="gstep">
-          <b style="color:var(--warn);">≥ 0.70 — HIGH</b>
-          <span>สัญญาณแรง · ใช้ <b>1/3 ของเงินเดิมพัน</b> · เข้าตามทิศทางสัญญาณ (CALL/PUT)</span>
-        </div>
-        <div class="gstep">
-          <b style="color:var(--bull);">0.60 – 0.69</b>
-          <span>สัญญาณปานกลาง · รอจังหวะยืนยันจาก Rule-Based (แนวรับ/ต้าน) ก่อนเข้า</span>
-        </div>
-        <div class="gstep">
-          <b style="color:var(--muted);">&lt; 0.60</b>
-          <span>ความมั่นใจต่ำกว่าจุดคุ้มทุน — <b>ไม่ควรเปิดออเดอร์</b> รอสัญญาณถัดไป</span>
+    <!-- C-8: คู่มือใช้งานสัญญาณ ML — ค่าจริงจากระบบ (ไม่ hard-code) · อัปเดตโดย refreshMlTab -->
+    <div class="guide-card ml-guide" id="mlGuide">
+      <div class="ml-guide-head">
+        <div class="gname">แนวทางใช้งานสัญญาณ ML</div>
+        <div class="ml-guide-chips">
+          <span class="mg-chip">เกตจริง ≥<b id="mlGuideGate">–</b></span>
+          <span class="mg-chip">จุดคุ้มทุน <b id="mlGuideBe">–</b></span>
+          <span class="mg-chip mg-warn" id="mlGuideGap" style="display:none;"></span>
         </div>
       </div>
-      <div class="guide-note">จุดคุ้มทุนจริงดูจากค่า <b>Breakeven</b> ด้านบน — จะเปิดออเดอร์ได้เมื่อความมั่นใจ (Win Prob) สูงกว่า Breakeven เสมอ</div>
+      <div class="guide-steps" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">
+        <div class="gstep" id="mlGuideHigh">
+          <b class="mg-hi">≥ <span>–</span> — HIGH</b>
+          <span>สัญญาณแรง · ใช้ <b>1/3 ของเงินเดิมพัน</b> · เข้าตามทิศทาง (CALL/PUT)</span>
+        </div>
+        <div class="gstep" id="mlGuideMid">
+          <b class="mg-md"><span>–</span> – <span>–</span></b>
+          <span>ผ่านเกตช่วงต้น · เข้าตามแผนปกติ (1/5–1/4 ของเงินเดิมพัน) · ระวังช่วงข่าว</span>
+        </div>
+        <div class="gstep" id="mlGuideLow">
+          <b class="mg-lo">&lt; <span>–</span></b>
+          <span>ต่ำกว่าเกตของระบบ — <b>ไม่ควรเปิดออเดอร์</b> รอสัญญาณถัดไป</span>
+        </div>
+      </div>
+      <div class="guide-note" id="mlGuideNote">เกตจริงดึงจาก ML_CONF_THRESHOLD (.env) · จุดคุ้มทุน = 1/(1+payout) — เปลี่ยนค่าเมื่อไรตัวเลขขยับทันที</div>
     </div>
     <div class="panel">
       <h3><span class="ph"></span>ประวัติสัญญาณ ML ทั้งหมด</h3>

@@ -15,3 +15,14 @@
     font-size:9px; font-weight:900; border-radius:10px; padding:1px 6px; margin-left:4px; vertical-align:1px;
     font-family:var(--num); letter-spacing:.3px;
   }
+
+/* ═══ C-8: คู่มือ ML แบบ dynamic ═══ */
+.ml-guide-head{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:10px;}
+.ml-guide-chips{display:flex; gap:6px; flex-wrap:wrap;}
+.mg-chip{display:inline-flex; align-items:center; gap:5px; font-size:10px; color:var(--muted);
+  background:var(--surface-alt); border:1px solid var(--border-subtle); border-radius:99px; padding:3px 10px; font-weight:600;}
+.mg-chip b{color:var(--text); font-family:var(--font-mono); font-weight:800;}
+.mg-chip.mg-warn{display:inline-flex; background:var(--warn-dim); border-color:transparent; color:var(--warn); font-weight:800;}
+.mg-hi{color:var(--bull);}
+.mg-md{color:var(--warn);}
+.mg-lo{color:var(--bear);}

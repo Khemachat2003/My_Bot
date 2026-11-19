@@ -20,6 +20,7 @@ async function refreshMlTab(){
     document.getElementById('mlBe').textContent=s.breakeven+'%';
     document.getElementById('mlMargin').textContent=s.n_resolved?fmtMargin(s.margin):'–';
     document.getElementById('mlCi').textContent=s.n_resolved?`[${s.ci_low}%, ${s.ci_high}%]`:'–';
+    renderMlGuide(s);
     const byTf=await fetchJSON('/api/ml/stats/by_timeframe');
     const t1=byTf['M1']||{}, t5=byTf['M5']||{};
     const setWin=(id,v)=>{const el=document.getElementById(id);
@@ -82,3 +83,33 @@ async function refreshMlRecentFeed(){
 
 
 export { refreshMlTab, refreshMlRecentFeed };
+
+// C-8: คู่มือใช้งาน ML แบบ dynamic — เกตจริงจาก .env (แนบมากับ /api/ml/latest) + breakeven จาก payout
+async function renderMlGuide(stats){
+  const gateEl=document.getElementById('mlGuideGate');
+  if(!gateEl) return;
+  let th=null;
+  try{
+    const latest=await fetchJSON('/api/ml/latest');
+    const g=(latest&&(latest['M1']||latest['M5']))||{};
+    if(g.env_threshold!=null) th=Number(g.env_threshold);
+    else if(g.threshold_used!=null) th=Number(g.threshold_used);
+  }catch(e){}
+  const be=(stats&&stats.breakeven!=null)?Number(stats.breakeven):null;
+  const gatePct=th!=null?Math.round(th*100):null;
+  const hiPct=th!=null?Math.round(Math.min(th+0.10,0.95)*100):null;
+  gateEl.textContent=gatePct!=null?gatePct+'%':'–';
+  const beEl=document.getElementById('mlGuideBe'); if(beEl) beEl.textContent=be!=null?be+'%':'–';
+  const hi=document.querySelector('#mlGuideHigh .mg-hi span'); if(hi) hi.textContent=hiPct!=null?hiPct+'%':'–';
+  const mid=document.querySelectorAll('#mlGuideMid .mg-md span');
+  if(mid[0]) mid[0].textContent=gatePct!=null?gatePct+'%':'–';
+  if(mid[1]) mid[1].textContent=(gatePct!=null&&hiPct!=null)?Math.max(hiPct-1,gatePct)+'%':'–';
+  const lo=document.querySelector('#mlGuideLow .mg-lo span'); if(lo) lo.textContent=gatePct!=null?gatePct+'%':'–';
+  // เตือนตรง ๆ เมื่อเกตของระบบต่ำกว่าจุดคุ้มทุน (expected value ติดลบเมื่อ payout ตามจริง)
+  const gap=document.getElementById('mlGuideGap');
+  if(gap){
+    if(gatePct!=null&&be!=null&&gatePct<be){
+      gap.style.display=''; gap.textContent=`⚠ เกตต่ำกว่า BE ${(be-gatePct).toFixed(1)} pts`;
+    } else { gap.style.display='none'; }
+  }
+}
