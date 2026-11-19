@@ -34,9 +34,23 @@ document.addEventListener('DOMContentLoaded',()=>{
     chartInd[chip.dataset.ind]=chip.classList.contains('active');
     if(lastCandles.length) drawLWChart(lastCandles,window._signalMarkers||[]);
   });
-  window.addEventListener('resize',()=>{ refreshLWResize(); });
+  // C-8 mobile fix: resize หลายทาง — window/visualViewport/RO/wrap + re-fit หลังเลย์เอาต์นิ่ง
+  // (เดิมวัดก่อน scrollbar ปรากฏ → canvas กว้างเกินจอ ~9-16px ทำให้ price scale ขวาถูกตัด)
+  const _refit=()=>requestAnimationFrame(()=>refreshLWResize());
+  window.addEventListener('resize',()=>{ _refit(); setTimeout(refreshLWResize,250); });
+  if(window.visualViewport) window.visualViewport.addEventListener('resize',_refit);
   const _chartPanelEl=document.getElementById('chartPanel');
-  if(_chartPanelEl && window.ResizeObserver){
-    new ResizeObserver(()=>refreshLWResize()).observe(_chartPanelEl);
+  const _lwWrapEl=document.getElementById('lwWrap');
+  if(window.ResizeObserver){
+    const ro=new ResizeObserver(()=>_refit());
+    if(_chartPanelEl) ro.observe(_chartPanelEl);
+    if(_lwWrapEl) ro.observe(_lwWrapEl);
   }
+  // drawer มือถือเปิด/ปิด = เลย์เอาต์เปลี่ยน (transition .2s) → refit หลังจบ transition
+  document.addEventListener('click',(e)=>{
+    if(e.target instanceof Element && e.target.closest('#navToggle,#drawerScrim')) setTimeout(refreshLWResize,280);
+  });
+  // กันพลาดตอนฟอนต์/scrollbar มาช้า
+  setTimeout(refreshLWResize,300);
+  setTimeout(refreshLWResize,1200);
 });

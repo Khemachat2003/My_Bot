@@ -43,3 +43,14 @@
     border:1px solid var(--border); border-radius:8px; padding:6px 11px; transition:.15s;
   }
   .logout:hover{color:var(--red); border-color:var(--red);}
+
+  /* ═══ C-8 mobile: กัน pricebox ดันหน้าล้นแนวนอนบนจอแคบ ═══ */
+  .pricebox{min-width:0;}
+  @media(max-width:420px){
+    .pricebox .price{font-size:22px;}
+    .pricebox .chg{font-size:10px; white-space:normal;}
+  }
+  @media(max-width:420px){
+    .pricebox{flex-wrap:wrap; justify-content:center; gap:8px; padding:4px 10px; max-width:100%;}
+    .pricebox .sym{font-size:10px;}
+  }

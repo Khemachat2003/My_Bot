@@ -10,7 +10,7 @@
     .open-trade-grid{grid-template-columns:repeat(2,1fr);}
   }
   @media(max-width:820px){
-    body{font-size:13px; overflow:auto;}
+    body{font-size:13px; overflow:auto; overflow-x:hidden;}
     .topbar{flex-wrap:wrap; gap:8px; padding:8px 12px;}
     .brand .ver{display:none;}
     .pricebox{order:3; flex:1 1 100%; justify-content:center; padding:5px 10px;}
@@ -111,4 +111,12 @@
   @media(min-width:769px){
     .nav-toggle{display:none;}
     #drawerScrim{display:none;}
+  }
+
+  /* ═══ C-8 mobile: ความสูง pane กราฟให้พอดีจอ (เดิม candle 320px + panes รวม ~590px สูงเกิน) ═══ */
+  @media(max-width:600px){
+    #candleChart{height:250px;}
+    #volChart{height:60px;}
+    #rsiChart{height:76px;}
+    #adxChart{height:80px;}
   }

@@ -106,9 +106,20 @@ function _lwSyncPanes(){
 
 function refreshLWResize(){
   const map={'candleChart':lwChart,'volChart':lwVolC,'rsiChart':lwRsiC,'adxChart':lwAdxC};
+  // C-8 mobile fix: กัน canvas กว้างเกินจอ (scrollbar/เลย์เอาต์เปลี่ยนทีหลัง) — clamp ด้วย viewport + parent
+  const vw=(window.visualViewport&&window.visualViewport.width)||document.documentElement.clientWidth||window.innerWidth||0;
   for(const id in map){
     const el=document.getElementById(id); const c=map[id];
-    if(c&&el&&el.clientWidth>0) c.applyOptions({width:el.clientWidth,height:el.clientHeight||460});
+    if(!c||!el) continue;
+    const raw=el.clientWidth||0;
+    const parent=el.parentElement?el.parentElement.clientWidth:raw;
+    const w=Math.floor(Math.min(raw||parent,parent||raw,vw||raw));
+    if(w>0){
+      const opt={width:w,height:el.clientHeight||460};
+      // จอแคบ: ลดฟอนต์แกนราคาให้ label ไม่ชนขอบ/ถูกตัด
+      if(w<420) opt.layout={fontSize:9};
+      c.applyOptions(opt);
+    }
   }
 }
 
