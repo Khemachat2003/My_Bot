@@ -28,10 +28,43 @@ async function refreshJournalTab(){
       cfd:cfdData,
     });
     const daily=j.daily||[];
-    document.querySelector('#dailyTable tbody').innerHTML=daily.map(d=>`
-      <tr><td>${d.day}</td><td class="mono">${d.n}</td><td class="mono">${d.wins}</td><td class="mono">${d.winrate}%</td>
-      <td class="mono ${d.pnl>0?'dir-call':(d.pnl<0?'dir-put':'')}">${pnlText(d.pnl,{fixed:true,digits:2})}</td></tr>`).join('')
-      || '<tr><td colspan="5" class="empty">ยังไม่มีข้อมูล</td></tr>';
+    const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const maxAbs=Math.max(1,...daily.map(d=>Math.abs(d.pnl||0)));
+    const be=j.breakeven;
+    const tb=document.querySelector('#dailyTable tbody');
+    if(!daily.length){
+      tb.innerHTML='<tr><td colspan="5" class="empty">ยังไม่มีข้อมูล</td></tr>';
+    } else {
+      const rows=daily.map(d=>{
+        const pnl=d.pnl||0;
+        const dirCls=pnl>0?'bull':(pnl<0?'bear':'muted');
+        const wrCol=wrColor(d.winrate, be);
+        const barW=Math.min(Math.abs(pnl)/maxAbs*50,50);           // ครึ่งความกว้างสูงสุด (ซ้าย/ขวาจากศูนย์กลาง)
+        const side=pnl>=0?'left:50%':'right:50%';
+        const [y,m,dd]=String(d.day||'').split('-');
+        const dLabel=(m&&dd)?`${dd} ${MON[(+m)-1]||''}`:(d.day||'');
+        return `<tr>
+          <td class="dl-day"><span class="dl-date">${dLabel}</span><span class="dl-yr">${y||''}</span></td>
+          <td class="mono dl-n">${d.n}</td>
+          <td class="mono dl-w">${d.wins}</td>
+          <td class="dl-wr"><span class="dl-track">${be!=null?`<u style="left:${Math.min(be,100)}%"></u>`:''}<i style="width:${Math.min(d.winrate,100)}%;background:var(--${wrCol})"></i></span><b style="color:var(--${wrCol})">${d.winrate}%</b></td>
+          <td class="dl-pnl"><span class="dl-pnl-val" style="color:var(--${dirCls})">${pnlText(d.pnl,{fixed:true,digits:2})}</span><span class="dl-track dl-track-pnl"><em></em><i style="width:${barW}%;${side};background:var(--${dirCls})"></i></span></td>
+        </tr>`;
+      }).join('');
+      const tN=daily.reduce((a,b)=>a+(b.n||0),0);
+      const tW=daily.reduce((a,b)=>a+(b.wins||0),0);
+      const tP=daily.reduce((a,b)=>a+(b.pnl||0),0);
+      const tWr=tN?+(tW/tN*100).toFixed(1):0;
+      const tCls=tP>0?'bull':(tP<0?'bear':'muted');
+      const total=`<tr class="dl-total">
+          <td class="dl-day"><span class="dl-date">รวม ${daily.length} วัน</span></td>
+          <td class="mono dl-n">${tN}</td>
+          <td class="mono dl-w">${tW}</td>
+          <td class="dl-wr"><b>${tWr}%</b></td>
+          <td class="dl-pnl"><span class="dl-pnl-val" style="color:var(--${tCls})">${pnlText(tP,{fixed:true,digits:2})}</span></td>
+        </tr>`;
+      tb.innerHTML=rows+total;
+    }
   }catch(e){}
   try{
     const models=await fetchJSON('/api/models');

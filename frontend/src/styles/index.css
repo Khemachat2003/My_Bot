@@ -25,3 +25,4 @@
 @import './responsive.css';
 @import '../shared/ui/report-layout.css';
 @import '../features/overview/overview-bottom.css';
+@import '../features/journal/journal.css'; /* C-8: ตารางผลรายวันพรีเมียม — class dl-… ต่อท้าย */

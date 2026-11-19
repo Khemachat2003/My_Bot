@@ -1,0 +1,65 @@
+/* journal.css — ตารางผลรายวันพรีเมียม (C-8) — class dl-… ใหม่ทั้งหมด (append-only)
+   import ต่อท้าย report-layout.css ใน styles/index.css */
+
+/* วัน/ปี */
+#dailyTable td{vertical-align:middle;}
+.dl-date{font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:11.5px; font-weight:700;
+  color:var(--text); letter-spacing:.02em;}
+.dl-yr{font-size:9px; color:var(--dim); margin-left:6px; font-weight:600;}
+.dl-n{color:var(--muted);}
+.dl-w{color:var(--text); font-weight:600;}
+
+/* แถบ winrate + marker จุดคุ้มทุน (เส้นขีดสว่าง) */
+.dl-track{display:inline-block; width:64px; height:5px; border-radius:3px; background:var(--surface-alt);
+  overflow:hidden; vertical-align:middle; margin-right:8px; position:relative;}
+.dl-track i{display:block; height:100%; border-radius:3px; transition:width .4s ease;}
+.dl-track u{position:absolute; top:-2px; bottom:-2px; width:1.5px; background:var(--text); opacity:.45;
+  text-decoration:none; z-index:1;}
+.dl-wr{min-width:112px;}
+.dl-wr b{font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:11px; font-weight:700;}
+
+/* P&L: ตัวเลขชิดขวา + แถบวิ่งออกจากศูนย์กลาง (bull→ขวา, bear→ซ้าย) */
+.dl-pnl{min-width:150px;}
+.dl-pnl-val{display:inline-block; min-width:56px; text-align:right; margin-right:9px;
+  font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:11.5px; font-weight:700;}
+.dl-track-pnl{width:58px; overflow:visible;}
+.dl-track-pnl em{position:absolute; left:50%; top:-2px; bottom:-2px; width:1px; background:var(--border); }
+.dl-track-pnl i{position:absolute; top:0; bottom:0; border-radius:2px; min-width:1px;}
+
+/* แถวรวมท้ายตาราง */
+.dl-total td{background:rgba(255,255,255,.025); border-top:1px solid var(--border); font-weight:800;}
+.dl-total .val,.dl-total b{font-weight:800;}
+.dl-total .dl-date{font-family:var(--font-body); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted);}
+
+/* มือถือ: แถวการ์ด — ซ่อนแถบในแนวกว้างแคบ ไม่ให้เบียด */
+@media(max-width:700px){
+  .dl-track{width:48px;}
+  .dl-track-pnl{width:44px;}
+  .dl-pnl{min-width:0;}
+  .dl-wr{min-width:0;}
+  .dl-total .dl-day{grid-column:1/-1;}
+}
+
+/* ═══ C-8: ตารางสรุป ML vs Rule-Based (periodTable) — จัดกลุ่มคอลัมน์ตามระบบ ═══ */
+.pg-table th.pg-ml{color:var(--accent);}
+.pg-table th.pg-rb{color:var(--bull);}
+.pg-table .pg-dot{display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:5px; vertical-align:middle;}
+.pg-table .pg-dot.ml{background:var(--accent);}
+.pg-table .pg-dot.rb{background:var(--bull);}
+/* เส้นแบ่งกลุ่ม + tint จาง ๆ ให้อ่านเป็นก้อนระบบ */
+.pg-table td.pg-ml, .pg-table th.pg-ml{background:rgba(76,141,255,.035);}
+.pg-table td.pg-rb, .pg-table th.pg-rb{background:rgba(22,199,132,.035);}
+.pg-table td.pg-ml:nth-child(6), .pg-table th.pg-ml:nth-child(6),
+.pg-table td.pg-rb:nth-child(9), .pg-table th.pg-rb:nth-child(9),
+.pg-table td.pg-bal, .pg-table th.pg-bal{border-left:1px solid var(--border);}
+.pg-table td.pg-bal{text-align:right; color:var(--muted); font-weight:700;}
+.pg-table td.pg-roi{font-weight:700;}
+.pg-table td.dl-wr{min-width:96px;}
+.pg-table td.dl-wr .dl-track{width:42px;}
+.pg-table td.pg-pnl{font-weight:700;}
+.pg-table td{white-space:nowrap;}
+.dl-muted{color:var(--dim);}
+@media(max-width:700px){
+  .pg-table td.pg-ml, .pg-table td.pg-rb{background:none;}
+  .pg-table td.pg-bal{text-align:left;}
+}

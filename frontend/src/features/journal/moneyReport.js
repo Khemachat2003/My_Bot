@@ -59,20 +59,47 @@ function renderPeriodTable(){
   const kind = activeTab ? activeTab.dataset.period : 'daily';
   const rows=moneyReport[kind]||[];
   const cur=moneyReport.settings.currency||'THB';
+  const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const pnl=(v)=>`${v>0?'+':''}${Number(v).toLocaleString('th-TH',{maximumFractionDigits:2})} ${cur}`;
+  // C-8: ป้ายช่วงเวลาแบบพรีเมียมตาม kind (daily=19 Nov / monthly=Nov 2026 / yearly=2026)
+  const periodLabel=(p)=>{
+    const [y,m,dd]=String(p||'').split('-');
+    const mon=MON[(+m)-1]||'';
+    if(kind==='yearly') return {main:(y||p||''),sub:''};
+    if(kind==='monthly') return {main:mon,sub:y||''};
+    if(kind==='weekly') return {main:`${dd} ${mon}`,sub:y||''};
+    return {main:`${dd} ${mon}`,sub:y||''};
+  };
+  // เซลล์กลุ่ม (ALL/ML/RB): ไม้ · WR(แถบ) · P&L — ใช้โครงเดียวกับตารางผลรายวัน
+  const wrCell=(g,cls)=>{
+    if(!g.n) return `<td class="dl-wr ${cls}"><span class="dl-muted">–</span></td>`;
+    const col=g.winrate>=50?'bull':'bear';
+    return `<td class="dl-wr ${cls}"><span class="dl-track"><i style="width:${Math.min(g.winrate,100)}%;background:var(--${col})"></i></span><b style="color:var(--${col})">${g.winrate}%</b></td>`;
+  };
+  const pnlCell=(g,cls)=>{
+    if(!g.n) return `<td class="mono ${cls}"><span class="dl-muted">–</span></td>`;
+    const col=pnlColor(g.pnl_money);
+    return `<td class="mono pg-pnl ${cls}" style="color:var(--${col})">${pnl(g.pnl_money)}</td>`;
+  };
   const body=document.querySelector('#periodTable tbody');
-  body.innerHTML=rows.slice().reverse().map(d=>`
-    <tr>
-      <td class="mono"><b>${d.period}</b></td>
-      <td class="mono">${d.ALL.n}</td><td class="mono ${d.ALL.winrate>=50?'dir-call':'dir-put'}">${d.ALL.n?d.ALL.winrate+'%':'–'}</td>
-      <td class="mono ${d.ALL.pnl_money>0?'dir-call':(d.ALL.pnl_money<0?'dir-put':'')}">${d.ALL.n?pnl(d.ALL.pnl_money):'–'}</td>
-      <td class="mono">${d.ALL.n?d.ALL.roi+'%':'–'}</td>
-      <td class="mono">${d.ML.n}</td><td class="mono">${d.ML.n?d.ML.winrate+'%':'–'}</td>
-      <td class="mono ${d.ML.pnl_money>0?'dir-call':(d.ML.pnl_money<0?'dir-put':'')}">${d.ML.n?pnl(d.ML.pnl_money):'–'}</td>
-      <td class="mono">${d.SETUP.n}</td><td class="mono">${d.SETUP.n?d.SETUP.winrate+'%':'–'}</td>
-      <td class="mono ${d.SETUP.pnl_money>0?'dir-call':(d.SETUP.pnl_money<0?'dir-put':'')}">${d.SETUP.n?pnl(d.SETUP.pnl_money):'–'}</td>
-      <td class="mono">${Number(d.balance).toLocaleString('th-TH',{maximumFractionDigits:2})}</td>
-    </tr>`).join('') || '<tr><td colspan="12" class="empty">ยังไม่มีข้อมูล</td></tr>';
+  body.innerHTML=rows.slice().reverse().map(d=>{
+    const {main,sub}=periodLabel(d.period);
+    const roiCol=d.ALL.n?(d.ALL.roi>0?'bull':(d.ALL.roi<0?'bear':'muted')):'muted';
+    return `<tr>
+      <td class="dl-day"><span class="dl-date">${main}</span>${sub?`<span class="dl-yr">${sub}</span>`:''}</td>
+      <td class="mono pg-all">${d.ALL.n}</td>
+      ${wrCell(d.ALL,'pg-all')}
+      ${pnlCell(d.ALL,'pg-all')}
+      <td class="mono pg-roi ${roiCol==='muted'?'':''}" style="color:var(--${roiCol})">${d.ALL.n?(d.ALL.roi>0?'+':'')+d.ALL.roi+'%':'–'}</td>
+      <td class="mono pg-ml">${d.ML.n||'–'}</td>
+      ${wrCell(d.ML,'pg-ml')}
+      ${pnlCell(d.ML,'pg-ml')}
+      <td class="mono pg-rb">${d.SETUP.n||'–'}</td>
+      ${wrCell(d.SETUP,'pg-rb')}
+      ${pnlCell(d.SETUP,'pg-rb')}
+      <td class="mono pg-bal">${Number(d.balance).toLocaleString('th-TH',{maximumFractionDigits:2})}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="12" class="empty">ยังไม่มีข้อมูล</td></tr>';
 }
 
 
