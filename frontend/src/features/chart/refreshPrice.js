@@ -2,6 +2,7 @@
 // ย้ายจาก index.html เดิม (_archive/index.legacy.html) บรรทัด 2612–2659 แบบ move-only
 
 import { drawLWChart } from './drawLwChart.js';
+import { lwChart } from './lwChartInit.js';
 import { fetchJSON } from '../../shared/api/client.js';
 import { setMarkersCache } from '../../shared/lib/markersCache.js';
 import { symbolList } from '../watchlist/index.js';
@@ -49,6 +50,8 @@ async function refreshPrice(showLoading=false){
     const sConn=document.getElementById('statusConn'); if(sConn){ sConn.textContent='● LIVE'; sConn.className='st-ok'; }
     const tTitle=document.getElementById('chartTitle');
     if(tTitle){ const meta=symbolList.find(s=>s.symbol===sym); tTitle.textContent=(meta?meta.label+' — ':'')+'Candlestick'; }
+    // C-8: watermark กลางกราฟตามซิมโบลจริง (จางมาก ไม่กวนกราฟ)
+    try{ lwChart&&lwChart.applyOptions({watermark:{text:(sym||'').replace(/^frx/,'')}}); }catch(e){}
   }catch(e){
     const sConn=document.getElementById('statusConn');
     if(sConn){ sConn.textContent='● OFFLINE'; sConn.className='st-bad'; }

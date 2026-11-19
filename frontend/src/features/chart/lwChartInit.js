@@ -33,13 +33,15 @@ function initLWChart(){
     layout:{background:{color:'transparent'},textColor:'#787B86',fontFamily:'IBM Plex Mono, monospace'},
     grid:{vertLines:{color:'#1E222D'},horzLines:{color:'#1E222D'}},
     crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
-    rightPriceScale:{borderColor:'#2A2E39'},
+    rightPriceScale:{borderColor:'#2A2E39',minimumWidth:64,scaleMargins:{top:0.08,bottom:0.08}},
     timeScale:{borderColor:'#2A2E39',timeVisible:true,secondsVisible:false,rightOffset:1,barSpacing:7},
     localization:{locale:'th-TH'},
   };
   // ── pane ราคาหลัก (ซ่อนแกนเวลา — แกนเวลาจะอยู่ที่แถบ ADX ล่างสุด) ──
   const el=document.getElementById('candleChart'); if(!el) return;
-  lwChart=LightweightCharts.createChart(el,{...baseOpts,width:el.clientWidth||300,height:el.clientHeight||320,timeScale:{...baseOpts.timeScale,visible:false}});
+  lwChart=LightweightCharts.createChart(el,{...baseOpts,width:el.clientWidth||300,height:el.clientHeight||320,timeScale:{...baseOpts.timeScale,visible:false},
+    // C-8: watermark เฉพาะ pane ราคาหลัก (เหมือนแพลตฟอร์มเทรด) — จางมาก
+    watermark:{visible:true, fontSize:40, color:'rgba(255,255,255,0.03)', fontFamily:'Archivo, IBM Plex Sans Thai, sans-serif', text:'XAUUSD'}});
   lwCandle=lwChart.addCandlestickSeries({
     upColor:'#26A69A',downColor:'#EF5350',borderVisible:false,
     wickUpColor:'#26A69A',wickDownColor:'#EF5350',
@@ -71,8 +73,9 @@ function initLWChart(){
     if(rEl){
       lwRsiC=LightweightCharts.createChart(rEl,{...baseOpts,width:rEl.clientWidth||300,height:rEl.clientHeight||96,timeScale:{...baseOpts.timeScale,visible:false}});
       lwRsi=lwRsiC.addLineSeries({color:'#9C6FE0',lineWidth:1,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false,priceFormat:{type:'custom',formatter:v=>v==null?'–':v.toFixed(1)}});
-      lwRsi.createPriceLine({price:70,color:'rgba(120,123,134,.45)',lineStyle:LightweightCharts.LineStyle.Dotted,title:'70'});
-      lwRsi.createPriceLine({price:30,color:'rgba(120,123,134,.45)',lineStyle:LightweightCharts.LineStyle.Dotted,title:'30'});
+      // C-8: ตัด title/axis label ของเส้น 70/30 ออก (เดิมเป็นป้ายทึบทับกราฟ) — เหลือเส้น dotted บาง ๆ
+      lwRsi.createPriceLine({price:70,color:'rgba(120,123,134,.35)',lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:false,title:''});
+      lwRsi.createPriceLine({price:30,color:'rgba(120,123,134,.35)',lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:false,title:''});
     }
   }catch(e){ console.error('rsi pane fail',e); }
   // ── pane ADX — instance แยก มีแกนเวลาแถวล่างสุด + เส้น 20 ──
@@ -83,7 +86,7 @@ function initLWChart(){
       lwAdx=lwAdxC.addLineSeries({color:'#FF9800',lineWidth:1,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false,priceFormat:{type:'custom',formatter:v=>v==null?'–':v.toFixed(1)}});
       lwPdi=lwAdxC.addLineSeries({color:'#26A69A',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
       lwNdi=lwAdxC.addLineSeries({color:'#EF5350',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
-      lwAdx.createPriceLine({price:20,color:'rgba(120,123,134,.5)',lineStyle:LightweightCharts.LineStyle.Dotted,title:'20'});
+      lwAdx.createPriceLine({price:20,color:'rgba(120,123,134,.35)',lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:false,title:''});
     }
   }catch(e){ console.error('adx pane fail',e); }
   _lwSyncPanes();   // pan/zoom ของทุกแถบขยับตามกัน
