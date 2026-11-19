@@ -26,3 +26,53 @@
 .mg-hi{color:var(--bull);}
 .mg-md{color:var(--warn);}
 .mg-lo{color:var(--bear);}
+
+/* ═══ C-8 premium: playbook ML (สเกลโซน + tier cards) ═══ */
+.ml-guide{position:relative; overflow:hidden;}
+.ml-guide::before{content:''; position:absolute; inset:0 0 auto 0; height:2px;
+  background:linear-gradient(90deg,var(--bear),var(--warn),var(--bull)); opacity:.55;}
+.mg-title{display:flex; align-items:center; gap:10px;}
+.mg-ic{width:30px; height:30px; border-radius:9px; display:grid; place-items:center; flex-shrink:0;
+  background:linear-gradient(135deg,var(--accent-dim),rgba(76,141,255,.02)); color:var(--accent); font-size:15px;
+  border:1px solid rgba(76,141,255,.18);}
+.mg-sub{font-size:10px; color:var(--dim); margin-top:2px;}
+
+/* สเกล confidence */
+.mg-scale{margin:4px 0 14px;}
+.mg-scale-lbl{display:flex; justify-content:space-between; font-size:9px; color:var(--dim);
+  letter-spacing:.06em; text-transform:uppercase; font-weight:700; margin-bottom:5px;}
+.mg-scale-track{position:relative; display:flex; height:10px; border-radius:6px; overflow:visible;
+  background:var(--surface-alt); border:1px solid var(--border-subtle);}
+.mg-zone{height:100%; transition:width .5s ease;}
+.mg-zone:first-child{border-radius:6px 0 0 6px;}
+.mg-zone.high{border-radius:0 6px 6px 0;}
+.mg-zone.low{background:linear-gradient(90deg,rgba(240,70,92,.55),rgba(240,70,92,.28));}
+.mg-zone.mid{background:linear-gradient(90deg,rgba(232,163,61,.45),rgba(232,163,61,.25));}
+.mg-zone.high{background:linear-gradient(90deg,rgba(22,199,132,.35),rgba(22,199,132,.6));}
+.mg-mark{position:absolute; top:-4px; bottom:-4px; width:2px; transform:translateX(-1px); background:var(--text); opacity:.75;}
+.mg-mark b{position:absolute; top:-16px; left:50%; transform:translateX(-50%); font-size:8.5px; font-weight:800;
+  letter-spacing:.04em; color:var(--text); background:var(--surface); border:1px solid var(--border);
+  padding:0 4px; border-radius:4px; line-height:1.45; white-space:nowrap;}
+.mg-mark.be{background:var(--warn); opacity:.95;}
+/* เกต/ BE อยู่ชิดกัน — ย้าย label ของ BE ลงใต้แถบ กันทับกัน */
+.mg-mark.be b{top:auto; bottom:-16px; background:var(--warn-dim); color:var(--warn); border-color:transparent;}
+.mg-scale{padding-bottom:16px;}
+
+/* tier cards */
+.mg-tiers{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px;}
+.mg-tier{position:relative; border:1px solid var(--border); border-radius:11px; padding:11px 13px 12px;
+  background:linear-gradient(180deg,var(--surface-alt),var(--card)); overflow:hidden;}
+.mg-tier::before{content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--tier-col,var(--border));}
+.mg-tier.t-high{--tier-col:var(--bull);}
+.mg-tier.t-mid{--tier-col:var(--warn);}
+.mg-tier.t-low{--tier-col:var(--bear);}
+.mg-tr{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;}
+.mg-tag{font-size:9px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+  padding:2px 8px; border-radius:99px; background:var(--tier-dim,var(--surface-alt)); color:var(--tier-col,var(--muted));}
+.mg-tier.t-high{--tier-dim:var(--bull-dim);}
+.mg-tier.t-mid{--tier-dim:var(--warn-dim);}
+.mg-tier.t-low{--tier-dim:var(--bear-dim);}
+.mg-range{font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:13px; font-weight:800; color:var(--text);}
+.mg-stake{font-size:11.5px; font-weight:800; color:var(--tier-col); margin-bottom:3px;}
+.mg-desc{font-size:10.5px; color:var(--muted); line-height:1.5;}
+@media(max-width:760px){ .mg-tiers{grid-template-columns:1fr;} }

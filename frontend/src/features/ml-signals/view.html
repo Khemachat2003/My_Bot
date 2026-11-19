@@ -48,25 +48,47 @@
     <!-- C-8: คู่มือใช้งานสัญญาณ ML — ค่าจริงจากระบบ (ไม่ hard-code) · อัปเดตโดย refreshMlTab -->
     <div class="guide-card ml-guide" id="mlGuide">
       <div class="ml-guide-head">
-        <div class="gname">แนวทางใช้งานสัญญาณ ML</div>
+        <div class="mg-title">
+          <span class="mg-ic"><i class="ti ti-book"></i></span>
+          <div>
+            <div class="gname">แนวทางใช้งานสัญญาณ ML</div>
+            <div class="mg-sub">ช่วงความมั่นใจที่ระบบยิงจริง — อัปเดตอัตโนมัติจาก .env + payout</div>
+          </div>
+        </div>
         <div class="ml-guide-chips">
           <span class="mg-chip">เกตจริง ≥<b id="mlGuideGate">–</b></span>
           <span class="mg-chip">จุดคุ้มทุน <b id="mlGuideBe">–</b></span>
           <span class="mg-chip mg-warn" id="mlGuideGap" style="display:none;"></span>
         </div>
       </div>
-      <div class="guide-steps" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">
-        <div class="gstep" id="mlGuideHigh">
-          <b class="mg-hi">≥ <span>–</span> — HIGH</b>
-          <span>สัญญาณแรง · ใช้ <b>1/3 ของเงินเดิมพัน</b> · เข้าตามทิศทาง (CALL/PUT)</span>
+
+      <!-- สเกล Confidence 0–100%: โซนแดง/เหลือง/เขียว + หมุดเกต (ระบบยิง) + หมุด BE (จุดคุ้มทุน) -->
+      <div class="mg-scale">
+        <div class="mg-scale-lbl"><span>0% WIN PROB</span><span>100%</span></div>
+        <div class="mg-scale-track">
+          <span class="mg-zone low" id="mlGuideZoneLow"></span>
+          <span class="mg-zone mid" id="mlGuideZoneMid"></span>
+          <span class="mg-zone high" id="mlGuideZoneHigh"></span>
+          <span class="mg-mark gate" id="mlGuideMarkGate"><b>เกต</b></span>
+          <span class="mg-mark be" id="mlGuideMarkBe"><b>BE</b></span>
         </div>
-        <div class="gstep" id="mlGuideMid">
-          <b class="mg-md"><span>–</span> – <span>–</span></b>
-          <span>ผ่านเกตช่วงต้น · เข้าตามแผนปกติ (1/5–1/4 ของเงินเดิมพัน) · ระวังช่วงข่าว</span>
+      </div>
+
+      <div class="mg-tiers">
+        <div class="mg-tier t-high" id="mlGuideHigh">
+          <div class="mg-tr"><span class="mg-tag">HIGH</span><span class="mg-range">≥ <span>–</span></span></div>
+          <div class="mg-stake">ใช้ 1/3 ของเงินเดิมพัน</div>
+          <div class="mg-desc">สัญญาณแรง — เข้าตามทิศทาง CALL/PUT</div>
         </div>
-        <div class="gstep" id="mlGuideLow">
-          <b class="mg-lo">&lt; <span>–</span></b>
-          <span>ต่ำกว่าเกตของระบบ — <b>ไม่ควรเปิดออเดอร์</b> รอสัญญาณถัดไป</span>
+        <div class="mg-tier t-mid" id="mlGuideMid">
+          <div class="mg-tr"><span class="mg-tag">ผ่านเกต</span><span class="mg-range"><span>–</span> – <span>–</span></span></div>
+          <div class="mg-stake">ใช้ 1/5 – 1/4 ของเงินเดิมพัน</div>
+          <div class="mg-desc">ผ่านเกตช่วงต้น — ระวังช่วงข่าว/ตลาดผันผวน</div>
+        </div>
+        <div class="mg-tier t-low" id="mlGuideLow">
+          <div class="mg-tr"><span class="mg-tag">ต่ำกว่าเกต</span><span class="mg-range">&lt; <span>–</span></span></div>
+          <div class="mg-stake">ไม่เปิดออเดอร์</div>
+          <div class="mg-desc">รอสัญญาณถัดไป — ระบบยังไม่ยิง</div>
         </div>
       </div>
       <div class="guide-note" id="mlGuideNote">เกตจริงดึงจาก ML_CONF_THRESHOLD (.env) · จุดคุ้มทุน = 1/(1+payout) — เปลี่ยนค่าเมื่อไรตัวเลขขยับทันที</div>

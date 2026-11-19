@@ -100,11 +100,21 @@ async function renderMlGuide(stats){
   const hiPct=th!=null?Math.round(Math.min(th+0.10,0.95)*100):null;
   gateEl.textContent=gatePct!=null?gatePct+'%':'–';
   const beEl=document.getElementById('mlGuideBe'); if(beEl) beEl.textContent=be!=null?be+'%':'–';
-  const hi=document.querySelector('#mlGuideHigh .mg-hi span'); if(hi) hi.textContent=hiPct!=null?hiPct+'%':'–';
-  const mid=document.querySelectorAll('#mlGuideMid .mg-md span');
+  const hi=document.querySelector('#mlGuideHigh .mg-range span'); if(hi) hi.textContent=hiPct!=null?hiPct+'%':'–';
+  const mid=document.querySelectorAll('#mlGuideMid .mg-range span');
   if(mid[0]) mid[0].textContent=gatePct!=null?gatePct+'%':'–';
   if(mid[1]) mid[1].textContent=(gatePct!=null&&hiPct!=null)?Math.max(hiPct-1,gatePct)+'%':'–';
-  const lo=document.querySelector('#mlGuideLow .mg-lo span'); if(lo) lo.textContent=gatePct!=null?gatePct+'%':'–';
+  const lo=document.querySelector('#mlGuideLow .mg-range span'); if(lo) lo.textContent=gatePct!=null?gatePct+'%':'–';
+  // สเกลโซน + หมุดตำแหน่งจริง
+  const setW=(id,v)=>{const el=document.getElementById(id); if(el) el.style.width=Math.max(Math.min(v||0,100),0)+'%';};
+  const setL=(id,v)=>{const el=document.getElementById(id); if(el) el.style.left=Math.max(Math.min(v||0,100),0)+'%';};
+  if(gatePct!=null&&hiPct!=null){
+    setW('mlGuideZoneLow',gatePct);
+    setW('mlGuideZoneMid',Math.max(hiPct-gatePct,0));
+    setW('mlGuideZoneHigh',Math.max(100-hiPct,0));
+  }
+  setL('mlGuideMarkGate',gatePct);
+  setL('mlGuideMarkBe',be);
   // เตือนตรง ๆ เมื่อเกตของระบบต่ำกว่าจุดคุ้มทุน (expected value ติดลบเมื่อ payout ตามจริง)
   const gap=document.getElementById('mlGuideGap');
   if(gap){
