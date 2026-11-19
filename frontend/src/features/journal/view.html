@@ -48,26 +48,19 @@
       </div>
     </div>
 
-    <div class="j-compare">
-      <div class="j-cmp-card">
-        <h4><span class="dot ml"></span>ML Model</h4>
-        <div class="j-cmp-stats">
-          <div class="j-cmp-stat"><div class="cs-lbl">Trades</div><div class="cs-val" id="jMlN">–</div></div>
-          <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="jMlWr">–</div></div>
-          <div class="j-cmp-stat"><div class="cs-lbl">P&amp;L</div><div class="cs-val" id="mPnlMl">–</div></div>
-        </div>
-        <div class="j-cmp-bar"><div class="j-cmp-bar-fill" id="jMlBar" style="width:0%;background:var(--accent);"></div></div>
-        <div class="jh-sub" id="mRoiMl" style="margin-top:6px;">ROI –</div>
+    <!-- C-8 premium: system duel — สองระบบเทียบกันตรง ๆ (แทนกล่องซ้ำ) -->
+    <div class="sys-duel">
+      <div class="sys-side ml">
+        <div class="sys-head"><span class="pg-dot ml"></span>ML MODEL<span class="sys-n"><b id="jMlN">–</b> ไม้</span></div>
+        <div class="val" id="mPnlMl">–</div>
+        <div class="sys-meta"><span class="sys-wr" id="jMlWr">–</span><span id="mRoiMl">ROI –</span></div>
+        <div class="sys-track"><i id="jMlBar" style="width:0%"></i></div>
       </div>
-      <div class="j-cmp-card">
-        <h4><span class="dot rb"></span>Rule-Based</h4>
-        <div class="j-cmp-stats">
-          <div class="j-cmp-stat"><div class="cs-lbl">Trades</div><div class="cs-val" id="jRbN">–</div></div>
-          <div class="j-cmp-stat"><div class="cs-lbl">Winrate</div><div class="cs-val" id="jRbWr">–</div></div>
-          <div class="j-cmp-stat"><div class="cs-lbl">P&amp;L</div><div class="cs-val" id="mPnlSt">–</div></div>
-        </div>
-        <div class="j-cmp-bar"><div class="j-cmp-bar-fill" id="jRbBar" style="width:0%;background:var(--accent);"></div></div>
-        <div class="jh-sub" id="mRoiSt" style="margin-top:6px;">ROI –</div>
+      <div class="sys-side rb">
+        <div class="sys-head"><span class="pg-dot rb"></span>RULE-BASED<span class="sys-n"><b id="jRbN">–</b> ไม้</span></div>
+        <div class="val" id="mPnlSt">–</div>
+        <div class="sys-meta"><span class="sys-wr" id="jRbWr">–</span><span id="mRoiSt">ROI –</span></div>
+        <div class="sys-track"><i id="jRbBar" style="width:0%"></i></div>
       </div>
     </div>
 
@@ -128,7 +121,7 @@
       <div class="j-section-body">
         <div class="tbl-wrap">
           <table id="modelTable" class="tbl-cards">
-            <thead><tr><th>Key</th><th>Version</th><th>Horizon</th><th>n_rows</th><th>AUC</th><th>Conf</th><th>Feature Set</th></tr></thead>
+            <thead><tr><th>Model</th><th>Version</th><th>Horizon</th><th>Rows</th><th>AUC (test)</th><th>Conf</th><th>Feature set</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>

@@ -25,45 +25,52 @@ function dirBadge(d){
 async function refreshTickTouchResearch(){
   try{
     const s=await fetchJSON('/api/ticktouch/stats');
-    // Case cards
+    // Case cards — C-8 premium: tile มีแถบสีบน + WR ใหญ่ + สรุป W/L
     const cards=document.getElementById('ttCaseCards');
     if(cards){
       const cases=Object.entries(s.by_case||{});
-      cards.innerHTML=cases.length?cases.map(([k,v])=>`
-        <div style="background:var(--bg);border:1px solid ${TT_CASE_COLORS[k]||'var(--border)'};border-radius:8px;padding:10px;text-align:center;">
-          <div style="font-size:11px;color:var(--muted);">${TT_CASE_COLORS[k]?k:'–'}</div>
-          <div style="font-size:20px;font-weight:800;color:var(--${wrColor(v.wr,60,50)});">${v.wr}%</div>
-          <div style="font-size:11px;color:var(--muted);">${v.wins}W / ${v.losses}L (${v.n})</div>
-        </div>`).join('')+'<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;"><div style="font-size:11px;color:var(--muted);">TOTAL</div><div style="font-size:20px;font-weight:800;">'+(s.wr||0)+'%</div><div style="font-size:11px;color:var(--muted);">'+s.wins+'W ('+s.resolved+') · ⏳'+s.pending+'</div></div>'
+      const card=(k,v,col)=>`
+        <div class="tt-card" style="--case:${col};">
+          <div class="tt-case">${k}</div>
+          <div class="tt-wr" style="color:var(--${wrColor(v.wr,60,50)});">${v.wr}%</div>
+          <div class="tt-meta">${v.wins}W / ${v.losses}L · ${v.n} ไม้</div>
+        </div>`;
+      cards.innerHTML=cases.length?cases.map(([k,v])=>card(k,v,TT_CASE_COLORS[k]||'var(--border)')).join('')
+        +`<div class="tt-card tt-total" style="--case:var(--border);">
+            <div class="tt-case">TOTAL</div>
+            <div class="tt-wr">${s.wr||0}%</div>
+            <div class="tt-meta">${s.wins}W · ${s.resolved} resolved · ⏳${s.pending}</div>
+          </div>`
         :'<div class="empty" style="grid-column:1/-1;">ยังไม่มีข้อมูล research — รอราคาแตะ EMA200</div>';
     }
-    // Condition vote table
+    // Condition vote table — WR เป็นแถบเทียบกัน
     const condBody=document.querySelector('#ttCondTable tbody');
     if(condBody){
       const conds=Object.entries(s.by_condition||{})
         .sort((a,b)=>(b[1].wr_when_true||0)-(a[1].wr_when_true||0));
-      condBody.innerHTML=conds.length?conds.map(([k,v])=>`
-        <tr>
+      condBody.innerHTML=conds.length?conds.map(([k,v])=>{
+        const col=wrColor(v.wr_when_true,60,50);
+        return `<tr>
           <td>${TT_COND_NAMES[k]||k}</td>
-          <td>${v.true_n}</td>
-          <td>${v.true_wins}</td>
-          <td><b style="color:var(--${wrColor(v.wr_when_true,60,50)})">${v.wr_when_true}%</b></td>
-          <td style="color:var(--muted);">${v.false_n?v.wr_when_false+'%':'–'}</td>
-        </tr>`).join(''):'<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:14px;">รอข้อมูล resolved</td></tr>';
+          <td class="mono mdl-dim">${v.true_n}</td>
+          <td class="mono mdl-dim">${v.true_wins}</td>
+          <td><span class="mdl-meter"><span class="dl-track"><i style="width:${Math.min(v.wr_when_true,100)}%;background:var(--${col})"></i></span><b style="color:var(--${col})">${v.wr_when_true}%</b></span></td>
+          <td class="mono mdl-dim">${v.false_n?v.wr_when_false+'%':'–'}</td>
+        </tr>`;}).join(''):'<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:14px;">รอข้อมูล resolved</td></tr>';
     }
-    // Recent touches
+    // Recent touches — case chip + จำนวน checklist chip
     const recBody=document.querySelector('#ttRecentTable tbody');
     if(recBody){
       const rec=s.recent||[];
       recBody.innerHTML=rec.length?rec.map(r=>`
         <tr>
-          <td>${fmtTime(r.signal_time)}</td>
-          <td>${(r.symbol||'').replace('frx','')}</td>
-          <td style="color:${TT_CASE_COLORS[r.touch_case]||'inherit'};">${(r.touch_case||'').replace('_TOUCH','').replace('_',' ')}</td>
+          <td class="mono mdl-dim">${fmtTime(r.signal_time)}</td>
+          <td><b>${(r.symbol||'').replace('frx','')}</b></td>
+          <td><span class="tt-chip" style="color:${TT_CASE_COLORS[r.touch_case]||'var(--muted)'};border-color:currentColor;">${(r.touch_case||'').replace('_TOUCH','').replace('_',' ')}</span></td>
           <td>${dirBadge(r.direction)}</td>
           <td class="mono">${r.entry_price?.toFixed(2)}</td>
-          <td class="mono">${r.exit_price!=null?r.exit_price.toFixed(2):'–'}</td>
-          <td class="mono">${r.passed_count}/10</td>
+          <td class="mono mdl-dim">${r.exit_price!=null?r.exit_price.toFixed(2):'–'}</td>
+          <td><span class="tt-chip">${r.passed_count}/10</span></td>
           <td><span class="pill ${r.result}">${r.result}</span></td>
         </tr>`).join(''):'<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px;">ยังไม่มีเหตุการณ์แตะ</td></tr>';
     }

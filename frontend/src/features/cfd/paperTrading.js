@@ -39,20 +39,21 @@ function renderCFDPaperTrades(d){
   if(!tbody) return;
   const trades=d.trades.slice(-50).reverse();
   tbody.innerHTML=trades.map(t=>{
-    const rc=t.result==='TP1'||t.result==='TP2'?'var(--bull)':t.result==='SL'?'var(--bear)':'var(--warn)';
+    // C-8 premium: result เป็น pill สี + system chip
+    const rc=t.result==='TP1'||t.result==='TP2'?'bull':t.result==='SL'?'bear':'warn';
     return `<tr>
-      <td>${t.id}</td>
-      <td>${fmtHM(t.entry_time)}</td>
-      <td>${t.signal_type}</td>
-      <td class="${t.direction==='CALL'?'dir-call':'dir-put'}">${t.direction}</td>
-      <td>${t.entry_price?.toFixed(2)}</td>
-      <td>${t.sl_price?.toFixed(2)}</td>
-      <td>${t.tp1_price?.toFixed(2)}</td>
-      <td>${t.tp2_price?.toFixed(2)}</td>
-      <td style="color:${rc}">${t.result}</td>
-      <td>${t.exit_price?.toFixed(2)??'–'}</td>
-      <td>${t.hold_bars??'–'}</td>
-      <td style="color:var(--${pnlColor(t.pnl)})">${t.pnl!=null?pnlText(t.pnl,{fixed:true,digits:2,prefix:'$'}):'–'}</td>
+      <td class="mono mdl-dim">${t.id}</td>
+      <td class="mono mdl-dim">${fmtHM(t.entry_time)}</td>
+      <td><span class="sys-chip ${t.signal_type==='ML'?'ml':'rb'}">${t.signal_type}</span></td>
+      <td>${t.direction==='CALL'?'<span class="dir-badge call">▲ CALL</span>':'<span class="dir-badge put">▼ PUT</span>'}</td>
+      <td class="mono">${t.entry_price?.toFixed(2)}</td>
+      <td class="mono mdl-dim">${t.sl_price?.toFixed(2)}</td>
+      <td class="mono mdl-dim">${t.tp1_price?.toFixed(2)}</td>
+      <td class="mono mdl-dim">${t.tp2_price?.toFixed(2)}</td>
+      <td><span class="cfd-res ${rc}">${t.result}</span></td>
+      <td class="mono mdl-dim">${t.exit_price?.toFixed(2)??'–'}</td>
+      <td><span class="tt-chip">${t.hold_bars??'–'}</span></td>
+      <td class="mono pg-pnl" style="color:var(--${pnlColor(t.pnl)})">${t.pnl!=null?pnlText(t.pnl,{fixed:true,digits:2,prefix:'$'}):'–'}</td>
     </tr>`;
   }).join('');
 

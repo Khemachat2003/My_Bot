@@ -44,19 +44,25 @@ async function refreshMlTab(){
     const empty=document.getElementById('mlEmpty');
     if(!rows.length){body.innerHTML='';empty.style.display='block';return;}
     empty.style.display='none';
-    body.innerHTML=rows.map(r=>`<tr>
-      <td>${fmtTime(r.signal_time)}</td>
-      <td><b>${r.timeframe||'M1'}</b></td>
+    body.innerHTML=rows.map(r=>{
+      // C-8 premium: Win Prob เป็นแถบmeter + model เป็น chip จาง
+      const conf=r.confidence!=null?r.confidence*100:null;
+      const confCol=conf==null?'muted':(conf>=70?'bull':(conf>=60?'warn':'muted'));
+      const confCell=conf==null?'<span class="dl-muted">–</span>'
+        :`<span class="mdl-meter"><span class="dl-track"><i style="width:${Math.min(conf,100)}%;background:var(--${confCol})"></i></span><b style="color:var(--${confCol})">${conf.toFixed(1)}%</b></span>`;
+      return `<tr>
+      <td class="mono mdl-dim">${fmtTime(r.signal_time)}</td>
+      <td><span class="mdl-key">${r.timeframe||'M1'}</span></td>
       <td>${dirBadge(r.direction)}</td>
       <td class="mono">${r.entry_price!=null?r.entry_price.toFixed(2):'–'}</td>
       ${cfdCells('ML',r.id,markers,2)}
-      <td class="mono">${r.exit_price!=null?r.exit_price.toFixed(2):'–'}</td>
-      <td class="mono">${r.confidence!=null?(r.confidence*100).toFixed(1)+'%':'–'}</td>
-      <td class="mono">${r.threshold_used!=null?(r.threshold_used*100).toFixed(0)+'%':'–'}</td>
-      <td class="mono">${r.horizon_min}m</td>
-      <td style="font-size:10px;color:var(--muted)">${r.model_version||'–'}${r.confidence!=null&&r.confidence>0.7?' <span class="hi-badge">HIGH</span>':''}</td>
+      <td class="mono mdl-dim">${r.exit_price!=null?r.exit_price.toFixed(2):'–'}</td>
+      <td>${confCell}</td>
+      <td class="mono mdl-dim">${r.threshold_used!=null?(r.threshold_used*100).toFixed(0)+'%':'–'}</td>
+      <td><span class="tt-chip">${r.horizon_min}m</span></td>
+      <td><span class="mdl-ver">${r.model_version||'–'}</span>${conf!=null&&conf>70?' <span class="hi-badge">HIGH</span>':''}</td>
       <td><span class="pill ${r.result}">${r.result}</span></td>
-    </tr>`).join('');
+    </tr>`;}).join('');
   }catch(e){}
   try{
     const rows=await fetchJSON('/api/ml/signals?limit=8');

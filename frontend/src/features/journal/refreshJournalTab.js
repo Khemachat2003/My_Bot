@@ -68,16 +68,20 @@ async function refreshJournalTab(){
   }catch(e){}
   try{
     const models=await fetchJSON('/api/models');
-    document.querySelector('#modelTable tbody').innerHTML=models.map(m=>`
-      <tr>
-        <td><b>${m.model_key}</b></td>
-        <td>${m.version}</td>
-        <td class="mono">${m.horizon}</td>
-        <td class="mono">${m.n_rows||'–'}</td>
-        <td class="mono">${m.auc_test!=null?m.auc_test:'–'}</td>
-        <td class="mono">${m.chosen_conf!=null?m.chosen_conf:'–'}</td>
-        <td style="font-size:10px;color:var(--muted)">${m.feature_set||'–'}</td>
-      </tr>`).join('') || '<tr><td colspan="7" class="empty">ยังไม่มีโมเดลที่ลงทะเบียน</td></tr>';
+    // C-8 premium: registry แบบ chip + แถบ AUC (เขียว ≥0.60 / เหลือง 0.55-0.59 / แดงต่ำกว่า)
+    document.querySelector('#modelTable tbody').innerHTML=models.map(m=>{
+      const auc=m.auc_test!=null?Number(m.auc_test):null;
+      const aucCol=auc==null?'muted':(auc>=0.60?'bull':(auc>=0.55?'warn':'bear'));
+      const aucPct=auc!=null?Math.min(auc*100,100):0;
+      return `<tr>
+        <td><span class="mdl-key">${m.model_key}</span></td>
+        <td><span class="mdl-ver">${m.version||'–'}</span></td>
+        <td class="mono mdl-dim">${m.horizon!=null?m.horizon+'m':'–'}</td>
+        <td class="mono mdl-dim">${m.n_rows?Number(m.n_rows).toLocaleString('th-TH'):'–'}</td>
+        <td><span class="mdl-meter"><span class="dl-track"><i style="width:${aucPct}%;background:var(--${aucCol})"></i></span><b style="color:var(--${aucCol})">${auc!=null?auc:'–'}</b></span></td>
+        <td><span class="mdl-conf">${m.chosen_conf!=null?m.chosen_conf:'–'}</span></td>
+        <td><span class="mdl-feat">${m.feature_set||'–'}</span></td>
+      </tr>`;}).join('') || '<tr><td colspan="7" class="empty">ยังไม่มีโมเดลที่ลงทะเบียน</td></tr>';
   }catch(e){}
 }
 

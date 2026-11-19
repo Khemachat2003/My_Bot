@@ -38,3 +38,24 @@
   .open-trade-grid{grid-template-columns:repeat(3,1fr);}
   .ot-prog{flex-basis:100%; max-width:none;}
 }
+
+/* ═══ C-8: เปรียบเทียบ TP1 vs TP2 — chip ระบบ + แถบ WR + tint กลุ่ม ═══ */
+.sys-chip{display:inline-block; padding:2px 9px; border-radius:7px; font-size:10px; font-weight:800; letter-spacing:.04em;}
+.sys-chip.ml{background:var(--accent-dim); color:var(--accent);}
+.sys-chip.rb{background:var(--bull-dim); color:var(--bull);}
+#cfdCompareTable td.pg-ml{background:rgba(76,141,255,.04);}
+#cfdCompareTable td.pg-rb{background:rgba(22,199,132,.04);}
+#cfdCompareTable td:nth-child(6), #cfdCompareTable th:nth-child(6){border-left:1px solid var(--border);}
+#cfdCompareTable .dl-track{width:46px; margin-right:0;}
+#cfdCompareTable .mdl-meter{gap:7px;}
+#cfdCompareTable .pg-pnl{font-weight:700;}
+#cfdCompareTable .cmp-total td{background:rgba(255,255,255,.03); border-top:1px solid var(--border); font-weight:800;}
+#cfdCompareTable .cmp-row:hover td{background:rgba(255,255,255,.02);}
+
+/* ═══ C-8: pill ผลลัพธ์ CFD + chip IMP ═══ */
+.cfd-res{display:inline-block; font-size:9.5px; font-weight:800; letter-spacing:.4px; padding:2px 9px; border-radius:99px;}
+.cfd-res.bull{background:var(--bull-dim); color:var(--bull);}
+.cfd-res.bear{background:var(--bear-dim); color:var(--bear);}
+.cfd-res.warn{background:var(--warn-dim); color:var(--warn);}
+.tt-chip.imp1{background:var(--bear-dim); color:var(--bear); border-color:transparent;}
+.tt-chip.imp2{background:var(--warn-dim); color:var(--warn); border-color:transparent;}

@@ -59,19 +59,27 @@ async function refreshSetupTab(){
     empty.style.display='none';
     body.innerHTML=rows.map(r=>{
       const impLabel=r.importance===1?'IMP1':r.importance===2?'IMP2':'';
-      const impColor=r.importance===1?'var(--red)':r.importance===2?'var(--yellow)':'var(--muted)';
+      const impCls=r.importance===1?'imp1':(r.importance===2?'imp2':'');
+      // C-8 premium: score เป็นแถบmeter + tier chip + จำนวน checklist chip
+      const score=r.score!=null?r.score:null;
+      const total=r.total||10;
+      const scorePct=score!=null?Math.min(score/total*100,100):0;
+      const scoreCol=scorePct>=70?'bull':(scorePct>=40?'warn':'bear');
+      const scoreCell=score==null?'<span class="dl-muted">–</span>'
+        :`<span class="mdl-meter"><span class="dl-track"><i style="width:${scorePct}%;background:var(--${scoreCol})"></i></span><b>${score.toFixed(1)}/${total}</b></span>`;
+      const passed=r.details?Object.values(r.details).filter(d=>d.frac!=null?d.frac>=0.999:d.ok).length:null;
       return `<tr>
-      <td>${fmtTime(r.signal_time)}</td>
+      <td class="mono mdl-dim">${fmtTime(r.signal_time)}</td>
       <td><b>${(r.symbol||'frxXAUUSD').replace('frx','')}</b></td>
-      <td><b>${r.timeframe||'M1'}</b></td>
-      <td style="color:${impColor};font-weight:700;font-size:11px;">${impLabel||'–'}</td>
+      <td><span class="mdl-key">${r.timeframe||'M1'}</span></td>
+      <td>${impLabel?`<span class="tt-chip ${impCls}">${impLabel}</span>`:'<span class="dl-muted">–</span>'}</td>
       <td>${dirBadge(r.direction)}</td>
       <td class="mono">${r.entry_price!=null?r.entry_price.toFixed(5):'–'}</td>
       ${cfdCells('SETUP',r.id,markers,5)}
-      <td class="mono">${r.exit_price!=null?r.exit_price.toFixed(5):'–'}</td>
-      <td class="mono">${r.score!=null?r.score.toFixed(1)+'/'+(r.total||'–'):'–'}</td>
+      <td class="mono mdl-dim">${r.exit_price!=null?r.exit_price.toFixed(5):'–'}</td>
+      <td>${scoreCell}</td>
       <td><span class="tier ${r.tier||'NONE'}">${TIER_ACTION[r.tier]?r.tier:'–'}</span></td>
-      <td class="mono">${r.details?Object.values(r.details).filter(d=>d.frac!=null?d.frac>=0.999:d.ok).length+'/11':'–'}</td>
+      <td>${passed!=null?`<span class="tt-chip">${passed}/11</span>`:'<span class="dl-muted">–</span>'}</td>
       <td><span class="pill ${r.result}">${r.result}</span></td>
     </tr>`;}).join('');
   }catch(e){}
