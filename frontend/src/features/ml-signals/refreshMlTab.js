@@ -65,4 +65,14 @@ async function refreshMlTab(){
 }
 
 
-export { refreshMlTab };
+// C-8 perf: เฟด "สัญญาณล่าสุด" บนหน้าภาพรวม — แยกออกมาเพื่อให้ refreshLoop เรียกเฉพาะตอนอยู่แท็บภาพรวม
+// (เดิม refreshMlTab ที่เป็นของแท็บ ML อัปเดต feed นี้ด้วย ทำให้หน้าภาพรวมต้องยิงข้อมูลแท็บ ML ทั้งชุด)
+async function refreshMlRecentFeed(){
+  try{
+    const rows=await fetchJSON('/api/ml/signals?limit=8');
+    document.getElementById('mlRecentFeed').innerHTML=rows.length?rows.map(feedRow).join(''):'<div class="empty">ยังไม่มีสัญญาณ</div>';
+  }catch(e){}
+}
+
+
+export { refreshMlTab, refreshMlRecentFeed };
