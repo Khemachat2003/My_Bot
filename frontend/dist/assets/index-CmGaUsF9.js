@@ -114,15 +114,16 @@
           <td class="mono dl-w">${n}</td>
           <td class="dl-wr"><b>${o}%</b></td>
           <td class="dl-pnl"><span class="dl-pnl-val" style="color:var(--${f})">${r(i,{fixed:!0,digits:2})}</span></td>
-        </tr>`}}catch{}try{let t=await e(`/api/models`);document.querySelector(`#modelTable tbody`).innerHTML=t.map(e=>{let t=e.auc_test==null?null:Number(e.auc_test),n=t==null?`muted`:t>=.6?`bull`:t>=.55?`warn`:`bear`,r=t==null?0:Math.min(t*100,100);return`<tr>
+        </tr>`}}catch{}try{let t=await e(`/api/models`);document.querySelector(`#modelTable tbody`).innerHTML=t.map(e=>{let t=e.auc_test==null?null:Number(e.auc_test),n=t==null?`muted`:t>=.6?`bull`:t>=.55?`warn`:`bear`,r=t==null?0:Math.min(t*100,100),i=String(e.note||``),a=/^ACCEPTED/i.test(i)?`ok`:/^REJECTED/i.test(i)?`rej`:/^ACTIVE/i.test(i)?`live`:``,o=a===`ok`?`ACCEPTED`:a===`rej`?`REJECTED`:a===`live`?`ACTIVE`:`—`,s=String(e.trained_at||``).slice(0,16).replace(`T`,` `);return`<tr>
         <td><span class="mdl-key">${e.model_key}</span></td>
-        <td><span class="mdl-ver">${e.version||`–`}</span></td>
+        <td><span class="mdl-ver">${e.version||`–`}</span>${s?`<div class="mdl-date">${s} UTC</div>`:``}</td>
         <td class="mono mdl-dim">${e.horizon==null?`–`:e.horizon+`m`}</td>
         <td class="mono mdl-dim">${e.n_rows?Number(e.n_rows).toLocaleString(`th-TH`):`–`}</td>
         <td><span class="mdl-meter"><span class="dl-track"><i style="width:${r}%;background:var(--${n})"></i></span><b style="color:var(--${n})">${t??`–`}</b></span></td>
         <td><span class="mdl-conf">${e.chosen_conf==null?`–`:e.chosen_conf}</span></td>
         <td><span class="mdl-feat">${e.feature_set||`–`}</span></td>
-      </tr>`}).join(``)||`<tr><td colspan="7" class="empty">ยังไม่มีโมเดลที่ลงทะเบียน</td></tr>`}catch{}}function ft(e){let t=e.confidence!=null&&e.confidence>.7?` <span class="hi-badge">HIGH</span>`:``;return`<div class="feed-row">
+        <td><span class="mdl-st ${a}">${o}</span></td>
+      </tr>`}).join(``)||`<tr><td colspan="8" class="empty">ยังไม่มีโมเดลที่ลงทะเบียน</td></tr>`}catch{}}function ft(e){let t=e.confidence!=null&&e.confidence>.7?` <span class="hi-badge">HIGH</span>`:``;return`<div class="feed-row">
     <span class="fdir ${e.direction||``}">${e.direction||`–`}</span>
     <span class="ftime">${n(e.signal_time)}</span>
     <span class="fprice">${e.entry_price==null?`–`:e.entry_price.toFixed(2)}</span>

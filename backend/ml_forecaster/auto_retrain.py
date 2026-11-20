@@ -487,6 +487,23 @@ def run_auto_retrain(min_new_signals: int = 5) -> dict:
     if best_c is None:
         msg = "  ⏸️ ไม่พบ threshold ที่ทำกำไรบน walk-forward — ไม่แตะโมเดล production"
         print(msg)
+        # C-9: บันทึกประวัติการเทรนรอบนี้ลง model_registry (เดิมไม่มีการบันทึก → หน้าเว็บว่าง)
+        try:
+            _now = pd.Timestamp.now(tz="UTC")
+            db.register_model(
+                model_key="M5",
+                version="wf_" + _now.strftime("%Y%m%d_%H%M%S"),
+                trained_at=_now.isoformat(),
+                horizon=HORIZON_M5,
+                n_rows=len(X_full),
+                auc_val=res["summary"]["_auc_avg"],
+                auc_test=None,
+                chosen_conf=None,
+                feature_set="v2_meanrev+setup_context",
+                note="REJECTED — ไม่มี threshold ทำกำไรบน walk-forward (ไม่แตะ production)",
+            )
+        except Exception as _e:  # registry ล้มต้องไม่ทำให้ retrain ล้ม
+            print(f"  registry error: {_e}")
         return {
             "trained": False,
             "reason": "no_profitable_conf",
@@ -551,6 +568,27 @@ def run_auto_retrain(min_new_signals: int = 5) -> dict:
     )
     os.replace(tmp_path, MODEL_FILE_M5)
     print(f"  💾 บันทึก {MODEL_FILE_M5.name} เรียบร้อย (conf={best_c})")
+
+    # C-9: บันทึกประวัติ ACCEPTED ลง model_registry (version ไม่ซ้ำต่อรอบ → เก็บย้อนหลังได้)
+    try:
+        _now = pd.Timestamp.now(tz="UTC")
+        db.register_model(
+            model_key="M5",
+            version="auto_" + _now.strftime("%Y%m%d_%H%M%S"),
+            trained_at=_now.isoformat(),
+            horizon=HORIZON_M5,
+            n_rows=len(X_full),
+            auc_val=res["summary"]["_auc_avg"],
+            auc_test=None,
+            chosen_conf=float(best_c),
+            feature_set="v2_meanrev+setup_context",
+            note=(
+                f"ACCEPTED → production (conf {best_c} · winrate "
+                f"{best_s['winrate_pct']}% · net {best_s['net_units']:.2f} · n={best_s['n']})"
+            ),
+        )
+    except Exception as _e:
+        print(f"  registry error: {_e}")
 
     msg = (
         f"🤖 [AUTO-RETRAIN] ML model_m5 อัปเดตแล้ว\n"

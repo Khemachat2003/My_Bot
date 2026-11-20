@@ -73,15 +73,20 @@ async function refreshJournalTab(){
       const auc=m.auc_test!=null?Number(m.auc_test):null;
       const aucCol=auc==null?'muted':(auc>=0.60?'bull':(auc>=0.55?'warn':'bear'));
       const aucPct=auc!=null?Math.min(auc*100,100):0;
+      const note=String(m.note||'');
+      const st=/^ACCEPTED/i.test(note)?'ok':(/^REJECTED/i.test(note)?'rej':(/^ACTIVE/i.test(note)?'live':''));
+      const stTxt=st==='ok'?'ACCEPTED':(st==='rej'?'REJECTED':(st==='live'?'ACTIVE':'—'));
+      const dt=String(m.trained_at||'').slice(0,16).replace('T',' ');
       return `<tr>
         <td><span class="mdl-key">${m.model_key}</span></td>
-        <td><span class="mdl-ver">${m.version||'–'}</span></td>
+        <td><span class="mdl-ver">${m.version||'–'}</span>${dt?`<div class="mdl-date">${dt} UTC</div>`:''}</td>
         <td class="mono mdl-dim">${m.horizon!=null?m.horizon+'m':'–'}</td>
         <td class="mono mdl-dim">${m.n_rows?Number(m.n_rows).toLocaleString('th-TH'):'–'}</td>
         <td><span class="mdl-meter"><span class="dl-track"><i style="width:${aucPct}%;background:var(--${aucCol})"></i></span><b style="color:var(--${aucCol})">${auc!=null?auc:'–'}</b></span></td>
         <td><span class="mdl-conf">${m.chosen_conf!=null?m.chosen_conf:'–'}</span></td>
         <td><span class="mdl-feat">${m.feature_set||'–'}</span></td>
-      </tr>`;}).join('') || '<tr><td colspan="7" class="empty">ยังไม่มีโมเดลที่ลงทะเบียน</td></tr>';
+        <td><span class="mdl-st ${st}">${stTxt}</span></td>
+      </tr>`;}).join('') || '<tr><td colspan="8" class="empty">ยังไม่มีโมเดลที่ลงทะเบียน</td></tr>';
   }catch(e){}
 }
 

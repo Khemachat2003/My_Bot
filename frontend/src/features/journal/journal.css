@@ -100,3 +100,11 @@
 .mdl-conf{font-family:var(--font-mono); font-size:10.5px; font-weight:700; color:var(--text);
   background:var(--surface-alt); border:1px solid var(--border-subtle); border-radius:6px; padding:1.5px 7px;}
 .mdl-feat{font-size:10px; color:var(--dim);}
+
+/* ═══ C-9: Model Registry — สถานะ/วันที่ ═══ */
+.mdl-date{font-family:var(--font-mono); font-size:9px; color:var(--dim); margin-top:3px; letter-spacing:.02em;}
+.mdl-st{display:inline-block; font-size:9px; font-weight:800; letter-spacing:.05em; padding:2px 8px; border-radius:99px; white-space:nowrap;}
+.mdl-st.ok{background:var(--bull-dim); color:var(--bull);}
+.mdl-st.rej{background:var(--bear-dim); color:var(--bear);}
+.mdl-st.live{background:var(--accent-dim); color:var(--accent);}
+.mdl-st:not(.ok):not(.rej):not(.live){background:var(--surface-alt); color:var(--dim);}

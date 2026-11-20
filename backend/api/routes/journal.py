@@ -162,7 +162,53 @@ def export_journal(
     )
 
 
+_ACTIVE_MODEL_CACHE: dict[str, tuple[float, dict]] = {}
+
+
+def _active_model_rows() -> list[dict]:
+    """C-9: meta ของโมเดลที่ใช้งานจริง (อ่านจาก joblib bundle) — cache ตาม mtime
+    เพราะ joblib.load โหลดทั้งโมเดล (หนัก) ไม่ควรทำทุก request /api/models"""
+    import joblib
+
+    from backend.api import ROOT_DIR
+
+    out: list[dict] = []
+    base = ROOT_DIR / "backend" / "ml_forecaster"
+    for key, fname in (("M1", "model_m1.joblib"), ("M5", "model_m5.joblib")):
+        pth = base / fname
+        if not pth.exists():
+            continue
+        try:
+            mtime = pth.stat().st_mtime
+            cached = _ACTIVE_MODEL_CACHE.get(str(pth))
+            if cached and cached[0] == mtime:
+                meta = cached[1]
+            else:
+                bundle = joblib.load(pth)
+                meta = {
+                    "model_key": key,
+                    "version": bundle.get("version") or fname,
+                    "trained_at": bundle.get("retrained_at") or "",
+                    "horizon": bundle.get("horizon"),
+                    "n_rows": bundle.get("n_rows"),
+                    "auc_val": bundle.get("auc_val"),
+                    "auc_test": bundle.get("auc_test"),
+                    "chosen_conf": bundle.get("chosen_conf"),
+                    "feature_set": bundle.get("feature_set"),
+                    "note": "ACTIVE — โมเดลที่กำลังใช้งาน (อ่านจากไฟล์)",
+                }
+                _ACTIVE_MODEL_CACHE[str(pth)] = (mtime, meta)
+            out.append(dict(meta))
+        except Exception:
+            continue
+    return out
+
+
 @router.get("/api/models")
 def get_models(_auth=Depends(require_auth)):
-    """model registry — ดู version โมเดลที่เคยเทรนทั้งหมด"""
-    return db.fetch_model_registry(limit=50)
+    """model registry — ประวัติ version โมเดลที่เคยเทรน
+    ถ้ายังไม่มีประวัติเลย → คืนโมเดล active จากไฟล์ เพื่อไม่ให้หน้าจอว่าง"""
+    rows = db.fetch_model_registry(limit=50)
+    if not rows:
+        rows = _active_model_rows()
+    return rows
