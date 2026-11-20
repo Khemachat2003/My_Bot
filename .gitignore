@@ -47,6 +47,11 @@ Thumbs.db
 *.temp
 NUL
 
+# ── ผลรันเทสต์/ดีบักหน้าเว็บ (สร้างใหม่ได้ทุกครั้ง — ห้าม commit) ──────────
+test-results/
+frontend/probe-out/
+frontend/tests/visual/__before_c8__/
+
 # ── สคริปต์แก้ปัญหาเฉพาะครั้ง (ใช้แล้วทิ้ง — ห้าม commit) ─────────────────
 _fix_*.py
 _check_*.py
