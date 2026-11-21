@@ -47,13 +47,14 @@ DB_PATH = ROOT / "data" / "bot.db"
 DATA_DIR = ROOT / "data"
 REPORT_DIR = ROOT / "reports"
 
-# ลำดับไฟล์ที่ auto_retrain._load_price_data() ใช้ ณ วันที่เขียนสคริปต์นี้
-# (ถ้าแก้ loader ภายหลัง ให้อัปเดต list นี้ด้วย)
+# ลำดับไฟล์ที่ auto_retrain._load_price_data() ใช้ (ต้องตรงกับ candidate_names ในฟังก์ชันนั้น)
+# — แก้ loader แล้วต้องอัปเดต list นี้ด้วย ไม่งั้นการตรวจจะไม่ตรงความจริง
 AUTO_RETRAIN_CANDIDATES = [
-    "deriv_frxXAUUSD_300s_120d.csv",
+    "deriv_frxXAUUSD_60s_60d.csv",
     "deriv_frxXAUUSD_60s_90d.csv",
     "deriv_frxXAUUSD_60s.csv",
-    "deriv_R_100_60s.csv",
+    "deriv_frxXAUUSD_300s_120d.csv",
+    "deriv_frxXAUUSD_300s.csv",
 ]
 
 PIPELINE = ROOT / "backend" / "ml_forecaster"

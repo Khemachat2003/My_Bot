@@ -54,7 +54,7 @@ def test_empty_and_missing_files_return_empty(tmp_path, monkeypatch):
 def test_numeric_garbage_filtered(tmp_path, monkeypatch):
     """ตัวเลขเพี้ยน (text ในคอลัมน์ OHLC) ต้องถูกกรองออก"""
     _write_csv(
-        tmp_path / "deriv_R_100_60s.csv",
+        tmp_path / "deriv_frxXAUUSD_60s.csv",
         (
             "2026-10-01 00:00:00+00:00,not-num,4001,3999,4000,0\n"
             "2026-10-01 00:05:00+00:00,500,501,499,500.5,0\n"
@@ -68,6 +68,53 @@ def test_numeric_garbage_filtered(tmp_path, monkeypatch):
     df = ar._load_price_data(data_dir=tmp_path)
     assert len(df) == 1
     assert float(df["close"].iloc[0]) == 500.5
+
+
+def test_other_symbol_file_is_never_loaded(tmp_path, monkeypatch):
+    """ไฟล์ deriv_R_100_60s.csv ต้องไม่ถูกอ่านเลย (เดิมเคยถูกใช้เป็น 'ตัวสำรอง')"""
+    _write_csv(
+        tmp_path / "deriv_R_100_60s.csv",
+        "2026-10-01 00:00:00+00:00,500,501,499,500.5,0\n",
+    )
+    monkeypatch.setattr(
+        ar,
+        "_load_prices_from_db",
+        lambda *a, **k: pd.DataFrame(columns=["open", "high", "low", "close", "volume"]),
+    )
+    df = ar._load_price_data(data_dir=tmp_path)
+    assert df.empty
+
+
+def test_mislabeled_price_level_is_skipped(tmp_path, monkeypatch):
+    """ไฟล์ที่ตั้งชื่อ XAUUSD แต่ราคา ~600 (คนละ symbol) ต้องถูกข้าม ไม่ปนเข้า dataset"""
+    _write_csv(
+        tmp_path / "deriv_frxXAUUSD_60s.csv",
+        "2026-10-01 00:00:00+00:00,500,501,499,500.5,0\n"
+        "2026-10-01 00:05:00+00:00,500,501,499,500.5,0\n",
+    )
+    _write_csv(
+        tmp_path / "deriv_frxXAUUSD_300s.csv",
+        "2026-10-01 00:00:00+00:00,4000,4002,3998,4001,0\n"
+        "2026-10-01 00:05:00+00:00,4001,4003,3999,4002,0\n",
+    )
+    monkeypatch.setattr(
+        ar,
+        "_load_prices_from_db",
+        lambda *a, **k: pd.DataFrame(
+            {
+                "open": [4000.0],
+                "high": [4001.0],
+                "low": [3999.0],
+                "close": [4000.5],
+                "volume": [0.0],
+            },
+            index=pd.DatetimeIndex(["2026-10-01 01:00:00+00:00"], name="datetime"),
+        ),
+    )
+    df = ar._load_price_data(data_dir=tmp_path)
+    assert not df.empty
+    # ต้องเหลือเฉพาะระดับราคา XAUUSD (~4,000) — ไม่มี 500 หลุดเข้ามา
+    assert (df["close"] > 3000).all()
 
 
 def test_load_prices_from_db(temp_db):

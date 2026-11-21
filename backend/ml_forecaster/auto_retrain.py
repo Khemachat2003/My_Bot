@@ -61,6 +61,11 @@ MODEL_DIR = Path(__file__).resolve().parent
 MODEL_FILE_M5 = MODEL_DIR / "model_m5.joblib"
 HORIZON_M5 = 6  # M5: พยากรณ์ 6 แท่ง = 30 นาที
 DEADZONE = 0.25
+# symbol เดียวสำหรับเทรน — ห้ามให้ไฟล์ symbol อื่นปนเข้า dataset เด็ดขาด
+# (เคสจริง: เดิมมี deriv_R_100_60s.csv เป็น "ตัวสำรอง" → ราคา ~600 ต่อท้าย XAUUSD ~4,000
+#  ทำให้ซีรีส์กระโดด 85% และ feature ท้ายชุดเพี้ยน — ตรวจพบด้วย scripts/diagnostics/ml_audit.py)
+TRAIN_SYMBOL = "frxXAUUSD"
+PRICE_LEVEL_TOL = 1.5  # ไฟล์ที่มี median ราคาต่างจากไฟล์แรกเกินเท่านี้ = สงสัยคนละ symbol → ข้าม
 MIN_REAL_SIGNALS = 10  # สัญญาณจริงขั้นต่ำก่อนคิดเทรนอัตโนมัติ
 MIN_TRAIN = 400
 MIN_SIGNALS_PER_CONF = 5
@@ -154,7 +159,12 @@ def _load_prices_from_db(symbol: str = "frxXAUUSD", limit: int = 50000) -> pd.Da
 
 
 def _load_price_data(data_dir: Path | None = None) -> pd.DataFrame:
-    """รวมข้อมูล M5 จาก CSV/cache ในเครื่อง (frxXAUUSD ก่อน, สำรอง R_100) + ตาราง prices ใน DB
+    """รวมข้อมูล M5 จาก CSV/cache ของ symbol เดียว (TRAIN_SYMBOL) + ตาราง prices ใน DB
+
+    🛡️ symbol lock: เดิมลิสต์มี deriv_R_100_60s.csv เป็นตัวสำรอง ทำให้ข้อมูล R_100 (~600)
+    ถูก concat ต่อท้าย XAUUSD (~4,000) → ซีรีส์กระโดด 85% ที่ปลายชุด = feature เพี้ยน
+    ตอนนี้สร้างชื่อไฟล์จาก TRAIN_SYMBOL เท่านั้น + ตรวจระดับราคาต่อไฟล์ (PRICE_LEVEL_TOL)
+    เทียบกับราคาอ้างอิง (median ของ DB ถ้ามี, ไม่งั้นไฟล์แรก) — ต่างเกิน 1.5× จะข้ามพร้อมเตือน
 
     🛡️ กันแถวขยะ CSV: เดิม parse_dates=["datetime"] ตรง ๆ — ถ้าไฟล์มีแถวเสียแม้แถวเดียว
     (เช่น เคสจริงบน VPS: แถว "0" ใน deriv_R_100_60s.csv ตั้งแต่ 10 ต.ค. 2026) index จะกลายเป็น
@@ -162,12 +172,20 @@ def _load_price_data(data_dir: Path | None = None) -> pd.DataFrame:
     → ตอนนี้ coerce เป็น NaT แล้ว dropna ทิ้งเอง + ตัวเลขเพี้ยนก็ถูกกรองด้วย to_numeric
     """
     data_dir = data_dir or ROOT / "data"
-    candidates = [
-        data_dir / "deriv_frxXAUUSD_300s_120d.csv",
-        data_dir / "deriv_frxXAUUSD_60s_90d.csv",
-        data_dir / "deriv_frxXAUUSD_60s.csv",
-        data_dir / "deriv_R_100_60s.csv",
+    candidate_names = [
+        f"deriv_{TRAIN_SYMBOL}_60s_60d.csv",
+        f"deriv_{TRAIN_SYMBOL}_60s_90d.csv",
+        f"deriv_{TRAIN_SYMBOL}_60s.csv",
+        f"deriv_{TRAIN_SYMBOL}_300s_120d.csv",
+        f"deriv_{TRAIN_SYMBOL}_300s.csv",
     ]
+    candidates = [data_dir / name for name in candidate_names]
+    # โหลด DB ก่อน — ใช้เป็นราคาอ้างอิงของ symbol (DB ถูกกรองด้วย symbol อยู่แล้ว)
+    df_db = _load_prices_from_db(TRAIN_SYMBOL)
+    price_reference: float | None = float(df_db["close"].median()) if not df_db.empty else None
+    if not df_db.empty:
+        print(f"  [auto_retrain] ราคาอ้างอิงจาก DB: {price_reference:,.2f}")
+
     parts = []
     for p in candidates:
         if not p.exists():
@@ -191,12 +209,25 @@ def _load_price_data(data_dir: Path | None = None) -> pd.DataFrame:
         if raw_csv.empty:
             continue
         df = raw_csv.set_index("datetime")
-        parts.append(df[["open", "high", "low", "close", "volume"]].astype(float))
+        df = df[["open", "high", "low", "close", "volume"]].astype(float)
+        median_price = float(df["close"].median())
+        if price_reference is None:
+            price_reference = median_price
+            print(f"  [auto_retrain] ราคาอ้างอิงจาก {p.name}: {median_price:,.2f}")
+        elif (
+            median_price > price_reference * PRICE_LEVEL_TOL
+            or median_price < price_reference / PRICE_LEVEL_TOL
+        ):
+            print(
+                f"  [auto_retrain] ⚠️ ข้าม {p.name}: median {median_price:,.2f}"
+                f" ต่างจาก {price_reference:,.2f} เกิน {PRICE_LEVEL_TOL:g}×"
+                " (สงสัยคนละ symbol)"
+            )
+            continue
+        parts.append(df)
         print(f"  [auto_retrain] ใช้ข้อมูล {p.name} → {len(df)} แท่ง")
 
-    # แหล่งที่ 2: DB prices (ข้อมูลสดจาก setup_feed) — ใส่ท้ายสุดเพื่อให้ทับแท่งซ้ำ
-    # จาก CSV เก่าตอน dedupe keep="last" ด้านล่าง
-    df_db = _load_prices_from_db()
+    # DB prices (ข้อมูลสดจาก setup_feed) ใส่ท้ายสุดเพื่อให้ทับแท่งซ้ำตอน dedupe keep="last"
     if not df_db.empty:
         parts.append(df_db)
         print(f"  [auto_retrain] ใช้ข้อมูล DB prices → {len(df_db)} แท่ง")
@@ -217,6 +248,11 @@ def _load_price_data(data_dir: Path | None = None) -> pd.DataFrame:
     out = pd.concat([o, h, lo, c, v], axis=1).dropna()
     out.columns = ["open", "high", "low", "close", "volume"]
     print(f"  [auto_retrain] resample → M5: {len(out)} แท่ง")
+    if len(out) < 1000:
+        print(
+            "  [auto_retrain] ⚠️ ข้อมูลน้อยผิดปกติ (<1,000 แท่ง)"
+            " — ตรวจ symbol/ไฟล์ก่อนเทรน (ดู scripts/diagnostics/ml_audit.py)"
+        )
     return out
 
 
