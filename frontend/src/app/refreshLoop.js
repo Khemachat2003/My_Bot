@@ -13,7 +13,7 @@ import { refreshJournalMoney, refreshJournalTab } from '../features/journal/inde
 import { refreshMlRecentFeed, refreshMlTab } from '../features/ml-signals/index.js';
 import { checkNewSignals, refreshRecentSignalsLog } from '../features/notifications/index.js';
 import { refreshOverview } from '../features/overview/index.js';
-import { refreshSetupAll, refreshSetupMini, refreshSetupTab } from '../features/setup-signals/index.js';
+import { refreshMtfTab, refreshSetupAll, refreshSetupMini, refreshSetupTab } from '../features/setup-signals/index.js';
 import { refreshHeaderSignals, updateClock } from '../features/status-bar/index.js';
 import { refreshWatchlist } from '../features/watchlist/index.js';
 import { ensureMarkers } from '../shared/lib/markersCache.js';
@@ -25,7 +25,7 @@ const REFRESH_MS = 5000;
 const TAB_GROUPS = {
   overview: [refreshOverview, refreshPrice, refreshGauges, refreshHero, refreshMlRecentFeed,
     refreshSetupMini, refreshWatchlist, ensureMarkers],
-  signals: [refreshMlTab, refreshSetupTab, refreshSetupAll],
+  signals: [refreshMlTab, refreshSetupTab, refreshSetupAll, refreshMtfTab],
   performance: [refreshJournalTab, refreshJournalMoney, refreshCFDPaper],
   log: [refreshRecentSignalsLog],
 };

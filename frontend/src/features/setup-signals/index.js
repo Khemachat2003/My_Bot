@@ -2,3 +2,4 @@
 // ไฟล์ใน feature: refreshSetupTab.js, tickTouchResearch.js, setupCards.js, refreshSetupPanels.js
 export { refreshSetupAll, refreshSetupMini } from './refreshSetupPanels.js';
 export { refreshSetupTab } from './refreshSetupTab.js';
+export { refreshMtfTab } from './mtfOverview.js';

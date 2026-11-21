@@ -36,11 +36,29 @@
     <div class="subtabs">
       <button class="subtab active" data-subtab="ml">ML Signals</button>
       <button class="subtab" data-subtab="setup">Rule-Based 11-Checklist</button>
+      <button class="subtab" data-subtab="mtf">MTF สรุป</button>
     </div>
 
     <!-- @include src/features/ml-signals/view.html -->
 
     <!-- @include src/features/setup-signals/view.html -->
+
+    <!-- C-13 (demo): ภาพรวมทุกไทม์เฟรม — แนวโน้ม/RSI/ADX คำนวณจริงจาก /api/candles -->
+    <div class="subtab-pane" id="pane-mtf" data-pane="mtf" style="display:none;">
+      <div class="mtf-hero" id="mtfHero"></div>
+      <div class="tbl-wrap" style="max-height:340px;overflow-y:auto;">
+        <table id="mtfTable">
+          <thead><tr><th>TF</th><th>แนวโน้ม</th><th>RSI (14)</th><th>ADX (14)</th><th>ล่าสุด</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div id="mtfEmpty" class="empty" style="display:none;">กำลังโหลดข้อมูลไทม์เฟรม…</div>
+      </div>
+      <div class="panel" style="margin-top:14px;">
+        <h3><span class="ph"></span>สัญญาณล่าสุด (ทุกระบบ)</h3>
+        <div id="mtfRecent" style="max-height:300px;overflow-y:auto;"></div>
+      </div>
+      <div class="guide-note">แนวโน้ม = ราคาเทียบ EMA50 + ความชัน · ADX ≥ 25 = เทรนด์ชัด · ล่าสุด = สัญญาณล่าสุดของ TF นั้นจากทั้งสองระบบ</div>
+    </div>
 
   </section>
 
@@ -76,6 +94,8 @@
 </div><!-- /shell -->
 
 <!-- @include src/features/status-bar/statusbar.html -->
+
+<!-- @include src/app/bottomnav.html -->
 
 </body>
 </html>

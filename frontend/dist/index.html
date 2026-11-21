@@ -15,8 +15,8 @@
 <script src="/static/vendor/lightweight-charts.standalone.production.js"></script>
 <link rel="stylesheet" href="/static/vendor/tabler/tabler-icons.min.css">
 <!-- CSS + JS ทั้งหมดอยู่ใน src/ (แยกตาม feature) — แผนที่ไฟล์: frontend/AGENTS.md / docs/code_map.md -->
-  <script type="module" crossorigin src="/static/dist/assets/index-DeInIYFh.js"></script>
-  <link rel="stylesheet" crossorigin href="/static/dist/assets/index-B9X3wCAg.css">
+  <script type="module" crossorigin src="/static/dist/assets/index-fiRjUcl0.js"></script>
+  <link rel="stylesheet" crossorigin href="/static/dist/assets/index-D5H4NKrc.css">
 </head>
 <body>
 
@@ -138,6 +138,12 @@
             <span id="lbValues" class="lb-values"></span>
           </div>
           <button class="lb-collapse" id="lbCollapse" title="ย่อ/ขยายค่า indicator"><i class="ti ti-chevron-down"></i></button>
+          <!-- C-13 (demo): สรุปสัญญาณ — แนวโน้ม/RSI/ADX ลอยใต้ legend แบบแอปเทรด -->
+          <div class="sig-summary" id="sigSummary">
+            <span class="ss-item" id="ssTrend"><i class="ti ti-trending-up"></i><b>–</b></span>
+            <span class="ss-item" id="ssRsi">RSI <b>–</b></span>
+            <span class="ss-item" id="ssAdx">ADX <b>–</b></span>
+          </div>
           <div class="lw-pane" id="lwPaneMain"><span class="lw-pane-label">ราคา</span><div id="candleChart"></div></div>
               <div class="lw-pane" id="lwPaneRsi"><span class="lw-pane-label">RSI (14)</span><div id="rsiChart"></div></div>
           <div class="lw-pane" id="lwPaneAdx"><span class="lw-pane-label">ADX (14)</span><div id="adxChart"></div></div>
@@ -153,21 +159,30 @@
           <div id="lwSrRows"></div>
         </div>
         <!-- C-8 TradingView-like: ตัวชี้วัด + คำอธิบายสัญลักษณ์ ซ่อนในแผงพับ (ค่าเริ่มต้น = กราฟสะอาด) -->
+        <!-- C-13 (demo): ตัวชี้วัด — มือถือเป็น bottom sheet (กลุ่มบนกราฟ/แผงย่อย + รีเซ็ต + เสร็จสิ้น) · desktop inline เหมือนเดิม -->
         <div class="chart-extra" id="chartExtra">
           <div class="chart-extra-head" data-toggle-parent="open">
-            <span><i class="ti ti-adjustments-horizontal"></i> ตัวชี้วัด &amp; สัญลักษณ์บนกราฟ</span>
+            <span class="cx-title"><i class="ti ti-adjustments-horizontal"></i> ตัวชี้วัด</span>
+            <span class="cx-count" id="indCount">–</span>
             <span class="cx-caret">▾</span>
           </div>
           <div class="chart-extra-body">
-            <div class="ind-bar" id="chartIndBar">
+            <div class="ind-group-label">บนกราฟราคา</div>
+            <div class="ind-bar">
               <span class="ind-chip active" data-ind="ema">EMA 50/100/200</span>
               <span class="ind-chip active" data-ind="bb">BB (20,2)</span>
               <span class="ind-chip active" data-ind="sma5">SMA5</span>
+            </div>
+            <div class="ind-group-label">แผงย่อยด้านล่าง</div>
+            <div class="ind-bar">
               <span class="ind-chip active" data-ind="rsi">RSI 14</span>
               <span class="ind-chip active" data-ind="adx">ADX 14</span>
               <span class="ind-chip active" data-ind="fractal">Fractal 15</span>
-              <span class="ind-chip" data-ind="vol">Volume</span>
-              <span class="ind-hint" id="indHint">กดเพื่อเปิด/ปิดตัวชี้วัดบนกราฟ</span>
+              <span class="ind-chip active" data-ind="vol">Volume</span>
+            </div>
+            <div class="ind-actions">
+              <button class="btn" id="btnIndReset">รีเซ็ตเป็นค่าเริ่มต้น</button>
+              <button class="btn accent" id="btnIndDone">เสร็จสิ้น</button>
             </div>
             <div class="chart-legend">
               <span><i style="background:#9C6FE0;"></i>EMA50</span>
@@ -249,6 +264,7 @@
     <div class="subtabs">
       <button class="subtab active" data-subtab="ml">ML Signals</button>
       <button class="subtab" data-subtab="setup">Rule-Based 11-Checklist</button>
+      <button class="subtab" data-subtab="mtf">MTF สรุป</button>
     </div>
 
 <!-- ─── ML ─── (Phase C-2: กลายเป็น sub-tab pane ของ tab-signals) -->
@@ -427,6 +443,23 @@
       </div>
     </div>
   </div>
+
+    <!-- C-13 (demo): ภาพรวมทุกไทม์เฟรม — แนวโน้ม/RSI/ADX คำนวณจริงจาก /api/candles -->
+    <div class="subtab-pane" id="pane-mtf" data-pane="mtf" style="display:none;">
+      <div class="mtf-hero" id="mtfHero"></div>
+      <div class="tbl-wrap" style="max-height:340px;overflow-y:auto;">
+        <table id="mtfTable">
+          <thead><tr><th>TF</th><th>แนวโน้ม</th><th>RSI (14)</th><th>ADX (14)</th><th>ล่าสุด</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div id="mtfEmpty" class="empty" style="display:none;">กำลังโหลดข้อมูลไทม์เฟรม…</div>
+      </div>
+      <div class="panel" style="margin-top:14px;">
+        <h3><span class="ph"></span>สัญญาณล่าสุด (ทุกระบบ)</h3>
+        <div id="mtfRecent" style="max-height:300px;overflow-y:auto;"></div>
+      </div>
+      <div class="guide-note">แนวโน้ม = ราคาเทียบ EMA50 + ความชัน · ADX ≥ 25 = เทรนด์ชัด · ล่าสุด = สัญญาณล่าสุดของ TF นั้นจากทั้งสองระบบ</div>
+    </div>
 
   </section>
 
@@ -732,6 +765,15 @@
   <span class="spacer"></span>
   <span id="statusNote"></span>
 </div>
+
+<!-- ═══════════ BOTTOM NAV (C-13 ตาม demo — มือถือแทน drawer; desktop ไม่แสดง) ═══════════
+     ใช้ class .nav-item ร่วมกับ sidebar → tabs.js/mobiledrawer bind และ sync active ให้เอง -->
+<nav class="bottom-nav" id="bottomNav">
+  <button class="nav-item bn-item active" data-tab="overview"><i class="ti ti-chart-arrows-vertical"></i><span>ภาพรวม</span></button>
+  <button class="nav-item bn-item" data-tab="signals"><i class="ti ti-activity"></i><span>สัญญาณ</span></button>
+  <button class="nav-item bn-item" data-tab="performance"><i class="ti ti-report-money"></i><span>ผลงาน</span></button>
+  <button class="nav-item bn-item" data-tab="log"><i class="ti ti-history"></i><span>ประวัติ</span></button>
+</nav>
 
 </body>
 </html>

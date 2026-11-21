@@ -179,6 +179,31 @@ function drawLWChart(prices,markers,tf){
   _renderPills();
   // C-10: ซิงก์ DOM โหมด/ปุ่ม (ครั้งแรกหลัง chart init)
   _applyModeDom();
+  // C-13 (demo): สรุปสัญญาณ — แนวโน้มเทียบ EMA50 + โซน RSI + ความแรง ADX
+  _renderSigSummary(bars);
+}
+
+function _renderSigSummary(bars){
+  const tEl=document.getElementById('ssTrend'), rEl=document.getElementById('ssRsi'), aEl=document.getElementById('ssAdx');
+  if(!tEl||!rEl||!aEl||!bars||!bars.length) return;
+  const close=bars[bars.length-1].close;
+  const e50=_emaArr(bars,50);
+  const e=e50[e50.length-1];
+  if(e!=null&&e.value!=null){
+    const up=close>e.value;
+    tEl.innerHTML=`<i class="ti ${up?'ti-trending-up':'ti-trending-down'}" style="color:var(--${up?'bull':'bear'})"></i><b style="color:var(--${up?'bull':'bear'})">${up?'ขาขึ้น':'ขาลง'} · ${up?'บน':'ใต้'} EMA 50</b>`;
+  }
+  const rsi=window.__lastRsi;
+  if(rsi!=null){
+    const zone=rsi>=70?'ซื้อมากเกิน':(rsi<=30?'ขายมากเกิน':'โซนกลาง');
+    const zc=rsi>=70?'warn':(rsi<=30?'accent':'muted');
+    rEl.innerHTML=`RSI <b style="color:var(--${zc})">${rsi.toFixed(1)} · ${zone}</b>`;
+  }
+  const adx=window.__lastAdx;
+  if(adx!=null){
+    const strong=adx>=25;
+    aEl.innerHTML=`ADX <b style="color:var(--${strong?'accent':'muted'})">${adx.toFixed(1)}${strong?' · เทรนด์ชัด':' · ไซด์เวย์'}</b>`;
+  }
 }
 
 let _lwLastBar=null,_lwLastPrev=null;

@@ -25,17 +25,46 @@ document.addEventListener('DOMContentLoaded',()=>{
     const key=chip.dataset.ind;
     chartInd[key]=!chartInd[key];
     chip.classList.toggle('off',!chartInd[key]);
-    const bar=document.querySelector('#chartIndBar .ind-chip[data-ind="'+key+'"]');
+    const bar=document.querySelector('.chart-extra .ind-chip[data-ind="'+key+'"]');
     if(bar) bar.classList.toggle('active',chartInd[key]);
+    _updIndCount();
   });
   document.getElementById('lbCollapse')?.addEventListener('click',()=>{
     document.getElementById('chartLegendBar')?.classList.toggle('collapsed');
   });
-  document.getElementById('chartIndBar')?.addEventListener('click',e=>{
+  // C-13 (demo): chips อยู่ 2 กลุ่ม (บนกราฟ/แผงย่อย) → delegate ที่ #chartExtra จุดเดียว
+  const _updIndCount=()=>{
+    const chips=[...document.querySelectorAll('.chart-extra .ind-chip')];
+    const on=chips.filter(c=>c.classList.contains('active')).length;
+    const el=document.getElementById('indCount');
+    if(el) el.textContent=`เปิดใช้งาน ${on}/${chips.length}`;
+  };
+  document.getElementById('chartExtra')?.addEventListener('click',e=>{
     const chip=e.target.closest('.ind-chip'); if(!chip) return;
     chip.classList.toggle('active');
     chartInd[chip.dataset.ind]=chip.classList.contains('active');
+    _updIndCount();
     if(lastCandles.length) drawLWChart(lastCandles,window._signalMarkers||[]);
+  });
+  _updIndCount();
+  // รีเซ็ตเป็นค่าเริ่มต้น (demo: ปุ่มใน bottom sheet)
+  document.getElementById('btnIndReset')?.addEventListener('click',()=>{
+    Object.assign(chartInd,{ema:true,bb:true,sma5:true,rsi:true,adx:true,fractal:true,vol:true,grip:false});
+    document.querySelectorAll('.chart-extra .ind-chip').forEach(c=>c.classList.toggle('active',!!chartInd[c.dataset.ind]));
+    _updIndCount();
+    if(lastCandles.length) drawLWChart(lastCandles,window._signalMarkers||[]);
+  });
+  // เสร็จสิ้น = ปิด sheet/แผง
+  document.getElementById('btnIndDone')?.addEventListener('click',()=>{
+    document.getElementById('chartExtra')?.classList.remove('open');
+  });
+  // คลิกข้างนอก = ปิด (สะดวกทั้ง sheet มือถือและแผง desktop)
+  document.addEventListener('click',(e)=>{
+    const ex=document.getElementById('chartExtra');
+    if(!ex||!ex.classList.contains('open')) return;
+    const t=e.target instanceof Element?e.target:null; if(!t) return;
+    if(ex.contains(t)||t.closest('#btnFx')) return;
+    ex.classList.remove('open');
   });
   // C-8 mobile fix: resize หลายทาง — window/visualViewport/RO/wrap + re-fit หลังเลย์เอาต์นิ่ง
   // (เดิมวัดก่อน scrollbar ปรากฏ → canvas กว้างเกินจอ ~9-16px ทำให้ price scale ขวาถูกตัด)

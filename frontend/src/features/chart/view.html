@@ -43,6 +43,12 @@
             <span id="lbValues" class="lb-values"></span>
           </div>
           <button class="lb-collapse" id="lbCollapse" title="ย่อ/ขยายค่า indicator"><i class="ti ti-chevron-down"></i></button>
+          <!-- C-13 (demo): สรุปสัญญาณ — แนวโน้ม/RSI/ADX ลอยใต้ legend แบบแอปเทรด -->
+          <div class="sig-summary" id="sigSummary">
+            <span class="ss-item" id="ssTrend"><i class="ti ti-trending-up"></i><b>–</b></span>
+            <span class="ss-item" id="ssRsi">RSI <b>–</b></span>
+            <span class="ss-item" id="ssAdx">ADX <b>–</b></span>
+          </div>
           <div class="lw-pane" id="lwPaneMain"><span class="lw-pane-label">ราคา</span><div id="candleChart"></div></div>
               <div class="lw-pane" id="lwPaneRsi"><span class="lw-pane-label">RSI (14)</span><div id="rsiChart"></div></div>
           <div class="lw-pane" id="lwPaneAdx"><span class="lw-pane-label">ADX (14)</span><div id="adxChart"></div></div>
@@ -58,21 +64,30 @@
           <div id="lwSrRows"></div>
         </div>
         <!-- C-8 TradingView-like: ตัวชี้วัด + คำอธิบายสัญลักษณ์ ซ่อนในแผงพับ (ค่าเริ่มต้น = กราฟสะอาด) -->
+        <!-- C-13 (demo): ตัวชี้วัด — มือถือเป็น bottom sheet (กลุ่มบนกราฟ/แผงย่อย + รีเซ็ต + เสร็จสิ้น) · desktop inline เหมือนเดิม -->
         <div class="chart-extra" id="chartExtra">
           <div class="chart-extra-head" data-toggle-parent="open">
-            <span><i class="ti ti-adjustments-horizontal"></i> ตัวชี้วัด &amp; สัญลักษณ์บนกราฟ</span>
+            <span class="cx-title"><i class="ti ti-adjustments-horizontal"></i> ตัวชี้วัด</span>
+            <span class="cx-count" id="indCount">–</span>
             <span class="cx-caret">▾</span>
           </div>
           <div class="chart-extra-body">
-            <div class="ind-bar" id="chartIndBar">
+            <div class="ind-group-label">บนกราฟราคา</div>
+            <div class="ind-bar">
               <span class="ind-chip active" data-ind="ema">EMA 50/100/200</span>
               <span class="ind-chip active" data-ind="bb">BB (20,2)</span>
               <span class="ind-chip active" data-ind="sma5">SMA5</span>
+            </div>
+            <div class="ind-group-label">แผงย่อยด้านล่าง</div>
+            <div class="ind-bar">
               <span class="ind-chip active" data-ind="rsi">RSI 14</span>
               <span class="ind-chip active" data-ind="adx">ADX 14</span>
               <span class="ind-chip active" data-ind="fractal">Fractal 15</span>
-              <span class="ind-chip" data-ind="vol">Volume</span>
-              <span class="ind-hint" id="indHint">กดเพื่อเปิด/ปิดตัวชี้วัดบนกราฟ</span>
+              <span class="ind-chip active" data-ind="vol">Volume</span>
+            </div>
+            <div class="ind-actions">
+              <button class="btn" id="btnIndReset">รีเซ็ตเป็นค่าเริ่มต้น</button>
+              <button class="btn accent" id="btnIndDone">เสร็จสิ้น</button>
             </div>
             <div class="chart-legend">
               <span><i style="background:#9C6FE0;"></i>EMA50</span>

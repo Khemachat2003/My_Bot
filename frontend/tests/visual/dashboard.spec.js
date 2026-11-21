@@ -42,18 +42,11 @@ async function openDashboard(page, viewport) {
   return errors;
 }
 
-// C-7 mobile: sidebar เป็น drawer (ซ่อนนอกจอ) — ต้องกด hamburger เปิดก่อนคลิกแท็บทุกครั้ง
-//   เลือกแท็บแล้ว drawer ปิดเอง → ทุกภาพถ่ายตอน drawer ปิด (desktop คง flow เดิม)
-//   legacy (UI_TARGET=legacy) ไม่มี #navToggle → ข้ามได้ เพื่อให้ regen baseline จาก legacy ยังรันได้
+// C-13 (demo): มือถือใช้ bottom nav (.bn-item) แทน drawer · desktop ระบุ .sidebar กันชน bottom nav
+//   (bottom nav ก็มี class .nav-item → strict mode เจอ 2 ตัว)
 async function openTab(page, tab, isMobile) {
-  if (isMobile) {
-    const toggle = page.locator('#navToggle');
-    if ((await toggle.count()) && (await toggle.isVisible())) {
-      await toggle.click();
-      await page.waitForTimeout(350); // รอ transition ของ drawer (.2s)
-    }
-  }
-  await page.locator(`.nav-item[data-tab="${tab}"]`).click();
+  const sel = isMobile ? `.bn-item[data-tab="${tab}"]` : `.sidebar .nav-item[data-tab="${tab}"]`;
+  await page.locator(sel).click();
 }
 
 for (const [vpName, viewport] of Object.entries(VIEWPORTS)) {
@@ -84,7 +77,7 @@ for (const [vpName, viewport] of Object.entries(VIEWPORTS)) {
 
 test('network ที่หน้าเว็บเรียก ตรงกับของเดิม', async ({ page }) => {
   await openDashboard(page, VIEWPORTS.desktop);
-  await page.locator('.nav-item[data-tab="performance"]').click();
+  await page.locator('.sidebar .nav-item[data-tab="performance"]').click();
   await page.locator('#tab-performance .subtab[data-subtab="cfd"]').click();
   await page.locator('#btnRunCfdBacktest, [onclick="runCFDBacktest()"]').first().click(); // ปุ่ม Run Backtest
   await page.waitForTimeout(800);

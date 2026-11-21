@@ -1,0 +1,11 @@
+/* mtf.css — หน้า MTF สรุป (C-13 ตาม demo "สัญญาณหลายไทม์เฟรม") — class ใหม่ mtf-* */
+.mtf-hero{display:flex; flex-direction:column; gap:8px; padding:14px 16px; margin-bottom:12px;
+  background:linear-gradient(180deg,var(--panel),var(--card)); border:1px solid var(--border); border-radius:12px;}
+.mtf-price-row{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;}
+.mtf-price{font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:26px; font-weight:800; color:var(--text);}
+.mtf-counts{display:flex; gap:6px; flex-wrap:wrap;}
+.mtf-counts .g-chip{font-family:var(--font-mono); font-size:10px; font-weight:700; padding:3px 10px;
+  border-radius:99px; background:var(--surface-alt); border:1px solid var(--border-subtle); color:var(--muted);}
+.mtf-counts .g-chip.up{color:var(--bull);}
+.mtf-counts .g-chip.dn{color:var(--bear);}
+#mtfTable td{white-space:nowrap;}

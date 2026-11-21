@@ -27,3 +27,27 @@
 
   /* ═══ CONTENT ═══ */
   .content{overflow-y:auto; padding:16px 18px 40px; min-height:0;}
+
+  /* ═══ C-13 (demo): bottom nav มือถือ — แทน drawer, desktop ไม่แสดง ═══ */
+  .bottom-nav{display:none;}
+  @media(max-width:768px){
+    .bottom-nav{
+      display:flex; position:fixed; left:0; right:0; bottom:0; z-index:1200;
+      background:var(--surface); border-top:1px solid var(--border);
+      padding:5px 4px calc(5px + env(safe-area-inset-bottom,0px));
+    }
+    .bn-item{
+      flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+      background:none; border:none; color:var(--muted); font-family:var(--font-body);
+      font-size:10px; font-weight:700; padding:5px 2px; cursor:pointer; border-radius:10px;
+      border-left:none; transition:.15s;
+    }
+    .bn-item .ti{font-size:20px;}
+    .bn-item.active{color:var(--accent); background:var(--accent-dim);}
+    /* demo ไม่มี drawer — ซ่อน hamburger+sidebar, statusbar อยู่เหนือ bottom nav */
+    .nav-toggle{display:none !important;}
+    .sidebar{display:none !important;}
+    .shell{grid-template-columns:1fr !important;}
+    body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px));}
+    .statusbar{border-radius:0 0 0 0;}
+  }
