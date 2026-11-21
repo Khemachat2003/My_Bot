@@ -132,7 +132,7 @@ function bindLWChart(){
       const p=lwCandle.coordinateToPrice(param.point.y);
       if(p==null) return;
       try{
-        const ln=lwCandle.createPriceLine({price:p,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,title:'S/R'});
+        const ln=lwCandle.createPriceLine({price:Math.round(p*100)/100,color:'#787B86',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,title:''}); // C-12: ปัด 2 ตำแหน่ง + แกนไม่ใส่ title กันบวม
         _userSr.push(ln);
       }catch(e){}
       _addingSr=false;

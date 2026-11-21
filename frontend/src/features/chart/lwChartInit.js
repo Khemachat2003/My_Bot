@@ -30,7 +30,7 @@ function initLWChart(){
   if(!window.LightweightCharts) return null;
   if(lwChart) return;
   const baseOpts={
-    layout:{background:{color:'transparent'},textColor:'#8A8F9C',fontFamily:'IBM Plex Mono, monospace'},
+    layout:{background:{color:'transparent'},textColor:'#8A8F9C',fontFamily:'IBM Plex Mono, monospace',fontSize:10},
     grid:{vertLines:{color:'#1C212C'},horzLines:{color:'#1C212C'}},
     crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
     rightPriceScale:{borderColor:'#2A2E39',minimumWidth:64,scaleMargins:{top:0.06,bottom:0.28}},
@@ -50,7 +50,8 @@ function initLWChart(){
   lwCandle=lwChart.addCandlestickSeries({
     upColor:'#26A69A',downColor:'#EF5350',borderVisible:false,
     wickUpColor:'#26A69A',wickDownColor:'#EF5350',
-    priceFormat:{type:'custom',formatter:p=>p},
+    // C-12 fix: เดิมใช้ custom formatter คืนค่าดิบ (p=>p) — ค่า float ยาว "0100.111111111111" ถูกวัดบนแกน
+    // จนแกนบวม 104-144px กินกราฟ 25-30% · ถอดออกใช้ format ปกติ (auto precision ตามคู่ + comma แบบ TradingView)
   });
   bindLWChart();          // ← เรียกทันทีหลังมี lwChart/lwCandle (ก่อน indicator อื่น) — S/R click ใช้ได้เสมอ
   try{

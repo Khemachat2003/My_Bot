@@ -219,12 +219,16 @@ function _showTrade(t){
   _clearPriceLines();
   const add=(p,color,style,title)=>{
     if(p==null) return;
-    try{ const ln=lwCandle.createPriceLine({price:Number(p),color,lineWidth:1,lineStyle:style,title,axisLabelVisible:true}); _selLines.push(ln); }catch(e){}
+    // C-12: ปัดทศนิยม 2 ตำแหน่ง — เดิมราคา 5 ตำแหน่ง (3573.50000) ทำ label แกนยาว 104px กินกราฟ ~30%
+    const px=Math.round(Number(p)*100)/100;
+    try{ const ln=lwCandle.createPriceLine({price:px,color,lineWidth:1,lineStyle:style,title,axisLabelVisible:true}); _selLines.push(ln); }catch(e){}
   };
-  add(t.entry,'#D1D4DC',LightweightCharts.LineStyle.Solid,'ENTRY');
-  add(t.sl,'#EF5350',LightweightCharts.LineStyle.Dashed,'SL');
-  add(t.tp1,'#FF9800',LightweightCharts.LineStyle.Dashed,'TP1');
-  add(t.tp2,'#26A69A',LightweightCharts.LineStyle.Dashed,'TP2');
+  // C-12: แกนราคาไม่ใส่ title (เดิม ENTRY/SL/TP1/TP2 ทำแกนบวมเป็น 104-144px กินกราฟ 25-30%)
+  // — บอกชื่อเส้นด้วย pills บนกราฟแทน (แบบ TradingView แกนมีแต่ตัวเลขสี)
+  add(t.entry,'#D1D4DC',LightweightCharts.LineStyle.Solid,'');
+  add(t.sl,'#EF5350',LightweightCharts.LineStyle.Dashed,'');
+  add(t.tp1,'#FF9800',LightweightCharts.LineStyle.Dashed,'');
+  add(t.tp2,'#26A69A',LightweightCharts.LineStyle.Dashed,'');
   // C-9 (mockup): position pills สีทับเส้น ENTRY/SL/TP ที่เลือก — ขยับตาม price scale ผ่าน window.__lwRepill
   _pillData=[];
   if(t.entry!=null) _pillData.push({price:Number(t.entry),kind:'entry',
