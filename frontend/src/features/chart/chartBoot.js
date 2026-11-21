@@ -65,6 +65,18 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
   document.getElementById('btnTypeLine')?.addEventListener('click',()=>setChartType('line'));
   document.getElementById('btnTypeCandle')?.addEventListener('click',()=>setChartType('candle'));
+  // C-11: เครื่องมือรอง (มือถือ) — popover ทับกราฟ + คลิกข้างนอกปิดเอง
+  const _tp=document.getElementById('toolsPop');
+  document.getElementById('btnTools')?.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    _tp?.classList.toggle('open');
+  });
+  document.addEventListener('click',(e)=>{
+    if(!_tp||!_tp.classList.contains('open')) return;
+    const t=e.target instanceof Element?e.target:null;
+    if(t&&(_tp.contains(t)||t.closest('#btnTools'))) return;
+    _tp.classList.remove('open');
+  });
   const _repill=()=>{ if(window.__lwRepill) window.__lwRepill(); };
   window.addEventListener('resize',()=>setTimeout(_repill,60));
 });
