@@ -10,7 +10,7 @@ import { _lwOHLClegend } from './chartLegend.js';
 let lwChart=null, lwCandle=null, lwVol=null;
 let lwEma50=null,lwEma100=null,lwEma200=null;
 let lwBbU=null,lwBbM=null,lwBbL=null,lwSma5=null;
-let lwRsi=null,lwAdx=null,lwPdi=null,lwNdi=null;
+let lwRsi=null,lwAdx=null,lwPdi=null,lwNdi=null,lwRsiBand=null;
 let lwVolC=null,lwRsiC=null,lwAdxC=null,_lwCharts=[];   // multi-pane: instance แยกของ Volume/RSI/ADX
 function _candleTime(d){
   if(d.t==null) return 0;
@@ -30,8 +30,8 @@ function initLWChart(){
   if(!window.LightweightCharts) return null;
   if(lwChart) return;
   const baseOpts={
-    layout:{background:{color:'transparent'},textColor:'#787B86',fontFamily:'IBM Plex Mono, monospace'},
-    grid:{vertLines:{color:'#1E222D'},horzLines:{color:'#1E222D'}},
+    layout:{background:{color:'transparent'},textColor:'#8A8F9C',fontFamily:'IBM Plex Mono, monospace'},
+    grid:{vertLines:{color:'#1C212C'},horzLines:{color:'#1C212C'}},
     crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
     rightPriceScale:{borderColor:'#2A2E39',minimumWidth:64,scaleMargins:{top:0.06,bottom:0.28}},
     timeScale:{borderColor:'#2A2E39',timeVisible:true,secondsVisible:false,rightOffset:1,barSpacing:7},
@@ -69,6 +69,15 @@ function initLWChart(){
     const rEl=document.getElementById('rsiChart');
     if(rEl){
       lwRsiC=LightweightCharts.createChart(rEl,{...baseOpts,width:rEl.clientWidth||300,height:rEl.clientHeight||96,timeScale:{...baseOpts.timeScale,visible:false}});
+      // C-9 (mockup): แถบแรเงา 30-70 สีม่วงจาง — baseline series ค่าคงที่ 70 (base 30) เส้น/label ทั้งหมดมองไม่เห็น
+      try{
+        lwRsiBand=lwRsiC.addBaselineSeries({
+          baseValue:{type:'price',price:30},
+          topFillColor1:'rgba(179,136,255,.09)', topFillColor2:'rgba(179,136,255,.09)',
+          bottomFillColor1:'rgba(0,0,0,0)', bottomFillColor2:'rgba(0,0,0,0)',
+          lineWidth:1, lineVisible:false, priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:false,
+        });
+      }catch(e){ console.error('rsi band fail',e); }
       lwRsi=lwRsiC.addLineSeries({color:'#9C6FE0',lineWidth:1,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false,priceFormat:{type:'custom',formatter:v=>v==null?'–':v.toFixed(1)}});
       // C-8: ตัด title/axis label ของเส้น 70/30 ออก (เดิมเป็นป้ายทึบทับกราฟ) — เหลือเส้น dotted บาง ๆ
       lwRsi.createPriceLine({price:70,color:'rgba(120,123,134,.35)',lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:false,title:''});
@@ -84,6 +93,7 @@ function initLWChart(){
       lwPdi=lwAdxC.addLineSeries({color:'#26A69A',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
       lwNdi=lwAdxC.addLineSeries({color:'#EF5350',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
       lwAdx.createPriceLine({price:20,color:'rgba(120,123,134,.35)',lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:false,title:''});
+      lwAdx.createPriceLine({price:25,color:'rgba(120,123,134,.3)',lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:false,title:''}); // C-9 (mockup)
     }
   }catch(e){ console.error('adx pane fail',e); }
   _lwSyncPanes();   // pan/zoom ของทุกแถบขยับตามกัน
@@ -126,5 +136,5 @@ function refreshLWResize(){
 }
 
 
-export { _candleTime, initLWChart, lwAdx, lwBbL, lwBbM, lwBbU, lwCandle, lwChart, lwEma100, lwEma200, lwEma50, lwNdi, lwPdi, lwRsi, lwSma5, lwVol, refreshLWResize };
+export { _candleTime, initLWChart, lwAdx, lwBbL, lwBbM, lwBbU, lwCandle, lwChart, lwEma100, lwEma200, lwEma50, lwNdi, lwPdi, lwRsi, lwRsiBand, lwSma5, lwVol, refreshLWResize };
 // lwVolC ถูกแทนด้วย volume overlay ใน pane ราคา (C-9)

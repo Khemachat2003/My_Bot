@@ -3,17 +3,17 @@
    หมายเหตุ: ชื่อ var ชุดเดิม (--panel/--green/--red/...) คงไว้เป็น alias ชี้ไปที่ token ใหม่
    เพื่อไม่ให้ CSS ของ feature อื่นพัง — งาน C-4 ขึ้นไปจะค่อย ๆ ย้ายไปใช้ชื่อใหม่ */
 :root{
-  /* Surface & Backgrounds */
-  --bg:#0A0C10;          /* พื้นหลังแอปหลัก ดำลึก */
-  --surface:#12151C;     /* Panel, Sidebar, Topbar */
-  --surface-alt:#171B24; /* Card ย่อย, Hover, Input */
-  --border:#232732;      /* เส้นขอบมาตรฐาน */
-  --border-subtle:#1A1D27; /* เส้นแบ่งภายในตาราง */
+  /* Surface & Backgrounds — C-9: จูนตาม hex mockup แอปเทรด (#131722/#1E222D/#2A2E39) */
+  --bg:#131722;          /* พื้นหลังแอปหลัก (mockup bg) */
+  --surface:#131722;     /* Panel แบนแบบ TradingView — แยกด้วยเส้นขอบ */
+  --surface-alt:#1E222D; /* Card ย่อย, Hover, Input (mockup elevated) */
+  --border:#2A2E39;      /* เส้นขอบมาตรฐาน (mockup border) */
+  --border-subtle:#22262F; /* เส้นแบ่งภายใน */
 
-  /* Text & Labels — --dim คอนทราสต์ 2.6:1 ใช้ได้เฉพาะเส้น/ขอบ/ตกแต่ง ห้ามใช้กับข้อความ */
-  --text:#EDEFF3;
-  --muted:#838B9C;
-  --dim:#4C5566;
+  /* Text & Labels — --dim คอนทราสต์ต่ำ ใช้ได้เฉพาะเส้น/ขอบ/ตกแต่ง ห้ามใช้กับข้อความ */
+  --text:#D1D4DC;
+  --muted:#8A8F9C;
+  --dim:#5D6673;
 
   /* Semantic State Colors */
   --bull:#16C784;        /* BUY / กำไร / ผ่าน */

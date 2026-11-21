@@ -3,7 +3,7 @@
 
 import { _clearPriceLines, _renderLWMarkers, _selLines } from './chartControls.js';
 import { _renderLWDefaultLegend } from './chartLegend.js';
-import { _candleTime, initLWChart, lwAdx, lwBbL, lwBbM, lwBbU, lwCandle, lwChart, lwEma100, lwEma200, lwEma50, lwNdi, lwPdi, lwRsi, lwSma5, lwVol } from './lwChartInit.js';
+import { _candleTime, initLWChart, lwAdx, lwBbL, lwBbM, lwBbU, lwCandle, lwChart, lwEma100, lwEma200, lwEma50, lwNdi, lwPdi, lwRsi, lwRsiBand, lwSma5, lwVol } from './lwChartInit.js';
 import { _bbArr, _emaArr, _normLW, _smaArr } from './seriesTransforms.js';
 import { adx, fractal, rsi } from '../../shared/lib/indicators.js';
 
@@ -64,7 +64,9 @@ function drawLWChart(prices,markers,tf){
     const rv=rsi(closesArr,14);
     const rdt=bars.map((b,i)=>({time:b.time,value:rv[i]})).filter(d=>d.value!=null);
     lwRsi.setData(rdt); window.__lastRsi=rdt.length?rdt[rdt.length-1].value:null;
-  } else { if(lwRsi) lwRsi.setData([]); }
+    // C-9 (mockup): band แรเงา 30-70 ลากตามช่วงเวลาเดียวกับ RSI (ค่าคงที่ 70)
+    if(lwRsiBand) lwRsiBand.setData(bars.map(b=>({time:b.time,value:70})));
+  } else { if(lwRsi) lwRsi.setData([]); if(lwRsiBand) lwRsiBand.setData([]); }
   // ── ADX (pane แยก #adxChart แถวนี้เป็นแถวล่างสุด → มีแกนเวลา) ──
   if(chartInd.adx&&bars.length>=28&&lwAdx){
     const aa=adx(bars.map(b=>b.high),bars.map(b=>b.low),closesArr,14);

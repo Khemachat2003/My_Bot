@@ -1,7 +1,6 @@
       <!-- Main chart panel (TradingView style) -->
       <div class="panel chart-panel" id="chartPanel">
-        <h3><span class="ph cyan"></span><span id="chartTitle">กราฟราคา</span></h3>
-        <div class="chart-toolbar">
+          <div class="chart-toolbar">
           <span class="sym-select-wrap"><span class="au-ic">Au</span>
             <select id="chartSymbol" class="sym-select" title="เลือกสัญลักษณ์"></select></span>
           <span class="tf-group" id="tfGroup">
@@ -23,13 +22,13 @@
             <button class="tf-btn has-lbl" id="btnTradeList" title="แสดง/ซ่อนรายการสัญญาณ"><i class="ti ti-list"></i><span class="btn-lbl">สัญญาณ</span></button>
           </span>
         </div>
-        <div class="chart-legendbar" id="chartLegendBar">
-          <span class="lb-ohlc" id="lbOhlc">—</span>
-          <span class="lb-spacer"></span>
-          <span id="lbValues" class="lb-values"></span>
-          <button class="lb-collapse" id="lbCollapse" title="ย่อ/ขยายค่า indicator"><i class="ti ti-chevron-down"></i></button>
-        </div>
         <div class="chart-wrap" id="lwWrap">
+          <!-- C-9 (mockup): legend ลอยในกราฟมุมซ้ายบน — สองแถวแบบแพลตฟอร์มเทรด -->
+          <div class="chart-legendbar" id="chartLegendBar">
+            <span class="lb-ohlc" id="lbOhlc">—</span>
+            <span id="lbValues" class="lb-values"></span>
+          </div>
+          <button class="lb-collapse" id="lbCollapse" title="ย่อ/ขยายค่า indicator"><i class="ti ti-chevron-down"></i></button>
           <div class="lw-pane" id="lwPaneMain"><span class="lw-pane-label">ราคา</span><div id="candleChart"></div></div>
               <div class="lw-pane" id="lwPaneRsi"><span class="lw-pane-label">RSI (14)</span><div id="rsiChart"></div></div>
           <div class="lw-pane" id="lwPaneAdx"><span class="lw-pane-label">ADX (14)</span><div id="adxChart"></div></div>

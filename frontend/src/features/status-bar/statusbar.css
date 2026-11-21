@@ -13,7 +13,7 @@
 
   /* ═══ C-8 premium: statusbar — chip ข้อมูล + pulse ═══ */
   .statusbar{
-    background:linear-gradient(180deg,rgba(14,20,34,.95),rgba(10,13,20,.98));
+    background:linear-gradient(180deg,rgba(19,23,34,.95),rgba(19,23,34,.98));
     gap:12px; padding:6px 18px; min-height:30px;
   }
   .statusbar .st-ok{display:inline-flex; align-items:center; gap:6px; font-weight:800; letter-spacing:.04em;
