@@ -14,6 +14,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     const btn=e.target.closest('.tf-btn'); if(!btn) return;
     document.querySelectorAll('#tfGroup .tf-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
+    // C-11b: sync ชื่อ TF บนปุ่ม dropdown + ปิด popover หลังเลือก (มือถือ)
+    const cur=document.getElementById('tfCur'); if(cur) cur.textContent=btn.dataset.tf||'';
+    document.getElementById('tfPop')?.classList.remove('open');
     lwChart&&lwChart.timeScale().fitContent();
     refreshPrice(true);   // ← user action → โชว์ loading
   });
@@ -65,17 +68,24 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
   document.getElementById('btnTypeLine')?.addEventListener('click',()=>setChartType('line'));
   document.getElementById('btnTypeCandle')?.addEventListener('click',()=>setChartType('candle'));
-  // C-11: เครื่องมือรอง (มือถือ) — popover ทับกราฟ + คลิกข้างนอกปิดเอง
+  // C-11: เครื่องมือรอง + TF (มือถือ) — popover ทับกราฟ + คลิกข้างนอกปิดเอง
   const _tp=document.getElementById('toolsPop');
+  const _fp=document.getElementById('tfPop');
   document.getElementById('btnTools')?.addEventListener('click',(e)=>{
     e.stopPropagation();
+    _fp?.classList.remove('open');
     _tp?.classList.toggle('open');
   });
+  document.getElementById('btnTf')?.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    _tp?.classList.remove('open');
+    _fp?.classList.toggle('open');
+  });
   document.addEventListener('click',(e)=>{
-    if(!_tp||!_tp.classList.contains('open')) return;
     const t=e.target instanceof Element?e.target:null;
-    if(t&&(_tp.contains(t)||t.closest('#btnTools'))) return;
-    _tp.classList.remove('open');
+    if(!t) return;
+    if(_tp&&_tp.classList.contains('open')&&!_tp.contains(t)&&!t.closest('#btnTools')) _tp.classList.remove('open');
+    if(_fp&&_fp.classList.contains('open')&&!_fp.contains(t)&&!t.closest('#btnTf')) _fp.classList.remove('open');
   });
   const _repill=()=>{ if(window.__lwRepill) window.__lwRepill(); };
   window.addEventListener('resize',()=>setTimeout(_repill,60));

@@ -159,10 +159,8 @@
   .tools-pop{display:inline-flex;}
 
   @media(max-width:768px){
-    /* แถบเดียว ไม่ wrap — เครื่องมือรองซ่อนหลัง ⋯ ประหยัดแนวตั้ง ~60px (เดิม 2 แถว กินกราฟ 20-30%) */
-    .chart-toolbar{flex-wrap:nowrap; overflow-x:auto; gap:4px; margin-top:6px;
-      scrollbar-width:none; -ms-overflow-style:none;}
-    .chart-toolbar::-webkit-scrollbar{display:none;}
+    /* แถบเดียว ไม่ wrap ไม่ต้องสไลด์ — TF รวมเป็น dropdown + เครื่องมือรองซ่อนหลัง ⋯ */
+    .chart-toolbar{flex-wrap:nowrap; overflow:visible; gap:4px; margin-top:6px;}
     #typeGroup{display:none;}               /* สลับเส้น/แท่งทำผ่านโหมดบนมือถือ (มอนิเตอร์=เส้น/วิเคราะห์=แท่ง) */
     .sym-select-wrap{padding:2px 6px 2px 3px; gap:5px; flex-shrink:0;}
     .sym-select-wrap .au-ic{width:24px; height:24px; border-radius:12px; font-size:10px;}
@@ -180,3 +178,18 @@
     .tools-pop .tf-btn .btn-lbl{display:inline;}
   }
   .tools-pop .tf-btn{display:flex; align-items:center;}
+
+  /* ═══ C-11b: TF dropdown (มือถือ) — desktop inline เหมือนเดิม ═══ */
+  .tf-toggle{display:none;}
+  .tf-pop{display:inline-flex;}
+  .tf-toggle b{font-family:var(--font-mono); font-weight:800;}
+  @media(max-width:768px){
+    .tf-toggle{display:inline-flex; align-items:center; gap:5px; min-width:58px; justify-content:center;}
+    .tf-toggle .ti{font-size:12px; color:var(--dim);}
+    .tf-pop{display:none; position:absolute; top:calc(100% + 6px); left:8px;
+      background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:8px;
+      box-shadow:0 10px 28px rgba(0,0,0,.5); z-index:30;}
+    .tf-pop.open{display:block;}
+    .tf-pop .tf-group{display:grid; grid-template-columns:repeat(3,1fr); gap:4px;}
+    .tf-pop .tf-btn{width:100%; height:38px; text-align:center; justify-content:center;}
+  }

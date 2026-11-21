@@ -3,6 +3,9 @@
           <div class="chart-toolbar">
           <span class="sym-select-wrap"><span class="au-ic">Au</span>
             <select id="chartSymbol" class="sym-select" title="เลือกสัญลักษณ์"></select></span>
+          <!-- C-11b: มือถือ TF รวมเป็น dropdown (desktop ยังกาง inline เหมือนเดิม) -->
+          <button class="tf-btn tf-toggle" id="btnTf" title="เลือก Timeframe"><b id="tfCur">1m</b><i class="ti ti-chevron-down"></i></button>
+          <div class="tf-pop" id="tfPop">
           <span class="tf-group" id="tfGroup">
             <button class="tf-btn active" data-tf="1m">1m</button>
             <button class="tf-btn" data-tf="5m">5m</button>
@@ -11,6 +14,7 @@
             <button class="tf-btn" data-tf="1h">1h</button>
             <button class="tf-btn" data-tf="4h">4h</button>
           </span>
+          </div>
           <span class="tf-sep" aria-hidden="true"></span>
           <!-- C-10: สลับชนิดกราฟ เส้น(มอนิเตอร์สบายตา)/แท่งเทียน แบบ TradingView -->
           <span class="tf-group" id="typeGroup" title="ชนิดกราฟ">

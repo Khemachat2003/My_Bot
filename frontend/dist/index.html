@@ -15,8 +15,8 @@
 <script src="/static/vendor/lightweight-charts.standalone.production.js"></script>
 <link rel="stylesheet" href="/static/vendor/tabler/tabler-icons.min.css">
 <!-- CSS + JS ทั้งหมดอยู่ใน src/ (แยกตาม feature) — แผนที่ไฟล์: frontend/AGENTS.md / docs/code_map.md -->
-  <script type="module" crossorigin src="/static/dist/assets/index-DjBii8Dj.js"></script>
-  <link rel="stylesheet" crossorigin href="/static/dist/assets/index-CmchCnOz.css">
+  <script type="module" crossorigin src="/static/dist/assets/index-BmtJ3MML.js"></script>
+  <link rel="stylesheet" crossorigin href="/static/dist/assets/index-B9X3wCAg.css">
 </head>
 <body>
 
@@ -98,6 +98,9 @@
           <div class="chart-toolbar">
           <span class="sym-select-wrap"><span class="au-ic">Au</span>
             <select id="chartSymbol" class="sym-select" title="เลือกสัญลักษณ์"></select></span>
+          <!-- C-11b: มือถือ TF รวมเป็น dropdown (desktop ยังกาง inline เหมือนเดิม) -->
+          <button class="tf-btn tf-toggle" id="btnTf" title="เลือก Timeframe"><b id="tfCur">1m</b><i class="ti ti-chevron-down"></i></button>
+          <div class="tf-pop" id="tfPop">
           <span class="tf-group" id="tfGroup">
             <button class="tf-btn active" data-tf="1m">1m</button>
             <button class="tf-btn" data-tf="5m">5m</button>
@@ -106,6 +109,7 @@
             <button class="tf-btn" data-tf="1h">1h</button>
             <button class="tf-btn" data-tf="4h">4h</button>
           </span>
+          </div>
           <span class="tf-sep" aria-hidden="true"></span>
           <!-- C-10: สลับชนิดกราฟ เส้น(มอนิเตอร์สบายตา)/แท่งเทียน แบบ TradingView -->
           <span class="tf-group" id="typeGroup" title="ชนิดกราฟ">
