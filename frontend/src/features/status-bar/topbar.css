@@ -54,3 +54,41 @@
     .pricebox{flex-wrap:wrap; justify-content:center; gap:8px; padding:4px 10px; max-width:100%;}
     .pricebox .sym{font-size:10px;}
   }
+
+  /* ═══ C-9 (mockup): sym chip + price head + px-meta ═══ */
+  .sym-chip{display:flex; align-items:center; gap:9px; padding:2px 10px 2px 4px; border-radius:12px;
+    border:1px solid var(--border); background:var(--card); transition:.15s;}
+  .sym-chip:hover{border-color:var(--border2);}
+  .sym-chip .au-ic{width:30px; height:30px; border-radius:15px; background:#E2B04A; color:#3A2A05;
+    display:grid; place-items:center; font:700 12px var(--font-mono); flex-shrink:0;}
+  .sym-chip .sym-meta{display:flex; flex-direction:column; gap:1px; min-width:0;}
+  .sym-chip .sym-name{display:flex; align-items:center; gap:4px; font-size:15px; font-weight:700; color:var(--text); line-height:1.15;}
+  .sym-chip .sym-name .ti{font-size:13px; color:var(--dim);}
+  .sym-chip .sym-sub{font-size:10px; color:var(--muted); line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+
+  .price-head{display:flex; align-items:center; gap:10px; padding:2px 12px; border-radius:12px;
+    border:1px solid var(--border); background:var(--card);}
+  .price-head .price{font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:27px; font-weight:800; line-height:1; letter-spacing:-.02em;}
+  .price-head .chg{font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:12.5px; font-weight:700; padding:2px 8px; border-radius:6px; white-space:nowrap;}
+
+  .px-meta{display:flex; flex-direction:column; align-items:flex-start; gap:4px; padding-left:12px;
+    border-left:1px solid var(--border-subtle);}
+  .px-meta .px-live{display:inline-flex; align-items:center; gap:6px; font:600 10px var(--font-mono); color:var(--muted);}
+  .px-meta .px-live .live-dot{width:7px; height:7px; border-radius:4px; background:var(--bull); display:inline-block;}
+  .px-meta .px-hl{font-size:10.5px; color:var(--muted); white-space:nowrap;}
+  .px-meta .px-hl b{font-family:var(--font-mono); color:var(--text); font-weight:700;}
+
+  @media(max-width:1080px){ .px-meta{display:none;} }
+  @media(max-width:820px){
+    .price-head{order:3; flex:1 1 auto; justify-content:space-between; padding:5px 12px;}
+    .price-head .price{font-size:24px;}
+    .px-meta{order:4; display:flex; flex-direction:row; align-items:center; gap:10px;}
+    .px-meta .px-hl{font-size:10px;}
+    .sym-chip .sym-sub{display:none;}
+    .sym-chip .sym-name{font-size:13.5px;}
+  }
+  @media(max-width:420px){
+    .price-head{flex-wrap:wrap; gap:4px 10px;}
+    .price-head .price{font-size:21px;}
+    .price-head .chg{font-size:11px;}
+  }

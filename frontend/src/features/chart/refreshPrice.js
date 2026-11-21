@@ -15,7 +15,6 @@ async function refreshPrice(showLoading=false){
     if(symSel&&symSel.value) sym=symSel.value;
     if(!sym){ try{ const s=await fetchJSON('/api/symbol'); if(s&&s.symbol){sym=s.symbol;}}catch(e){} }
     if(!sym) sym='frxXAUUSD';
-    const badge=document.getElementById('symbolBadge'); if(badge) badge.textContent=sym;
     const wrap=document.getElementById('lwWrap');
     if(showLoading && wrap) wrap.classList.add('loading');   // ← แสดง loading เฉพาะตอนผู้ใช้กดเปลี่ยน TF/symbol เอง
     // fetch candles + markers พร้อมกัน → เปลี่ยน TF เร็วขึ้น
@@ -42,8 +41,26 @@ async function refreshPrice(showLoading=false){
     pe.textContent=last.c.toFixed(2);
     pe.className='price '+(chg>=0?'up':'down');
     const ce=document.getElementById('tickerChg');
-    ce.textContent=`${chg>=0?'+':''}${chg.toFixed(2)} (${chgPct>=0?'+':''}${chgPct.toFixed(2)}%)`;
+    // C-9 (mockup): เพิ่มลูกศร ▲/▼ หน้า chg
+    ce.textContent=`${chg>=0?'▲ +':'▼ −'}${Math.abs(chg).toFixed(2)} (${chgPct>=0?'+':''}${chgPct.toFixed(2)}%)`;
     ce.className='chg '+(chg>=0?'up':'down');
+    // C-9 (mockup): สูง/ต่ำช่วง 24 ชม. — คำนวณจากแท่งที่โหลดอยู่แล้ว (ไม่เพิ่ม request / network baseline คงเดิม)
+    try{
+      const tfSec={'1m':60,'5m':300,'15m':900,'30m':1800,'1h':3600,'4h':14400}[tf]||60;
+      const n=Math.max(2,Math.floor(86400/tfSec));
+      const win=(prices||[]).slice(-n);
+      if(win.length){
+        const hi=Math.max(...win.map(b=>b.h)), lo=Math.min(...win.map(b=>b.l));
+        const hiEl=document.getElementById('pxDayHi'), loEl=document.getElementById('pxDayLo');
+        if(hiEl) hiEl.textContent=hi.toFixed(2);
+        if(loEl) loEl.textContent=lo.toFixed(2);
+      }
+    }catch(e){}
+    // C-9 (mockup): sym chip — ชื่อย่อ + label จาก symbols.json
+    const short=sym.replace(/^frx/,'');
+    const subEl=document.getElementById('symbolSub');
+    if(subEl){ const meta=symbolList.find(x=>x.symbol===sym); subEl.textContent=meta?(meta.label||short).replace(short+' · ',''):(short); }
+    const badge=document.getElementById('symbolBadge'); if(badge) badge.textContent=short;
     // status bar
     const sSym=document.getElementById('statusSym'); if(sSym) sSym.textContent=sym;
     const sTs=document.getElementById('statusTs'); if(sTs) sTs.textContent=new Date().toLocaleTimeString('th-TH');

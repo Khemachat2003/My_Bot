@@ -15,12 +15,12 @@
 <script src="/static/vendor/lightweight-charts.standalone.production.js"></script>
 <link rel="stylesheet" href="/static/vendor/tabler/tabler-icons.min.css">
 <!-- CSS + JS ทั้งหมดอยู่ใน src/ (แยกตาม feature) — แผนที่ไฟล์: frontend/AGENTS.md / docs/code_map.md -->
-  <script type="module" crossorigin src="/static/dist/assets/index-CmGaUsF9.js"></script>
-  <link rel="stylesheet" crossorigin href="/static/dist/assets/index-CeArE9c_.css">
+  <script type="module" crossorigin src="/static/dist/assets/index-8clfIL9g.js"></script>
+  <link rel="stylesheet" crossorigin href="/static/dist/assets/index-CYoZeWUV.css">
 </head>
 <body>
 
-<!-- ═══════════ TOP BAR ═══════════ -->
+<!-- ═══════════ TOP BAR (C-9 ตาม mockup: sym chip + price head + px-meta) ═══════════ -->
 <div class="topbar">
   <!-- C-7: hamburger เปิด drawer — โชว์เฉพาะจอ ≤768px (responsive.css); desktop display:none = pixel เดิม -->
   <button type="button" class="nav-toggle" id="navToggle" aria-label="เปิดเมนู" aria-expanded="false"><i class="ti ti-menu"></i></button>
@@ -31,12 +31,28 @@
       <div class="ver">ML + RULE-BASED MONITOR</div>
     </div>
   </div>
-  <div class="pricebox">
-    <span class="sym" id="symbolBadge">frxXAUUSD</span>
+
+  <!-- sym chip (mockup): ไอคอนทอง Au + ชื่อ + คำอธิบาย + chevron -->
+  <div class="sym-chip" id="symChip">
+    <span class="au-ic">Au</span>
+    <span class="sym-meta">
+      <span class="sym-name"><b id="symbolBadge">XAUUSD</b><i class="ti ti-chevron-down"></i></span>
+      <span class="sym-sub" id="symbolSub">ทองคำ · Gold Spot</span>
+    </span>
+  </div>
+
+  <!-- price head (mockup): ราคาใหญ่ + chg ลูกศร -->
+  <div class="price-head">
     <span class="price" id="tickerPrice">–</span>
     <span class="chg" id="tickerChg"></span>
   </div>
-  <!-- badge โหมด LIVE/PHANTOM: ยังไม่มี endpoint บอกโหมด (design_system Section 7 ⛔) — ซ่อนไว้ ห้ามใส่ค่าคงที่ -->
+
+  <!-- px-meta (mockup): LIVE + สูง/ต่ำช่วง 24 ชม. (คำนวณจากแท่งเทียนที่โหลด — ไม่เพิ่ม request) -->
+  <div class="px-meta">
+    <span class="px-live"><span class="live-dot"></span>LIVE</span>
+    <span class="px-hl">สูง/ต่ำ <b id="pxDayHi">–</b> / <b id="pxDayLo">–</b></span>
+  </div>
+
   <div class="spacer"></div>
   <div class="topstat">
     <div class="ts">M1<br><b id="hM1">–</b></div>
@@ -81,7 +97,8 @@
       <div class="panel chart-panel" id="chartPanel">
         <h3><span class="ph cyan"></span><span id="chartTitle">กราฟราคา</span></h3>
         <div class="chart-toolbar">
-          <select id="chartSymbol" class="sym-select" title="เลือกสัญลักษณ์"></select>
+          <span class="sym-select-wrap"><span class="au-ic">Au</span>
+            <select id="chartSymbol" class="sym-select" title="เลือกสัญลักษณ์"></select></span>
           <span class="tf-group" id="tfGroup">
             <button class="tf-btn active" data-tf="1m">1m</button>
             <button class="tf-btn" data-tf="5m">5m</button>
@@ -90,6 +107,8 @@
             <button class="tf-btn" data-tf="1h">1h</button>
             <button class="tf-btn" data-tf="4h">4h</button>
           </span>
+          <span class="tf-sep" aria-hidden="true"></span>
+          <button class="tf-btn" id="btnFx" title="ตัวชี้วัด & สัญลักษณ์บนกราฟ"><i class="ti ti-adjustments-horizontal"></i></button>
           <span class="tf-group" id="zoomGroup" title="ลากเพื่อเลื่อน · ล้อเมาส์/สองนิ้วเพื่อซูม (มือถือ: pinch)">
             <button class="tf-btn has-lbl" id="zoomReset" title="กลับมุมมองล่าสุด (fit)"><i class="ti ti-refresh"></i><span class="btn-lbl">กลับมุมมอง</span></button>
             <button class="tf-btn has-lbl" id="addSrR" title="กดเพื่อเริ่มวางเส้นแนวรับ/ต้าน — คลิกบนกราฟเพื่อวาง"><i class="ti ti-layout-horizontal"></i><span class="btn-lbl">เพิ่ม S/R</span></button>
@@ -107,8 +126,7 @@
         </div>
         <div class="chart-wrap" id="lwWrap">
           <div class="lw-pane" id="lwPaneMain"><span class="lw-pane-label">ราคา</span><div id="candleChart"></div></div>
-          <div class="lw-pane" id="lwPaneVol"><span class="lw-pane-label">Volume</span><div id="volChart"></div></div>
-          <div class="lw-pane" id="lwPaneRsi"><span class="lw-pane-label">RSI (14)</span><div id="rsiChart"></div></div>
+              <div class="lw-pane" id="lwPaneRsi"><span class="lw-pane-label">RSI (14)</span><div id="rsiChart"></div></div>
           <div class="lw-pane" id="lwPaneAdx"><span class="lw-pane-label">ADX (14)</span><div id="adxChart"></div></div>
           <div class="lw-modehint" id="lwModeHint" style="display:none;"></div>
         </div>

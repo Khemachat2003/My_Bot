@@ -8,7 +8,7 @@ import { _bbArr, _emaArr, _normLW, _smaArr } from './seriesTransforms.js';
 import { adx, fractal, rsi } from '../../shared/lib/indicators.js';
 
 let lastCandles=[];
-let chartInd={bb:true,ema:true,sma5:true,rsi:true,adx:true,fractal:true,vol:false,grip:false};
+let chartInd={bb:true,ema:true,sma5:true,rsi:true,adx:true,fractal:true,vol:true,grip:false}; // C-9: vol overlay เปิด default
 let lwSrLines=[];
 let lwActiveLines=[];
 let lwAddingSr=false;
@@ -49,7 +49,7 @@ function drawLWChart(prices,markers,tf){
   _lwLastPrev=bars.length>1?bars[bars.length-2].close:null;
   _renderLWDefaultLegend();
   if(lwCandle) lwCandle.setData(bars);
-  if(lwVol){ if(chartInd.vol) lwVol.setData(bars.map(b=>({time:b.time,value:b.volume,color:b.close>=b.open?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'}))); else lwVol.setData([]); }
+  if(lwVol){ if(chartInd.vol) lwVol.setData(bars.map(b=>({time:b.time,value:b.volume,color:b.close>=b.open?'rgba(38,166,154,.42)':'rgba(239,83,80,.42)'}))); else lwVol.setData([]); }
   if(chartInd.ema){ if(lwEma50&&lwEma100&&lwEma200){ lwEma50.setData(_emaArr(bars,50)); lwEma100.setData(_emaArr(bars,100)); lwEma200.setData(_emaArr(bars,200)); } }
   else { if(lwEma50)lwEma50.setData([]); if(lwEma100)lwEma100.setData([]); if(lwEma200)lwEma200.setData([]); }
   const bbOn=chartInd.bb&&bars.length>=20;
@@ -129,6 +129,8 @@ function drawLWChart(prices,markers,tf){
   _renderLWMarkers(markers);
   _buildLWData(markers);
   _autoSelectOpen(markers);
+  // C-9: หลัง redraw (fit/scale เปลี่ยน) → ขยับ pills ให้ตรงเส้น
+  _renderPills();
 }
 
 let _lwLastBar=null,_lwLastPrev=null;
@@ -175,7 +177,30 @@ function _showTrade(t){
   add(t.sl,'#EF5350',LightweightCharts.LineStyle.Dashed,'SL');
   add(t.tp1,'#FF9800',LightweightCharts.LineStyle.Dashed,'TP1');
   add(t.tp2,'#26A69A',LightweightCharts.LineStyle.Dashed,'TP2');
+  // C-9 (mockup): position pills สีทับเส้น ENTRY/SL/TP ที่เลือก — ขยับตาม price scale ผ่าน window.__lwRepill
+  _pillData=[];
+  if(t.entry!=null) _pillData.push({price:Number(t.entry),kind:'entry',
+    text:`${t.direction==='CALL'?'▲':'▼'} ENTRY ${Number(t.entry).toFixed(2)}`});
+  if(t.sl!=null) _pillData.push({price:Number(t.sl),kind:'sl',text:`SL − ${Number(t.sl).toFixed(2)}`});
+  if(t.tp1!=null) _pillData.push({price:Number(t.tp1),kind:'tp',text:`TP1 + ${Number(t.tp1).toFixed(2)}`});
+  if(t.tp2!=null) _pillData.push({price:Number(t.tp2),kind:'tp',text:`TP2 + ${Number(t.tp2).toFixed(2)}`});
+  _renderPills();
 }
+
+let _pillData=[];
+function _renderPills(){
+  const wrap=document.querySelector('.chart-wrap');
+  if(!wrap||!lwCandle){ return; }
+  let el=document.getElementById('posPills');
+  if(!_pillData.length){ if(el) el.remove(); return; }
+  if(!el){ el=document.createElement('div'); el.id='posPills'; el.className='pos-pills'; wrap.appendChild(el); }
+  el.innerHTML=_pillData.map(p=>{
+    const y=lwCandle.priceToCoordinate(p.price);
+    if(y==null) return '';
+    return `<span class="pos-pill ${p.kind}" style="top:${Math.round(y-9)}px">${p.text}</span>`;
+  }).join('');
+}
+window.__lwRepill=_renderPills;
 
 function _autoSelectOpen(markers){
   const rowsEl=document.getElementById('lwTradeRows'); if(!rowsEl) return;

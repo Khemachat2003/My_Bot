@@ -53,4 +53,10 @@ document.addEventListener('DOMContentLoaded',()=>{
   // กันพลาดตอนฟอนต์/scrollbar มาช้า
   setTimeout(refreshLWResize,300);
   setTimeout(refreshLWResize,1200);
+  // C-9 (mockup): ปุ่ม fx เปิด/ปิดแผงตัวชี้วัด + ขยับ position pills หลัง resize ทุกทาง
+  document.getElementById('btnFx')?.addEventListener('click',()=>{
+    document.getElementById('chartExtra')?.classList.toggle('open');
+  });
+  const _repill=()=>{ if(window.__lwRepill) window.__lwRepill(); };
+  window.addEventListener('resize',()=>setTimeout(_repill,60));
 });

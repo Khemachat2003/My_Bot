@@ -88,3 +88,35 @@
   /* C-8: legend bar มี fade ขวา บอกใบ้ว่าเลื่อนได้ (มือถือ) */
   .chart-legendbar{ -webkit-mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent); mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent); }
   @media(max-width:600px){ .chart-legendbar{font-size:9px; padding:4px 8px;} }
+
+  /* ═══ C-9 (mockup): TF buttons + fx + sym-select gold + position pills ═══ */
+  .tf-btn{
+    background:none; border:none; color:#9AA0AE; cursor:pointer;
+    font:500 12.5px var(--font-mono); padding:0 12px; height:34px; border-radius:8px; transition:.15s;
+  }
+  .tf-btn:hover{color:var(--text); background:rgba(255,255,255,.03);}
+  .tf-btn.active{background:rgba(41,98,255,.20); color:#7FA6FF; font-weight:600;}
+  .tf-btn .ti{font-size:16px;}
+  .tf-sep{width:1px; height:20px; background:var(--border); display:inline-block; margin:0 6px; vertical-align:middle;}
+  .tf-group{gap:0; padding:0; border:none; background:none; display:inline-flex; align-items:center;}
+  .tf-group .tf-btn{border-radius:8px;}
+  /* sym-select หุ้มด้วยไอคอนทองแบบ mockup */
+  .sym-select-wrap{display:inline-flex; align-items:center; gap:8px; background:var(--card);
+    border:1px solid var(--border); border-radius:12px; padding:2px 10px 2px 4px; transition:.15s;}
+  .sym-select-wrap:hover{border-color:var(--border2);}
+  .sym-select-wrap .au-ic{width:28px; height:28px; border-radius:14px; background:#E2B04A; color:#3A2A05;
+    display:grid; place-items:center; font:700 11.5px var(--font-mono); flex-shrink:0;}
+  .sym-select{border:none; background:none; color:var(--text); font-weight:700; padding:6px 4px;}
+  .sym-select:focus{outline:none;}
+
+  /* position pills ทับเส้น ENTRY/SL/TP (mockup) */
+  .pos-pills{position:absolute; left:8px; top:0; bottom:0; z-index:4; pointer-events:none; width:0;}
+  .pos-pill{position:absolute; left:0; height:18px; padding:0 7px; border-radius:3px; white-space:nowrap;
+    font:600 10px/18px var(--font-mono); color:#fff; box-shadow:0 1px 3px rgba(0,0,0,.35);}
+  .pos-pill.entry{background:#2962FF;}
+  .pos-pill.sl{background:#A62B2B;}
+  .pos-pill.tp{background:#0F5C54;}
+
+  /* C-9: candle สูงขึ้น (volume ย้ายมา overlay ใน pane เดียวกัน — ไม่มี pane volume แยก) */
+  #candleChart{height:400px;}
+  .chart-wrap{height:auto;}

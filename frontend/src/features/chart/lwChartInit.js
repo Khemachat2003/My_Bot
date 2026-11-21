@@ -33,7 +33,7 @@ function initLWChart(){
     layout:{background:{color:'transparent'},textColor:'#787B86',fontFamily:'IBM Plex Mono, monospace'},
     grid:{vertLines:{color:'#1E222D'},horzLines:{color:'#1E222D'}},
     crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
-    rightPriceScale:{borderColor:'#2A2E39',minimumWidth:64,scaleMargins:{top:0.08,bottom:0.08}},
+    rightPriceScale:{borderColor:'#2A2E39',minimumWidth:64,scaleMargins:{top:0.06,bottom:0.28}},
     timeScale:{borderColor:'#2A2E39',timeVisible:true,secondsVisible:false,rightOffset:1,barSpacing:7},
     localization:{locale:'th-TH'},
   };
@@ -42,6 +42,11 @@ function initLWChart(){
   lwChart=LightweightCharts.createChart(el,{...baseOpts,width:el.clientWidth||300,height:el.clientHeight||320,timeScale:{...baseOpts.timeScale,visible:false},
     // C-8: watermark เฉพาะ pane ราคาหลัก (เหมือนแพลตฟอร์มเทรด) — จางมาก
     watermark:{visible:true, fontSize:40, color:'rgba(255,255,255,0.03)', fontFamily:'Archivo, IBM Plex Sans Thai, sans-serif', text:'XAUUSD'}});
+  // C-9 (mockup): volume เป็น overlay ล่าง pane ราคา (แบบ TradingView) — สร้างก่อน candle เพื่อให้ candle วาดทับ
+  try{
+    lwVol=lwChart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'vol',priceLineVisible:false,lastValueVisible:false});
+    lwChart.priceScale('vol').applyOptions({visible:false, scaleMargins:{top:0.82, bottom:0}});
+  }catch(e){ console.error('vol overlay fail',e); }
   lwCandle=lwChart.addCandlestickSeries({
     upColor:'#26A69A',downColor:'#EF5350',borderVisible:false,
     wickUpColor:'#26A69A',wickDownColor:'#EF5350',
@@ -59,14 +64,6 @@ function initLWChart(){
     lwBbL=lwChart.addLineSeries({color:'rgba(41,98,255,.45)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,lineStyle:LightweightCharts.LineStyle.Dotted});
   }catch(e){ console.error('bb setup fail',e); }
   try{ lwSma5=lwChart.addLineSeries({color:'#26C6DA',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false}); }catch(e){ console.error('sma5 setup fail',e); }
-  // ── pane Volume — instance แยก (ไม่ทับราคา 100%) ──
-  try{
-    const vEl=document.getElementById('volChart');
-    if(vEl){
-      lwVolC=LightweightCharts.createChart(vEl,{...baseOpts,width:vEl.clientWidth||300,height:vEl.clientHeight||80,timeScale:{...baseOpts.timeScale,visible:false}});
-      lwVol=lwVolC.addHistogramSeries({priceFormat:{type:'volume'}});
-    }
-  }catch(e){ console.error('volume pane fail',e); }
   // ── pane RSI — instance แยก มีเส้น 70/30 ของตัวเอง ──
   try{
     const rEl=document.getElementById('rsiChart');
@@ -95,7 +92,7 @@ function initLWChart(){
 
 // ── sync pan/zoom ข้ามทุกแถบ (ตามแพทเทิร์นใน multi-pane-chart-demo.html) ──
 function _lwSyncPanes(){
-  _lwCharts=[lwChart,lwVolC,lwRsiC,lwAdxC].filter(Boolean);
+  _lwCharts=[lwChart,lwRsiC,lwAdxC].filter(Boolean);
   let syncing=false;
   _lwCharts.forEach(c=>{
     c.timeScale().subscribeVisibleLogicalRangeChange(range=>{
@@ -103,12 +100,14 @@ function _lwSyncPanes(){
       syncing=true;
       _lwCharts.forEach(o=>{ if(o!==c) o.timeScale().setVisibleLogicalRange(range); });
       syncing=false;
+      // C-9: ขยับ position pills ตาม price scale ที่เปลี่ยน (hook จาก drawLwChart)
+      if(window.__lwRepill) window.__lwRepill();
     });
   });
 }
 
 function refreshLWResize(){
-  const map={'candleChart':lwChart,'volChart':lwVolC,'rsiChart':lwRsiC,'adxChart':lwAdxC};
+  const map={'candleChart':lwChart,'rsiChart':lwRsiC,'adxChart':lwAdxC};
   // C-8 mobile fix: กัน canvas กว้างเกินจอ (scrollbar/เลย์เอาต์เปลี่ยนทีหลัง) — clamp ด้วย viewport + parent
   const vw=(window.visualViewport&&window.visualViewport.width)||document.documentElement.clientWidth||window.innerWidth||0;
   for(const id in map){
@@ -128,3 +127,4 @@ function refreshLWResize(){
 
 
 export { _candleTime, initLWChart, lwAdx, lwBbL, lwBbM, lwBbU, lwCandle, lwChart, lwEma100, lwEma200, lwEma50, lwNdi, lwPdi, lwRsi, lwSma5, lwVol, refreshLWResize };
+// lwVolC ถูกแทนด้วย volume overlay ใน pane ราคา (C-9)

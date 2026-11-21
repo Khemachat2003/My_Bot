@@ -115,8 +115,7 @@
 
   /* ═══ C-8 mobile: ความสูง pane กราฟให้พอดีจอ (เดิม candle 320px + panes รวม ~590px สูงเกิน) ═══ */
   @media(max-width:600px){
-    #candleChart{height:250px;}
-    #volChart{height:60px;}
+    #candleChart{height:300px;}
     #rsiChart{height:76px;}
     #adxChart{height:80px;}
   }

@@ -2,7 +2,8 @@
       <div class="panel chart-panel" id="chartPanel">
         <h3><span class="ph cyan"></span><span id="chartTitle">กราฟราคา</span></h3>
         <div class="chart-toolbar">
-          <select id="chartSymbol" class="sym-select" title="เลือกสัญลักษณ์"></select>
+          <span class="sym-select-wrap"><span class="au-ic">Au</span>
+            <select id="chartSymbol" class="sym-select" title="เลือกสัญลักษณ์"></select></span>
           <span class="tf-group" id="tfGroup">
             <button class="tf-btn active" data-tf="1m">1m</button>
             <button class="tf-btn" data-tf="5m">5m</button>
@@ -11,6 +12,8 @@
             <button class="tf-btn" data-tf="1h">1h</button>
             <button class="tf-btn" data-tf="4h">4h</button>
           </span>
+          <span class="tf-sep" aria-hidden="true"></span>
+          <button class="tf-btn" id="btnFx" title="ตัวชี้วัด & สัญลักษณ์บนกราฟ"><i class="ti ti-adjustments-horizontal"></i></button>
           <span class="tf-group" id="zoomGroup" title="ลากเพื่อเลื่อน · ล้อเมาส์/สองนิ้วเพื่อซูม (มือถือ: pinch)">
             <button class="tf-btn has-lbl" id="zoomReset" title="กลับมุมมองล่าสุด (fit)"><i class="ti ti-refresh"></i><span class="btn-lbl">กลับมุมมอง</span></button>
             <button class="tf-btn has-lbl" id="addSrR" title="กดเพื่อเริ่มวางเส้นแนวรับ/ต้าน — คลิกบนกราฟเพื่อวาง"><i class="ti ti-layout-horizontal"></i><span class="btn-lbl">เพิ่ม S/R</span></button>
@@ -28,8 +31,7 @@
         </div>
         <div class="chart-wrap" id="lwWrap">
           <div class="lw-pane" id="lwPaneMain"><span class="lw-pane-label">ราคา</span><div id="candleChart"></div></div>
-          <div class="lw-pane" id="lwPaneVol"><span class="lw-pane-label">Volume</span><div id="volChart"></div></div>
-          <div class="lw-pane" id="lwPaneRsi"><span class="lw-pane-label">RSI (14)</span><div id="rsiChart"></div></div>
+              <div class="lw-pane" id="lwPaneRsi"><span class="lw-pane-label">RSI (14)</span><div id="rsiChart"></div></div>
           <div class="lw-pane" id="lwPaneAdx"><span class="lw-pane-label">ADX (14)</span><div id="adxChart"></div></div>
           <div class="lw-modehint" id="lwModeHint" style="display:none;"></div>
         </div>
