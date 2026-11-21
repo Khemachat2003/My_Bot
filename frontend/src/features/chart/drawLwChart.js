@@ -3,12 +3,49 @@
 
 import { _clearPriceLines, _renderLWMarkers, _selLines } from './chartControls.js';
 import { _renderLWDefaultLegend } from './chartLegend.js';
-import { _candleTime, initLWChart, lwAdx, lwBbL, lwBbM, lwBbU, lwCandle, lwChart, lwEma100, lwEma200, lwEma50, lwNdi, lwPdi, lwRsi, lwRsiBand, lwSma5, lwVol } from './lwChartInit.js';
+import { _candleTime, initLWChart, lwAdx, lwBbL, lwBbM, lwBbU, lwCandle, lwChart, lwEma100, lwEma200, lwEma50, lwLine, lwNdi, lwPdi, lwRsi, lwRsiBand, lwSma5, lwVol, refreshLWResize } from './lwChartInit.js';
 import { _bbArr, _emaArr, _normLW, _smaArr } from './seriesTransforms.js';
 import { adx, fractal, rsi } from '../../shared/lib/indicators.js';
 
 let lastCandles=[];
 let chartInd={bb:true,ema:true,sma5:true,rsi:true,adx:true,fractal:true,vol:true,grip:false}; // C-9: vol overlay เปิด default
+
+// ═══ C-10: โหมดมอนิเตอร์/วิเคราะห์ + ชนิดกราฟ เส้น/แท่ง (จำค่าไว้ใน localStorage) ═══
+// มอนิเตอร์ (default) = กราฟเส้นสบายตา ไม่มี indicator/RSI/ADX/volume — ดูคร่าว ๆ แบบ TradingView
+// วิเคราะห์ = แท่งเทียน + EMA/BB/SMA + volume + RSI/ADX pane + fractal ตาม chartInd เดิม
+let chartMode='monitor', chartType='line';
+try{
+  const _m=localStorage.getItem('lwMode'); if(_m==='analysis'||_m==='monitor') chartMode=_m;
+  const _t=localStorage.getItem('lwType'); if(_t==='line'||_t==='candle') chartType=_t;
+}catch(e){}
+function setChartMode(m){
+  if(m!=='monitor'&&m!=='analysis') return;
+  chartMode=m; try{localStorage.setItem('lwMode',m);}catch(e){}
+  _applyModeDom();
+  if(lastCandles.length) drawLWChart(lastCandles,window._signalMarkers||[]);
+}
+function setChartType(t){
+  if(t!=='line'&&t!=='candle') return;
+  chartType=t; try{localStorage.setItem('lwType',t);}catch(e){}
+  if(lastCandles.length) drawLWChart(lastCandles,window._signalMarkers||[]);
+}
+function _applyModeDom(){
+  const ana=chartMode==='analysis';
+  const rsi=document.getElementById('lwPaneRsi'), adx=document.getElementById('lwPaneAdx');
+  if(rsi) rsi.style.display=ana?'':'none';
+  if(adx) adx.style.display=ana?'':'none';
+  const panel=document.getElementById('chartPanel');
+  if(panel) panel.classList.toggle('monitor',!ana);
+  // มอนิเตอร์: ADX (แกนเวลา) ถูกซ่อน → เปิดแกนเวลาที่ pane หลักแทน
+  try{ if(lwChart) lwChart.applyOptions({timeScale:{visible:!ana}}); }catch(e){}
+  // ปุ่มโหมด = บอกปลายทาง (อยู่มอนิเตอร์ → เขียน "วิเคราะห์")
+  const btn=document.getElementById('btnMode');
+  if(btn) btn.innerHTML=ana?'<i class="ti ti-eye"></i><span class="btn-lbl">มอนิเตอร์</span>':'<i class="ti ti-focus-2"></i><span class="btn-lbl">วิเคราะห์</span>';
+  const bL=document.getElementById('btnTypeLine'), bC=document.getElementById('btnTypeCandle');
+  if(bL) bL.classList.toggle('active',chartType==='line');
+  if(bC) bC.classList.toggle('active',chartType==='candle');
+  refreshLWResize();
+}
 let lwSrLines=[];
 let lwActiveLines=[];
 let lwAddingSr=false;
@@ -33,7 +70,8 @@ function drawLWChart(prices,markers,tf){
   if(isNewView) _lwFitKey=fitKey;
   // ข้ามงานซ้ำถ้าแท่งท้ายสุด (เวลา+close)+สัญญาณ+การตั้งค่า indicator ไม่เปลี่ยน → ลดกระตุกตอน refresh ทุก 5 วิ
   const last=bars[bars.length-1];
-  const indKey=[chartInd.vol,chartInd.ema,chartInd.bb,chartInd.sma5,chartInd.rsi,chartInd.adx,chartInd.fractal].join('');
+  const ana=chartMode==='analysis';
+  const indKey=chartMode+chartType+[chartInd.vol,chartInd.ema,chartInd.bb,chartInd.sma5,chartInd.rsi,chartInd.adx,chartInd.fractal].join('');
   if(!needInit&&!isNewView&&_lwLastSig&&_lwLastSig.t===last.time&&_lwLastSig.c===last.close&&_lwLastSig.sig===JSON.stringify(markers||[])&&_lwLastSig.ind===indKey){
     return;
   }
@@ -48,22 +86,26 @@ function drawLWChart(prices,markers,tf){
   _lwLastBar=bars[bars.length-1];
   _lwLastPrev=bars.length>1?bars[bars.length-2].close:null;
   _renderLWDefaultLegend();
-  if(lwCandle) lwCandle.setData(bars);
-  if(lwVol){ if(chartInd.vol) lwVol.setData(bars.map(b=>({time:b.time,value:b.volume,color:b.close>=b.open?'rgba(38,166,154,.42)':'rgba(239,83,80,.42)'}))); else lwVol.setData([]); }
-  if(chartInd.ema){ if(lwEma50&&lwEma100&&lwEma200){ lwEma50.setData(_emaArr(bars,50)); lwEma100.setData(_emaArr(bars,100)); lwEma200.setData(_emaArr(bars,200)); } }
+  // C-10: มอนิเตอร์ = เส้นพื้นที่เดียวสบายตา · วิเคราะห์ = แท่งเทียน + ทุก indicator ตาม chartInd
+  if(lwCandle){ lwCandle.setData(bars); lwCandle.applyOptions({visible:chartType==='candle'}); }
+  if(lwLine){ lwLine.setData(bars.map(b=>({time:b.time,value:b.close}))); lwLine.applyOptions({visible:chartType==='line'}); }
+  if(lwVol){ if(ana&&chartInd.vol) lwVol.setData(bars.map(b=>({time:b.time,value:b.volume,color:b.close>=b.open?'rgba(38,166,154,.42)':'rgba(239,83,80,.42)'}))); else lwVol.setData([]); }
+  if(ana&&chartInd.ema){ if(lwEma50&&lwEma100&&lwEma200){ lwEma50.setData(_emaArr(bars,50)); lwEma100.setData(_emaArr(bars,100)); lwEma200.setData(_emaArr(bars,200)); } }
   else { if(lwEma50)lwEma50.setData([]); if(lwEma100)lwEma100.setData([]); if(lwEma200)lwEma200.setData([]); }
-  const bbOn=chartInd.bb&&bars.length>=20;
+  const bbOn=ana&&chartInd.bb&&bars.length>=20;
   if(bbOn&&lwBbU&&lwBbM&&lwBbL){ const bb=_bbArr(bars,20,2); lwBbU.setData(bb.u); lwBbM.setData(bb.m); lwBbL.setData(bb.l); }
   else { if(lwBbU)lwBbU.setData([]); if(lwBbM)lwBbM.setData([]); if(lwBbL)lwBbL.setData([]); }
-  if(chartInd.sma5&&bars.length>=5&&lwSma5){ lwSma5.setData(_smaArr(bars,5)); }
+  if(ana&&chartInd.sma5&&bars.length>=5&&lwSma5){ lwSma5.setData(_smaArr(bars,5)); }
   else { if(lwSma5) lwSma5.setData([]); }
   // ── RSI (pane แยก #rsiChart) ──
   window.__lastRsi=window.__lastAdx=window.__lastPdi=window.__lastNdi=null;
   const closesArr=bars.map(b=>b.close);
+  // C-10 fix: RSI/ADX ต้องเติมข้อมูลเสมอ (แม้โหมดมอนิเตอร์จะซ่อน pane) —
+  // ถ้า setData([]) ตอนซ่อน sync ข้าม pane จะดึง range กราฟหลักให้หดเหลือไม่กี่แท่ง
   if(chartInd.rsi&&bars.length>=16&&lwRsi){
     const rv=rsi(closesArr,14);
     const rdt=bars.map((b,i)=>({time:b.time,value:rv[i]})).filter(d=>d.value!=null);
-    lwRsi.setData(rdt); window.__lastRsi=rdt.length?rdt[rdt.length-1].value:null;
+    lwRsi.setData(rdt); window.__lastRsi=ana&&rdt.length?rdt[rdt.length-1].value:null;
     // C-9 (mockup): band แรเงา 30-70 ลากตามช่วงเวลาเดียวกับ RSI (ค่าคงที่ 70)
     if(lwRsiBand) lwRsiBand.setData(bars.map(b=>({time:b.time,value:70})));
   } else { if(lwRsi) lwRsi.setData([]); if(lwRsiBand) lwRsiBand.setData([]); }
@@ -74,7 +116,7 @@ function drawLWChart(prices,markers,tf){
     const pdt=bars.map((b,i)=>({time:b.time,value:aa.pdi[i]})).filter(d=>d.value!=null);
     const ndt=bars.map((b,i)=>({time:b.time,value:aa.ndi[i]})).filter(d=>d.value!=null);
     lwAdx.setData(adt); lwPdi.setData(pdt); lwNdi.setData(ndt);
-    window.__lastAdx=adt.length?adt[adt.length-1].value:null;
+    window.__lastAdx=ana&&adt.length?adt[adt.length-1].value:null;
     window.__lastPdi=pdt.length?pdt[pdt.length-1].value:null;
     window.__lastNdi=ndt.length?ndt[ndt.length-1].value:null;
   } else { if(lwAdx){ lwAdx.setData([]); lwPdi.setData([]); lwNdi.setData([]); } }
@@ -111,7 +153,7 @@ function drawLWChart(prices,markers,tf){
   }).filter(Boolean);
   // ── Fractal 15: จุดสูง=ส้ม(แนวต้าน) · จุดต่ำ=เขียว(แนวรับ) — ไม่ซ้ำกับสัญญาณ ──
   let fractalMarkers=[];
-  if(chartInd.fractal&&bars.length>=16){
+  if(ana&&chartInd.fractal&&bars.length>=16){ // C-10: fractal จุดสบายตาเฉพาะโหมดวิเคราะห์
     const nd=bars.map((b,i)=>({o:b.open,h:b.high,l:b.low,c:b.close,i}));
     fractalMarkers=fractal(nd,7,7).map(p=>({
       time:bars[p.i].time,
@@ -121,8 +163,10 @@ function drawLWChart(prices,markers,tf){
       text:'',
     }));
   }
+  // C-10: marker ไปตาม series ที่กำลังแสดง (เส้น/แท่ง) — สัญญาณ ▲▼ โชว์ทุกโหมด (นี่คือหัวใจของ monitor)
   const markerList=[...sigMarkerList,...fractalMarkers].sort((a,b)=>a.time-b.time);
-  if(lwCandle) lwCandle.setMarkers(markerList);
+  const targetSeries=chartType==='line'?lwLine:lwCandle;
+  if(targetSeries) targetSeries.setMarkers(markerList);
   // fitContent เฉพาะครั้งแรก / เปลี่ยน TF / เปลี่ยน symbol — ไม่รบกวน zoom/pan ที่ผู้ใช้ตั้งไว้
   if(isNewView) lwChart.timeScale().fitContent();
 
@@ -133,6 +177,8 @@ function drawLWChart(prices,markers,tf){
   _autoSelectOpen(markers);
   // C-9: หลัง redraw (fit/scale เปลี่ยน) → ขยับ pills ให้ตรงเส้น
   _renderPills();
+  // C-10: ซิงก์ DOM โหมด/ปุ่ม (ครั้งแรกหลัง chart init)
+  _applyModeDom();
 }
 
 let _lwLastBar=null,_lwLastPrev=null;
@@ -220,4 +266,4 @@ function _autoSelectOpen(markers){
 }
 
 
-export { _lwLastBar, _lwLastPrev, chartInd, drawLWChart, lastCandles };
+export { _lwLastBar, _lwLastPrev, chartInd, chartMode, chartType, setChartMode, setChartType, drawLWChart, lastCandles };

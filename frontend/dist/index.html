@@ -15,8 +15,8 @@
 <script src="/static/vendor/lightweight-charts.standalone.production.js"></script>
 <link rel="stylesheet" href="/static/vendor/tabler/tabler-icons.min.css">
 <!-- CSS + JS ทั้งหมดอยู่ใน src/ (แยกตาม feature) — แผนที่ไฟล์: frontend/AGENTS.md / docs/code_map.md -->
-  <script type="module" crossorigin src="/static/dist/assets/index-C9iqvZer.js"></script>
-  <link rel="stylesheet" crossorigin href="/static/dist/assets/index-Dja58JQZ.css">
+  <script type="module" crossorigin src="/static/dist/assets/index-CaMVBQ4n.js"></script>
+  <link rel="stylesheet" crossorigin href="/static/dist/assets/index-B2JfVWhK.css">
 </head>
 <body>
 
@@ -106,6 +106,13 @@
             <button class="tf-btn" data-tf="1h">1h</button>
             <button class="tf-btn" data-tf="4h">4h</button>
           </span>
+          <span class="tf-sep" aria-hidden="true"></span>
+          <!-- C-10: สลับชนิดกราฟ เส้น(มอนิเตอร์สบายตา)/แท่งเทียน แบบ TradingView -->
+          <span class="tf-group" id="typeGroup" title="ชนิดกราฟ">
+            <button class="tf-btn" id="btnTypeLine" title="กราฟเส้น — สบายตา ดูคร่าว ๆ"><i class="ti ti-chart-line"></i></button>
+            <button class="tf-btn" id="btnTypeCandle" title="แท่งเทียน — รายละเอียด O-H-L-C"><i class="ti ti-chart-arrows-vertical"></i></button>
+          </span>
+          <button class="tf-btn mode-btn" id="btnMode" title="สลับโหมดมอนิเตอร์/วิเคราะห์"><i class="ti ti-focus-2"></i><span class="btn-lbl">วิเคราะห์</span></button>
           <span class="tf-sep" aria-hidden="true"></span>
           <button class="tf-btn" id="btnFx" title="ตัวชี้วัด & สัญลักษณ์บนกราฟ"><i class="ti ti-adjustments-horizontal"></i></button>
           <span class="tf-group" id="zoomGroup" title="ลากเพื่อเลื่อน · ล้อเมาส์/สองนิ้วเพื่อซูม (มือถือ: pinch)">

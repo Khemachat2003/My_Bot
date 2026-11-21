@@ -139,3 +139,16 @@
   }
   .lb-collapse:hover{color:var(--text);}
   .chart-legendbar.collapsed + .lb-collapse{transform:rotate(180deg);}
+
+  /* ═══ C-10: ปุ่มโหมด + ความสูงโหมดมอนิเตอร์ ═══ */
+  .mode-btn{display:inline-flex; align-items:center; gap:6px; border:1px solid var(--border);
+    background:var(--surface-alt); color:var(--text); font-family:var(--font-body); font-weight:700;
+    font-size:11px; padding:0 12px; height:34px; border-radius:8px; transition:.15s;}
+  .mode-btn:hover{border-color:var(--accent); color:var(--accent);}
+  .mode-btn .ti{font-size:15px;}
+  #typeGroup .tf-btn.active{background:rgba(41,98,255,.20); color:#7FA6FF;}
+  /* มอนิเตอร์: panes ถูกซ่อน → กราฟหลักสูงขึ้นเต็มพื้นที่ */
+  .chart-panel.monitor #candleChart{height:470px;}
+  @media(max-width:600px){
+    .chart-panel.monitor #candleChart{height:340px;}
+  }

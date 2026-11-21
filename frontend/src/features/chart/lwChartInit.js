@@ -10,7 +10,7 @@ import { _lwOHLClegend } from './chartLegend.js';
 let lwChart=null, lwCandle=null, lwVol=null;
 let lwEma50=null,lwEma100=null,lwEma200=null;
 let lwBbU=null,lwBbM=null,lwBbL=null,lwSma5=null;
-let lwRsi=null,lwAdx=null,lwPdi=null,lwNdi=null,lwRsiBand=null;
+let lwRsi=null,lwAdx=null,lwPdi=null,lwNdi=null,lwRsiBand=null,lwLine=null;
 let lwVolC=null,lwRsiC=null,lwAdxC=null,_lwCharts=[];   // multi-pane: instance แยกของ Volume/RSI/ADX
 function _candleTime(d){
   if(d.t==null) return 0;
@@ -64,6 +64,13 @@ function initLWChart(){
     lwBbL=lwChart.addLineSeries({color:'rgba(41,98,255,.45)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,lineStyle:LightweightCharts.LineStyle.Dotted});
   }catch(e){ console.error('bb setup fail',e); }
   try{ lwSma5=lwChart.addLineSeries({color:'#26C6DA',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false}); }catch(e){ console.error('sma5 setup fail',e); }
+  // C-10: กราฟเส้น/พื้นที่ (โหมดมอนิเตอร์) — สไตล์ TradingView ฟ้า + fill จาง, ซ่อนไว้ก่อน (สลับกับแท่งเทียน)
+  try{
+    lwLine=lwChart.addAreaSeries({lineColor:'#2962FF',lineWidth:2,
+      topColor:'rgba(41,98,255,.26)',bottomColor:'rgba(41,98,255,.02)',
+      priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:true});
+    lwLine.applyOptions({visible:false});
+  }catch(e){ console.error('line series fail',e); }
   // ── pane RSI — instance แยก มีเส้น 70/30 ของตัวเอง ──
   try{
     const rEl=document.getElementById('rsiChart');
@@ -136,5 +143,5 @@ function refreshLWResize(){
 }
 
 
-export { _candleTime, initLWChart, lwAdx, lwBbL, lwBbM, lwBbU, lwCandle, lwChart, lwEma100, lwEma200, lwEma50, lwNdi, lwPdi, lwRsi, lwRsiBand, lwSma5, lwVol, refreshLWResize };
+export { _candleTime, initLWChart, lwAdx, lwBbL, lwBbM, lwBbU, lwCandle, lwChart, lwEma100, lwEma200, lwEma50, lwLine, lwNdi, lwPdi, lwRsi, lwRsiBand, lwSma5, lwVol, refreshLWResize };
 // lwVolC ถูกแทนด้วย volume overlay ใน pane ราคา (C-9)

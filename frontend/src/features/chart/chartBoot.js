@@ -2,7 +2,7 @@
 // ย้ายจาก index.html เดิม (_archive/index.legacy.html) บรรทัด 2727–2760 แบบ move-only
 
 import { bindChartToolbar } from './chartControls.js';
-import { chartInd, drawLWChart, lastCandles } from './drawLwChart.js';
+import { chartInd, chartMode, drawLWChart, lastCandles, setChartMode, setChartType } from './drawLwChart.js';
 import { lwChart, refreshLWResize } from './lwChartInit.js';
 import { refreshPrice } from './refreshPrice.js';
 import { loadSymbols } from '../watchlist/index.js';
@@ -54,9 +54,17 @@ document.addEventListener('DOMContentLoaded',()=>{
   setTimeout(refreshLWResize,300);
   setTimeout(refreshLWResize,1200);
   // C-9 (mockup): ปุ่ม fx เปิด/ปิดแผงตัวชี้วัด + ขยับ position pills หลัง resize ทุกทาง
+  // C-10: ถ้าอยู่โหมดมอนิเตอร์แล้วกด fx → สลับเป็นโหมดวิเคราะห์ให้ก่อน (indicator ถึงจะโชว์)
   document.getElementById('btnFx')?.addEventListener('click',()=>{
+    if(chartMode!=='analysis') setChartMode('analysis');
     document.getElementById('chartExtra')?.classList.toggle('open');
   });
+  // C-10: ปุ่มสลับโหมด + ชนิดกราฟ
+  document.getElementById('btnMode')?.addEventListener('click',()=>{
+    setChartMode(chartMode==='analysis'?'monitor':'analysis');
+  });
+  document.getElementById('btnTypeLine')?.addEventListener('click',()=>setChartType('line'));
+  document.getElementById('btnTypeCandle')?.addEventListener('click',()=>setChartType('candle'));
   const _repill=()=>{ if(window.__lwRepill) window.__lwRepill(); };
   window.addEventListener('resize',()=>setTimeout(_repill,60));
 });
