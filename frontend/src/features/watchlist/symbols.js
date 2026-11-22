@@ -29,6 +29,7 @@ async function loadSymbols(){
     try{ const s=await fetchJSON('/api/symbol'); if(s&&s.symbol) cur=s.symbol; }catch(e){}
     sel.innerHTML=symbolList.map(s=>`<option value="${s.symbol}" ${s.symbol===cur?'selected':''}>${s.label}</option>`).join('');
     sel.addEventListener('change',()=>refreshPrice(true));   // ← user action → โชว์ loading
+    window.__symSync&&window.__symSync();                  // C-14: sync ปุ่ม symbol picker
   }
   renderWatchlist();
 }

@@ -97,17 +97,72 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
   document.getElementById('btnTypeLine')?.addEventListener('click',()=>setChartType('line'));
   document.getElementById('btnTypeCandle')?.addEventListener('click',()=>setChartType('candle'));
+  // ═══ C-14: symbol picker (demo หน้า 1) — ปุ่ม chip ทอง + popover รายชื่อ + sync จาก watchlist/API ═══
+  const _symPop=document.getElementById('symPop');
+  const _symIc=(sym)=>{
+    if(sym.includes('XAU')) return {t:'Au',c:'#E2B04A',dark:true};
+    if(sym.includes('XAG')) return {t:'Ag',c:'#C7CEDB',dark:true};
+    if(sym.startsWith('R_')) return {t:'V',c:'#B58CFF',dark:true};
+    return {t:String(sym).replace(/^frx/,'').slice(0,3),c:'var(--accent)',dark:false};
+  };
+  const _shortSym=(v)=>String(v).replace(/^frx/,'');
+  function _syncSymButton(){
+    const sel=document.getElementById('chartSymbol');
+    const v=sel?.value||'frxXAUUSD';
+    const ic=_symIc(v);
+    const icEl=document.getElementById('symPickIc');
+    if(icEl){ icEl.textContent=ic.t; icEl.style.background=ic.c; icEl.style.color=ic.dark?'#0D1117':'var(--text)'; }
+    const nameEl=document.getElementById('symPickName'); if(nameEl) nameEl.textContent=_shortSym(v);
+    const lblEl=document.getElementById('symPickLabel');
+    const opt=sel?.selectedOptions&&sel.selectedOptions[0];
+    if(lblEl) lblEl.textContent=opt?opt.textContent.replace(_shortSym(v),'').replace(/^\s*·\s*/,'')||_shortSym(v):_shortSym(v);
+  }
+  function _buildSymPop(){
+    const sel=document.getElementById('chartSymbol');
+    if(!sel||!_symPop) return;
+    _symPop.innerHTML=[...sel.options].map(o=>{
+      const v=o.value, ic=_symIc(v);
+      return `<div class="sym-row${o.selected?' active':''}" data-sym="${v}">
+        <span class="sym-ic" style="background:${ic.c};${ic.dark?'color:#0D1117;':''}">${ic.t}</span>
+        <span class="sym-row-text"><b>${_shortSym(v)}</b><small>${o.textContent}</small></span>
+        ${o.selected?'<i class="ti ti-check"></i>':''}
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('btnSymPick')?.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    _fp?.classList.remove('open'); _tp?.classList.remove('open');
+    if(!_symPop.classList.contains('open')) _buildSymPop();
+    _symPop.classList.toggle('open');
+  });
+  _symPop?.addEventListener('click',(e)=>{
+    const row=e.target.closest('.sym-row'); if(!row) return;
+    const sel=document.getElementById('chartSymbol');
+    if(sel&&sel.value!==row.dataset.sym){ sel.value=row.dataset.sym; sel.dispatchEvent(new Event('change')); }
+    _syncSymButton();
+    _symPop.classList.remove('open');
+  });
+  window.__symSync=_syncSymButton;
+  _syncSymButton();
+  // คลิกข้างนอก = ปิด symPop ด้วย (ต่อจาก tfPop/toolsPop)
+  document.addEventListener('click',(e)=>{
+    if(!_symPop||!_symPop.classList.contains('open')) return;
+    const t=e.target instanceof Element?e.target:null; if(!t) return;
+    if(_symPop.contains(t)||t.closest('#btnSymPick')) return;
+    _symPop.classList.remove('open');
+  });
+
   // C-11: เครื่องมือรอง + TF (มือถือ) — popover ทับกราฟ + คลิกข้างนอกปิดเอง
   const _tp=document.getElementById('toolsPop');
   const _fp=document.getElementById('tfPop');
   document.getElementById('btnTools')?.addEventListener('click',(e)=>{
     e.stopPropagation();
-    _fp?.classList.remove('open');
+    _fp?.classList.remove('open'); _symPop?.classList.remove('open');
     _tp?.classList.toggle('open');
   });
   document.getElementById('btnTf')?.addEventListener('click',(e)=>{
     e.stopPropagation();
-    _tp?.classList.remove('open');
+    _tp?.classList.remove('open'); _symPop?.classList.remove('open');
     _fp?.classList.toggle('open');
   });
   document.addEventListener('click',(e)=>{

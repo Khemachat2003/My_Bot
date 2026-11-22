@@ -274,3 +274,35 @@
     margin-top:6px; font-size:10.5px; color:var(--muted);}
   .chart-extra .chart-legend span{display:inline-flex; align-items:center; gap:6px; white-space:nowrap;}
   .chart-extra .chart-legend i{flex:none;}
+
+  /* ═══ C-14: symbol picker (demo หน้า 1) — ปุ่ม chip + popover รายชื่อ ═══ */
+  .sym-select-wrap{display:inline-flex; align-items:center; gap:9px; padding:3px 12px 3px 4px;
+    border-radius:12px; border:1px solid var(--border); background:var(--card); cursor:pointer;
+    font-family:var(--font-body); transition:.15s;}
+  .sym-select-wrap:hover{border-color:var(--border2);}
+  .sym-select-wrap .au-ic{width:30px; height:30px; border-radius:15px; display:grid; place-items:center;
+    font:700 12px var(--font-mono); flex:none; background:#E2B04A; color:#0D1117;}
+  .sym-select-wrap .sym-pick-meta{display:flex; flex-direction:column; gap:1px; min-width:0; text-align:left;}
+  .sym-select-wrap b{font-size:14px; font-weight:700; color:var(--text); line-height:1.15;}
+  .sym-select-wrap small{font-size:9.5px; color:var(--muted); line-height:1.15; white-space:nowrap;
+    overflow:hidden; text-overflow:ellipsis; max-width:110px;}
+  .sym-select-wrap > .ti{font-size:13px; color:var(--dim); flex:none;}
+  .sym-pop{display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:40;
+    min-width:250px; max-height:340px; overflow-y:auto; background:var(--surface);
+    border:1px solid var(--border); border-radius:14px; padding:8px;
+    box-shadow:0 12px 36px rgba(0,0,0,.55);}
+  .sym-pop.open{display:block;}
+  .sym-row{display:flex; align-items:center; gap:11px; padding:8px 9px; border-radius:10px; cursor:pointer;}
+  .sym-row:hover{background:rgba(255,255,255,.04);}
+  .sym-row + .sym-row{border-top:1px solid var(--border-subtle);}
+  .sym-row .sym-ic{width:28px; height:28px; border-radius:14px; display:grid; place-items:center;
+    font:700 10.5px var(--font-mono); flex:none; background:var(--accent); color:var(--text);}
+  .sym-row .sym-row-text{flex:1; min-width:0; display:flex; flex-direction:column; gap:1px;}
+  .sym-row .sym-row-text b{font-size:13px; font-weight:700; color:var(--text);}
+  .sym-row .sym-row-text small{font-family:var(--font-mono); font-size:9.5px; color:var(--muted);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .sym-row .ti-check{color:var(--accent); font-size:15px; flex:none;}
+  @media(max-width:768px){
+    .sym-pop{left:8px; right:8px; min-width:0;}
+    .sym-select-wrap small{display:none;}
+  }

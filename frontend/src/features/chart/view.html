@@ -1,8 +1,17 @@
       <!-- Main chart panel (TradingView style) -->
       <div class="panel chart-panel" id="chartPanel">
           <div class="chart-toolbar">
-          <span class="sym-select-wrap"><span class="au-ic">Au</span>
-            <select id="chartSymbol" class="sym-select" title="เลือกสัญลักษณ์"></select></span>
+          <!-- C-14: symbol picker แบบแอปเทรด (select เนทีบถูกซ่อน — ยังเป็น source of truth ให้ logic เดิม) -->
+          <button class="sym-select-wrap" id="btnSymPick" title="เลือกสัญลักษณ์" type="button">
+            <span class="au-ic" id="symPickIc">Au</span>
+            <span class="sym-pick-meta">
+              <b id="symPickName">XAUUSD</b>
+              <small id="symPickLabel">ทองคำ</small>
+            </span>
+            <i class="ti ti-chevron-down"></i>
+          </button>
+          <div class="sym-pop" id="symPop"></div>
+          <select id="chartSymbol" class="sym-select-native" style="display:none;"></select>
           <!-- C-11b: มือถือ TF รวมเป็น dropdown (desktop ยังกาง inline เหมือนเดิม) -->
           <button class="tf-btn tf-toggle" id="btnTf" title="เลือก Timeframe"><b id="tfCur">1m</b><i class="ti ti-chevron-down"></i></button>
           <div class="tf-pop" id="tfPop">

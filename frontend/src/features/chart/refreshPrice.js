@@ -15,6 +15,7 @@ async function refreshPrice(showLoading=false){
     if(symSel&&symSel.value) sym=symSel.value;
     if(!sym){ try{ const s=await fetchJSON('/api/symbol'); if(s&&s.symbol){sym=s.symbol;}}catch(e){} }
     if(!sym) sym='frxXAUUSD';
+    window.__symSync&&window.__symSync(); // C-14: sync ปุ่ม symbol picker (watchlist เปลี่ยน select ตรง ๆ ก็ตาม)
     const wrap=document.getElementById('lwWrap');
     if(showLoading && wrap) wrap.classList.add('loading');   // ← แสดง loading เฉพาะตอนผู้ใช้กดเปลี่ยน TF/symbol เอง
     // fetch candles + markers พร้อมกัน → เปลี่ยน TF เร็วขึ้น
