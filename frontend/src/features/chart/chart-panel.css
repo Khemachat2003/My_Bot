@@ -162,6 +162,9 @@
     /* แถบเดียว ไม่ wrap ไม่ต้องสไลด์ — TF รวมเป็น dropdown + เครื่องมือรองซ่อนหลัง ⋯ */
     .chart-toolbar{flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none; gap:4px; margin-top:6px;}
     .chart-toolbar::-webkit-scrollbar{display:none;}
+    /* C-15 fix: overflow-x:auto ทำให้ popover ทั้ง 3 (sym/tf/tools — absolute ใต้ toolbar) ถูกตัดหายบนมือถือ
+       → ชั่วขณะที่ popover เปิด ให้ toolbar หยุด clip (เนื้อหาบีบพอดี 360 อยู่แล้ว) */
+    .chart-toolbar:has(.sym-pop.open,.tf-pop.open,.tools-pop.open){overflow:visible;}
     /* C-14 fix: ปุ่มเส้น/แท่งต้องกดได้บนมือถือ (ไม่ซ่อน) — กันล้นจอแคบให้ toolbar เลื่อนได้เป็น fallback */
     .sym-select-wrap{padding:2px 6px 2px 3px; gap:5px; flex-shrink:0;}
     .sym-select-wrap .au-ic{width:24px; height:24px; border-radius:12px; font-size:10px;}
