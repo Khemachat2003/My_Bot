@@ -25,8 +25,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     const key=chip.dataset.ind;
     chartInd[key]=!chartInd[key];
     chip.classList.toggle('off',!chartInd[key]);
-    const bar=document.querySelector('.chart-extra .ind-chip[data-ind="'+key+'"]');
-    if(bar) bar.classList.toggle('active',chartInd[key]);
+    const bar=document.querySelector('.chart-extra .ind-row[data-ind="'+key+'"]');
+    if(bar) bar.classList.toggle('on',chartInd[key]);
     _updIndCount();
   });
   document.getElementById('lbCollapse')?.addEventListener('click',()=>{
@@ -34,15 +34,15 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
   // C-13 (demo): chips อยู่ 2 กลุ่ม (บนกราฟ/แผงย่อย) → delegate ที่ #chartExtra จุดเดียว
   const _updIndCount=()=>{
-    const chips=[...document.querySelectorAll('.chart-extra .ind-chip')];
-    const on=chips.filter(c=>c.classList.contains('active')).length;
+    const rows=[...document.querySelectorAll('.chart-extra .ind-row')];
+    const on=rows.filter(r=>r.classList.contains('on')).length;
     const el=document.getElementById('indCount');
-    if(el) el.textContent=`เปิดใช้งาน ${on}/${chips.length}`;
+    if(el) el.textContent=`เปิดใช้งาน ${on}/${rows.length}`;
   };
   document.getElementById('chartExtra')?.addEventListener('click',e=>{
-    const chip=e.target.closest('.ind-chip'); if(!chip) return;
-    chip.classList.toggle('active');
-    chartInd[chip.dataset.ind]=chip.classList.contains('active');
+    const row=e.target.closest('.ind-row'); if(!row) return;
+    row.classList.toggle('on');
+    chartInd[row.dataset.ind]=row.classList.contains('on');
     _updIndCount();
     if(lastCandles.length) drawLWChart(lastCandles,window._signalMarkers||[]);
   });
@@ -50,14 +50,14 @@ document.addEventListener('DOMContentLoaded',()=>{
   // รีเซ็ตเป็นค่าเริ่มต้น (demo: ปุ่มใน bottom sheet)
   document.getElementById('btnIndReset')?.addEventListener('click',()=>{
     Object.assign(chartInd,{ema:true,bb:true,sma5:true,rsi:true,adx:true,fractal:true,vol:true,grip:false});
-    document.querySelectorAll('.chart-extra .ind-chip').forEach(c=>c.classList.toggle('active',!!chartInd[c.dataset.ind]));
+    document.querySelectorAll('.chart-extra .ind-row').forEach(r=>r.classList.toggle('on',!!chartInd[r.dataset.ind]));
     _updIndCount();
     if(lastCandles.length) drawLWChart(lastCandles,window._signalMarkers||[]);
   });
   // เสร็จสิ้น = ปิด sheet/แผง
-  document.getElementById('btnIndDone')?.addEventListener('click',()=>{
-    document.getElementById('chartExtra')?.classList.remove('open');
-  });
+  const _indClose=()=>document.getElementById('chartExtra')?.classList.remove('open');
+  document.getElementById('btnIndDone')?.addEventListener('click',_indClose);
+  document.getElementById('btnIndClose')?.addEventListener('click',_indClose);
   // คลิกข้างนอก = ปิด (สะดวกทั้ง sheet มือถือและแผง desktop)
   document.addEventListener('click',(e)=>{
     const ex=document.getElementById('chartExtra');

@@ -64,31 +64,34 @@
           <div id="lwSrRows"></div>
         </div>
         <!-- C-8 TradingView-like: ตัวชี้วัด + คำอธิบายสัญลักษณ์ ซ่อนในแผงพับ (ค่าเริ่มต้น = กราฟสะอาด) -->
-        <!-- C-13 (demo): ตัวชี้วัด — มือถือเป็น bottom sheet (กลุ่มบนกราฟ/แผงย่อย + รีเซ็ต + เสร็จสิ้น) · desktop inline เหมือนเดิม -->
+        <!-- C-13b (demo หน้า 3): ตัวชี้วัดแบบรายการแถว + toggle switch + swatch รูปเส้นจริง
+             (มือถือ = bottom sheet · desktop = inline — โครงเดียวกัน) -->
         <div class="chart-extra" id="chartExtra">
           <div class="chart-extra-head" data-toggle-parent="open">
             <span class="cx-title"><i class="ti ti-adjustments-horizontal"></i> ตัวชี้วัด</span>
             <span class="cx-count" id="indCount">–</span>
+            <span class="cx-close" id="btnIndClose" title="ปิด"><i class="ti ti-x"></i></span>
             <span class="cx-caret">▾</span>
           </div>
           <div class="chart-extra-body">
             <div class="ind-group-label">บนกราฟราคา</div>
-            <div class="ind-bar">
-              <span class="ind-chip active" data-ind="ema">EMA 50/100/200</span>
-              <span class="ind-chip active" data-ind="bb">BB (20,2)</span>
-              <span class="ind-chip active" data-ind="sma5">SMA5</span>
+            <div class="ind-list">
+              <div class="ind-row on" data-ind="ema"><span class="sw line" style="color:#9C6FE0"></span><span class="ind-text"><b>EMA</b><small>ช่วง 50 / 100 / 200</small></span><span class="ind-switch"><span class="ind-knob"></span></span></div>
+              <div class="ind-row on" data-ind="bb"><span class="sw dot" style="color:#2962FF"></span><span class="ind-text"><b>Bollinger Bands</b><small>ช่วง 20 · ส่วนเบี่ยงเบน 2</small></span><span class="ind-switch"><span class="ind-knob"></span></span></div>
+              <div class="ind-row on" data-ind="sma5"><span class="sw line" style="color:#26C6DA"></span><span class="ind-text"><b>SMA</b><small>ช่วง 5</small></span><span class="ind-switch"><span class="ind-knob"></span></span></div>
             </div>
             <div class="ind-group-label">แผงย่อยด้านล่าง</div>
-            <div class="ind-bar">
-              <span class="ind-chip active" data-ind="rsi">RSI 14</span>
-              <span class="ind-chip active" data-ind="adx">ADX 14</span>
-              <span class="ind-chip active" data-ind="fractal">Fractal 15</span>
-              <span class="ind-chip active" data-ind="vol">Volume</span>
+            <div class="ind-list">
+              <div class="ind-row on" data-ind="rsi"><span class="sw line" style="color:#9C6FE0"></span><span class="ind-text"><b>RSI</b><small>ช่วง 14 · โซน 30 / 70</small></span><span class="ind-switch"><span class="ind-knob"></span></span></div>
+              <div class="ind-row on" data-ind="adx"><span class="sw line" style="color:#FF9800"></span><span class="ind-text"><b>ADX</b><small>ช่วง 14 · เกณฑ์ 25 · +DI −DI</small></span><span class="ind-switch"><span class="ind-knob"></span></span></div>
+              <div class="ind-row on" data-ind="fractal"><span class="sw tri" style="color:#FF9800"></span><span class="ind-text"><b>Fractal</b><small>จุดกลับตัว · 15 แท่ง · สูง=ต้าน ต่ำ=รับ</small></span><span class="ind-switch"><span class="ind-knob"></span></span></div>
+              <div class="ind-row on" data-ind="vol"><span class="sw bars" style="color:#8A8F9C"></span><span class="ind-text"><b>Volume</b><small>ปริมาณซื้อขาย</small></span><span class="ind-switch"><span class="ind-knob"></span></span></div>
             </div>
             <div class="ind-actions">
               <button class="btn" id="btnIndReset">รีเซ็ตเป็นค่าเริ่มต้น</button>
               <button class="btn accent" id="btnIndDone">เสร็จสิ้น</button>
             </div>
+            <div class="ind-group-label">คำอธิบายสัญลักษณ์บนกราฟ</div>
             <div class="chart-legend">
               <span><i style="background:#9C6FE0;"></i>EMA50</span>
               <span><i style="background:#787B86;"></i>EMA100</span>

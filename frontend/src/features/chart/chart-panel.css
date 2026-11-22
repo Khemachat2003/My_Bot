@@ -227,3 +227,50 @@
     .chart-extra .ind-bar{gap:6px;}
     .chart-extra .ind-chip{padding:7px 12px; font-size:12px;}
   }
+
+  /* ═══ C-13b (demo หน้า 3): รายการตัวชี้วัดแบบแถว + toggle switch + swatch ═══ */
+  .chart-extra .ind-list{display:flex; flex-direction:column; margin:0 -6px;}
+  .ind-row{
+    display:flex; align-items:center; gap:12px; min-height:50px; padding:4px 8px;
+    cursor:pointer; border-radius:10px; transition:background .15s;
+  }
+  .ind-row:hover{background:rgba(255,255,255,.03);}
+  .ind-row + .ind-row{border-top:1px solid var(--border-subtle);}
+  .ind-text{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; line-height:1.25;}
+  .ind-row .ind-text b{font-size:13.5px; font-weight:700; color:var(--text);}
+  .ind-row .ind-text small{font-family:var(--font-mono); font-size:10.5px; color:var(--muted);}
+  .ind-row:not(.on) .ind-text b{color:var(--muted);}
+  .ind-row:not(.on) .ind-text small{color:var(--dim);}
+
+  /* swatch — ภาพย่อรูปลักษณ์เส้นจริงบนกราฟ (เส้น/จุด/สามเหลี่ยม/แท่ง) */
+  .sw{width:30px; height:14px; flex:none; position:relative; color:var(--accent);}
+  .sw::before{content:''; position:absolute; left:0; right:0; top:6px; height:3px; border-radius:2px; background:currentColor;}
+  .sw.dot::before{background:repeating-linear-gradient(90deg,currentColor 0 2px,transparent 2px 6px);}
+  .sw.tri::before{height:0; width:0; left:5px; right:auto; top:2px; border-left:5px solid transparent;
+    border-right:5px solid transparent; border-bottom:9px solid currentColor; background:none;}
+  .sw.tri::after{content:''; position:absolute; right:5px; top:3px; width:0; height:0;
+    border-left:5px solid transparent; border-right:5px solid transparent; border-top:9px solid currentColor;}
+  .sw.bars::before{height:11px; top:2px; border-radius:1px;
+    background:repeating-linear-gradient(90deg,currentColor 0 3px,transparent 3px 7px);}
+  .ind-row:not(.on) .sw{opacity:.4;}
+
+  /* toggle switch (ตาม demo: track 40x24 / knob 18px) */
+  .ind-switch{width:40px; height:24px; border-radius:12px; background:var(--border);
+    position:relative; flex:none; transition:background .2s;}
+  .ind-knob{position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:9px;
+    background:var(--muted); transition:left .2s, background .2s;}
+  .ind-row.on .ind-switch{background:var(--accent);}
+  .ind-row.on .ind-knob{left:19px; background:var(--bg);}
+
+  /* ปุ่ม X ปิดบนหัว sheet + ปุ่มล่าง 48px ตาม demo */
+  .cx-close{width:38px; height:38px; margin-left:2px; background:transparent; border:none;
+    color:var(--muted); font-size:16px; cursor:pointer; border-radius:9px; flex:none;}
+  .cx-close:hover{color:var(--text); background:rgba(255,255,255,.05);}
+  .chart-extra .ind-actions .btn{padding:0 16px; height:48px; border-radius:12px; font-size:13.5px; font-weight:700;}
+  .chart-extra .ind-actions .btn:not(.accent){background:transparent; border:1px solid var(--border2);}
+
+  /* legend ในแผง — จัด grid กระชับ */
+  .chart-extra .chart-legend{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px 12px;
+    margin-top:6px; font-size:10.5px; color:var(--muted);}
+  .chart-extra .chart-legend span{display:inline-flex; align-items:center; gap:6px; white-space:nowrap;}
+  .chart-extra .chart-legend i{flex:none;}
