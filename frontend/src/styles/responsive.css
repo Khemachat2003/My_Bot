@@ -73,12 +73,15 @@
     }
     body.drawer-open .sidebar{transform:translateX(0); box-shadow:var(--shadow-panel);}
 
-    /* ── 5.1: ชาร์ตเต็มกว้างก่อน → Gauges|Mini Setup เลื่อนแนวนอน → watchlist ท้ายสุด ── */
+    /* ── 5.1 (ปรับ 2026-11-22): ชาร์ตเต็มกว้างก่อน → Hero/Gauges/Setup การ์ดเต็มความกว้าง 100% เรียงลง → watchlist ท้ายสุด
+          เดิม (C-7): ตั้งใจให้ side-col เป็นแถวเลื่อนแนวนอน การ์ดละ 78% — แต่ชน display:grid จาก
+          terminal-layout.css (ยังค้าง ≤1300px) → flex-direction ตาย + เหลือแต่ max-width:78%
+          ผลลัพธ์: การ์ดทุกใบกว้าง 78% เว้นช่องขวา 22% และสกรอลล์ไม่ทำงาน — แก้เป็น column เต็ม 100% ── */
     .terminal{grid-template-columns:1fr; gap:12px;}
     .terminal .chart-panel{order:-1;}
     .terminal .wlist{order:9;}
-    .terminal .side-col{flex-direction:row; align-items:flex-start; overflow-x:auto; padding-bottom:4px;}
-    .terminal .side-col > .panel{flex:0 0 78%; max-width:78%;}
+    .terminal .side-col{display:flex; flex-direction:column; align-items:stretch; gap:12px; overflow:visible; padding-bottom:0;}
+    .terminal .side-col > .panel{flex:0 0 auto; width:100%; max-width:100%;}
 
     /* ── KPI/สถิติ + การ์ดสรุป → แถบเลื่อนแนวนอน (5.1 KPI strip / 5.2–5.3 มือถือ)
          .content ... = ชนะ report-layout/overview-bottom ที่ import ทีหลัง ── */
@@ -106,6 +109,19 @@
     .tbl-cards td:last-child{border-bottom:none;}
     .tbl-cards td[colspan]{display:block; text-align:center; padding:12px 2px; border-bottom:none;}
     .tbl-cards td[colspan]::before{content:none;}
+
+    /* ── 2026-11-22 พรีเมียมมือถือ: 3 การ์ด side-col (Hero ML / Probability Gauges / Setup ทุกคู่เงิน)
+          Gauges: วงแหวนซ้าย + ชิปสถิติเรียงขวา — ใช้พื้นที่เต็มการ์ด (เดิมวงกลาง เหลือข้างว่างเยอะ) ── */
+    .gauge{flex-direction:row; flex-wrap:wrap; align-items:center; gap:8px 12px;}
+    .gauge .g-top{flex:1 1 100%;}
+    .gauge .g-ring{width:118px; flex:0 0 118px; margin:0;}
+    .gauge .g-chips{flex:1 1 0; min-width:0; width:auto; flex-direction:column; gap:5px;}
+    .gauge .g-chip{overflow:hidden; text-overflow:ellipsis;}
+    .gauge .gempty{flex:1 1 100%;}
+    /* Hero Signal: แถว countdown M1/M5 ให้ wrap ลงบรรทัดใหม่บนจอแคบ แทนบีบเข้ากัน */
+    .hero-cd{flex-wrap:wrap;}
+    /* Setup ทุกคู่เงิน: แถว compact กระชับขึ้นบนจอแคบ (คอลัมน์ sym/tier/score เล็กลง) */
+    .setup-row-head{grid-template-columns:72px 48px 1fr 42px; padding:9px 10px;}
   }
   /* ≥769px: ไม่มี hamburger/drawer — desktop คง pixel เดิมจาก C-6 ทุกจุด */
   @media(min-width:769px){
