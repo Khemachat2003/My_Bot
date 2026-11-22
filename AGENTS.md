@@ -31,13 +31,14 @@ cd frontend && npm run check                # lint + typecheck + unit test + bui
 cd frontend && npm run dev                  # dev server (API จาก uvicorn :8000 ที่ต้องรันคู่)
 cd frontend && npm run build                # build → dist/ (แล้ว commit dist — ดูกฎด้านล่าง)
 cd frontend && npm run test:visual          # ภาพ + network ต้องตรง baseline
+git tag v1.0.x && git push origin v1.0.x    # DEPLOY ขึ้น VPS — ห้ามทำโดยไม่ได้รับสั่ง (กฎข้อ 2)
 ```
 
 ## กฎเหล็ก (ห้ามละเมิด)
 
 1. **ห้ามแตะ `executor/`** และ logic การเทรด/คำนวณ/ส่งสัญญาณ — `setup_scorer.py`, `setup_feed.py`,
    `notifier.py`, `indicators.py` ถ้าต้องแตะ หยุดแล้วถามผู้ใช้ก่อนเสมอ
-2. **ห้าม push main** — push main = auto-deploy ขึ้น VPS จริง ทำงานบน branch เท่านั้น
+2. **ห้าม deploy โดยไม่ได้รับสั่ง** — ตอนนี้ deploy ขึ้น VPS ด้วยการ push **tag `v*`** เท่านั้น (push main ไม่ deploy แล้ว) ทำงานบน branch เท่านั้น
 3. **ห้ามใส่ความลับในโค้ด** — token/รหัสผ่าน/IP อยู่ที่ `.env` เท่านั้น (รวมถึงไฟล์ test/fixture)
 4. **ห้ามอ่านไฟล์ใหญ่ทั้งไฟล์** (`db.py`, `api.py`, `index.html` เก่า) — ใช้ grep/outline
    แล้วอ่านเฉพาะช่วงที่ต้องการ ดูจุดแก้ที่ต้องการจาก `docs/code_map.md` ก่อน
@@ -47,6 +48,10 @@ cd frontend && npm run test:visual          # ภาพ + network ต้อง�
 8. **บันทึกงานทุกครั้งใน `WORKLOG.md`** — agent ทุกตัวเริ่มงานต้องอ่าน `WORKLOG.md` ก่อน (ประวัติแก้ไข +
    สถานะ VPS + playbook ดิสก์เต็ม) และ**จบงานต้อง append log ใหม่ที่ท้ายไฟล์** ตาม template ในนั้น
    — ไฟล์นี้อยู่ LOCAL เท่านั้น (ถูก .gitignore ไว้ ห้าม commit/push/deploy ขึ้น VPS)
+9. **Actions แดง ≠ deploy พัง** — หลัง push tag อย่าเชื่อสถานะ run อย่างเดียว: healthcheck เดิมรอแค่ 8 วิ เคย
+   false-negative หลายรอบ (v1.0.2/12/13/14 deploy จริงสำเร็จแต่รายงาน fail — แก้เป็น retry 90 วิแล้วตั้งแต่ v1.0.15)
+   ต้องพิสูจน์จากของจริง: ดู log run (token อยู่ใน git credential — ใช้แบบไม่พิมพ์ค่า) หรือ curl `/api/health`
+   + ไฟล์ asset ใหม่ `/static/dist/assets/index-*` บน VPS (IP + playbook เช็คอยู่ใน WORKLOG) ก่อนสรุปว่าพัง
 
 ## อยากแก้อะไร → ไปที่ไหน
 

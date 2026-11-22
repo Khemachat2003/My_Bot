@@ -87,9 +87,14 @@ jobs:
             docker compose up -d --build
             echo '--- deployed commit (ต้องตรงกับ tag) ---'
             git rev-parse --short HEAD
-            echo '--- healthcheck (หน่วงเวลา 8 วิ รอ boot) ---'
-            sleep 8
-            curl -s -f http://127.0.0.1:8000/api/health || { echo 'HEALTH FAILED — ดู log ด้านล่าง'; docker compose logs --tail=60; exit 1; }
+            echo '--- healthcheck (ลองสูงสุด 90 วิ ทุก 5 วิ — api บูตช้ากว่า 8 วิ, แก้จาก sleep 8 ครั้งเดียวที่เคย false-negative) ---'
+            ok=0
+            for i in \$(seq 1 18); do
+              sleep 5
+              if curl -s -f http://127.0.0.1:8000/api/health; then ok=1; echo; echo \"HEALTH OK (ครั้งที่ \$i)\"; break; fi
+              echo \"...ยังไม่ตอบ (ลองแล้ว \$i/18)\"
+            done
+            if [ \"\$ok\" = \"0\" ]; then echo 'HEALTH FAILED — ดู log ด้านล่าง'; docker compose logs --tail=60; exit 1; fi
             docker compose ps
           "
 

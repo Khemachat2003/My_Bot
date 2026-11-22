@@ -51,10 +51,14 @@ feat(chart): เพิ่ม timeframe 15m
 
 ---
 
-## 2) Push ขึ้น GitHub
+## 2) Push ขึ้น GitHub + Deploy
+
+> **เตือน:** กลไกเปลี่ยนแล้ว — push branch/main **ไม่ deploy** อีกต่อไป
+> deploy ขึ้น VPS ทำผ่าน **push tag `v*`** เท่านั้น ("tag = ปุ่มอนุมัติ deploy" — ดู `.github/workflows/deploy.yml`)
 
 ```bash
-git push origin main
+git push origin feature/<branch>            # เก็บงานขึ้น GitHub (ยังไม่ deploy)
+git tag v1.0.14 && git push origin v1.0.14  # ← อันนี้คือ deploy จริง (ต้องได้รับสั่งก่อน)
 ```
 
 ถ้าเป็นครั้งแรกของเครื่องใหม่ในทีม:
@@ -63,12 +67,13 @@ git push origin main
 git remote -v                  # ต้องเห็น origin -> https://github.com/Khemachat2003/My_Bot.git
 git fetch origin
 git pull --rebase origin main  # ดึงของที่เพื่อน push มาก่อน
-git push origin main
 ```
 
-> **push แล้วได้อะไรต่อ?** → GitHub Actions จะ deploy ขึ้น VPS ให้เองอัตโนมัติ
-> ดูผลได้ที่ **GitHub → repo → Actions → Deploy to VPS**
-> ✅ เขียว = สำเร็จ · 🔴 แดง = ดู log ในนั้นเลย
+> **push tag แล้วได้อะไรต่อ?** → GitHub Actions จะ SSH เข้า VPS: fetch → checkout tag → build → สตาร์ตใหม่ →
+> healthcheck (ลองสูงสุด 90 วิ) ดูผลได้ที่ **GitHub → repo → Actions → Deploy to VPS**
+> ✅ เขียว = สำเร็จ · 🔴 แดง = อย่าเพิ่งเชื่อ ให้ดู log ในนั้น + พิสูจน์จากของจริง (curl `/api/health`
+> + ไฟล์ asset ใหม่ `/static/dist/assets/index-*` บน VPS — เคย false-negative หลายรอบตอน healthcheck
+> รอแค่ 8 วิ ก่อนแก้เป็น retry — ดูประวัติใน WORKLOG.md)
 
 ---
 
