@@ -160,8 +160,9 @@
 
   @media(max-width:768px){
     /* แถบเดียว ไม่ wrap ไม่ต้องสไลด์ — TF รวมเป็น dropdown + เครื่องมือรองซ่อนหลัง ⋯ */
-    .chart-toolbar{flex-wrap:nowrap; overflow:visible; gap:4px; margin-top:6px;}
-    #typeGroup{display:none;}               /* สลับเส้น/แท่งทำผ่านโหมดบนมือถือ (มอนิเตอร์=เส้น/วิเคราะห์=แท่ง) */
+    .chart-toolbar{flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none; gap:4px; margin-top:6px;}
+    .chart-toolbar::-webkit-scrollbar{display:none;}
+    /* C-14 fix: ปุ่มเส้น/แท่งต้องกดได้บนมือถือ (ไม่ซ่อน) — กันล้นจอแคบให้ toolbar เลื่อนได้เป็น fallback */
     .sym-select-wrap{padding:2px 6px 2px 3px; gap:5px; flex-shrink:0;}
     .sym-select-wrap .au-ic{width:24px; height:24px; border-radius:12px; font-size:10px;}
     .sym-select{max-width:86px; padding:5px 2px;}
@@ -305,4 +306,20 @@
   @media(max-width:768px){
     .sym-pop{left:8px; right:8px; min-width:0;}
     .sym-select-wrap small{display:none;}
+  }
+
+  /* C-14 fix: ย่อ sym picker บนมือถือให้แถบ toolbar (sym+TF+fx+เส้น/แท่ง+โหมด+⋯) พอดีจอ 360-390 ไม่ต้องสไลด์ */
+  @media(max-width:768px){
+    .sym-select-wrap{padding:2px 8px 2px 4px; gap:7px;}
+    .sym-select-wrap .au-ic{width:26px; height:26px; border-radius:13px; font-size:10.5px;}
+    .sym-select-wrap b{font-size:13px;}
+    .sym-select-wrap > .ti{font-size:11px;}
+  }
+
+  /* C-14 fix (ต่อ): บีบให้พอดี 360 — ตัด chevron sym picker + ปุ่มแคบลง + gap 3px */
+  @media(max-width:768px){
+    .chart-toolbar{gap:3px;}
+    .sym-select-wrap > .ti{display:none;}
+    #btnTf{min-width:54px;}
+    #typeGroup .tf-btn{padding:0 6px;}
   }
