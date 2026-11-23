@@ -135,3 +135,84 @@
     #rsiChart{height:76px;}
     #adxChart{height:80px;}
   }
+
+  /* ═══ C-20 mobile: การ์ดสัญญาณกระชับ — ตารางประวัติ ML/Setup จากแถว label/value 13-14 แถว
+     (~650px/สัญญาณ) → การ์ด grid 4 แถว (~150px) โดยข้อมูลครบทุกช่อง ═══ */
+  @media(max-width:768px){
+    #mlFullTable.tbl-cards tr,
+    #setupTable.tbl-cards tr{
+      display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px 10px; padding:10px 12px;
+    }
+    #mlFullTable.tbl-cards tr{
+      grid-template-areas:
+        "time time dir result"
+        "entry sl tp rr"
+        "exit prob thresh hold"
+        "tf model model model";
+    }
+    #setupTable.tbl-cards tr{
+      grid-template-areas:
+        "time time dir result"
+        "entry sl tp rr"
+        "exit score tier passed"
+        "sym tf imp .";
+    }
+    #mlFullTable.tbl-cards td,
+    #setupTable.tbl-cards td{
+      display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start; gap:3px;
+      min-width:0; padding:0; border-bottom:none; text-align:left; white-space:normal; overflow-wrap:break-word;
+    }
+    #mlFullTable.tbl-cards td::before,
+    #setupTable.tbl-cards td::before{font-size:8px; line-height:1; color:var(--dim);}
+    #mlFullTable.tbl-cards td.mono,
+    #setupTable.tbl-cards td.mono{font-size:10.5px; line-height:1.3;}
+    #mlFullTable.tbl-cards td:nth-child(1),
+    #setupTable.tbl-cards td:nth-child(1){grid-area:time; flex-direction:row; align-items:center; font-size:10.5px;}
+    #mlFullTable.tbl-cards td:nth-child(3),
+    #setupTable.tbl-cards td:nth-child(5){grid-area:dir; flex-direction:row; align-items:center; justify-self:end; align-self:center;}
+    #mlFullTable.tbl-cards td:nth-child(13),
+    #setupTable.tbl-cards td:nth-child(14){grid-area:result; flex-direction:row; align-items:center; justify-self:end; align-self:center;}
+    #mlFullTable.tbl-cards td:nth-child(1)::before,
+    #mlFullTable.tbl-cards td:nth-child(2)::before,
+    #mlFullTable.tbl-cards td:nth-child(3)::before,
+    #mlFullTable.tbl-cards td:nth-child(12)::before,
+    #mlFullTable.tbl-cards td:nth-child(13)::before,
+    #setupTable.tbl-cards td:nth-child(1)::before,
+    #setupTable.tbl-cards td:nth-child(2)::before,
+    #setupTable.tbl-cards td:nth-child(3)::before,
+    #setupTable.tbl-cards td:nth-child(4)::before,
+    #setupTable.tbl-cards td:nth-child(5)::before,
+    #setupTable.tbl-cards td:nth-child(14)::before{content:none;}
+    #mlFullTable.tbl-cards td:nth-child(4),
+    #setupTable.tbl-cards td:nth-child(6){grid-area:entry;}
+    #mlFullTable.tbl-cards td:nth-child(5),
+    #setupTable.tbl-cards td:nth-child(7){grid-area:sl;}
+    #mlFullTable.tbl-cards td:nth-child(6),
+    #setupTable.tbl-cards td:nth-child(8){grid-area:tp; font-size:9.5px;}
+    #mlFullTable.tbl-cards td:nth-child(7),
+    #setupTable.tbl-cards td:nth-child(9){grid-area:rr; font-size:9.5px;}
+    #mlFullTable.tbl-cards td:nth-child(8),
+    #setupTable.tbl-cards td:nth-child(10){grid-area:exit;}
+    #mlFullTable.tbl-cards td:nth-child(9){grid-area:prob;}
+    #mlFullTable.tbl-cards td:nth-child(10){grid-area:thresh;}
+    #mlFullTable.tbl-cards td:nth-child(11){grid-area:hold; flex-direction:row; align-items:center;}
+    #setupTable.tbl-cards td:nth-child(11){grid-area:score;}
+    #setupTable.tbl-cards td:nth-child(12){grid-area:tier;}
+    #setupTable.tbl-cards td:nth-child(13){grid-area:passed;}
+    #mlFullTable.tbl-cards td:nth-child(9) .mdl-meter,
+    #setupTable.tbl-cards td:nth-child(11) .mdl-meter{flex-direction:column-reverse; align-items:stretch; gap:4px; width:100%;}
+    #mlFullTable.tbl-cards td:nth-child(9) .mdl-meter .dl-track,
+    #setupTable.tbl-cards td:nth-child(11) .mdl-meter .dl-track{width:100%;}
+    #mlFullTable.tbl-cards td:nth-child(9) .mdl-meter b,
+    #setupTable.tbl-cards td:nth-child(11) .mdl-meter b{font-size:10.5px;}
+    #mlFullTable.tbl-cards td:nth-child(2),
+    #setupTable.tbl-cards td:nth-child(3){grid-area:tf; flex-direction:row; align-items:center; align-self:center;}
+    #mlFullTable.tbl-cards td:nth-child(12){grid-area:model; flex-direction:row; align-items:center; gap:5px; align-self:center;}
+    #mlFullTable.tbl-cards td:nth-child(12) .mdl-ver{max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+    #setupTable.tbl-cards td:nth-child(2){grid-area:sym; flex-direction:row; align-items:center; align-self:center; font-size:11px;}
+    #setupTable.tbl-cards td:nth-child(4){grid-area:imp; flex-direction:row; align-items:center; align-self:center;}
+  }
+  @media(max-width:380px){
+    #mlFullTable.tbl-cards tr,
+    #setupTable.tbl-cards tr{gap:6px 6px; padding:8px 10px;}
+  }
