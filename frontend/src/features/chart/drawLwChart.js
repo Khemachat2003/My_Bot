@@ -3,7 +3,7 @@
 
 import { _clearPriceLines, _renderLWMarkers, _selLines } from './chartControls.js';
 import { _renderLWDefaultLegend } from './chartLegend.js';
-import { _candleTime, initLWChart, lwAdx, lwBbL, lwBbM, lwBbU, lwCandle, lwChart, lwEma100, lwEma200, lwEma50, lwLine, lwNdi, lwPdi, lwRsi, lwRsiBand, lwSma5, lwVol, refreshLWResize } from './lwChartInit.js';
+import { _candleTime, initLWChart, lwAdx, lwBbL, lwBbM, lwBbU, lwCandle, lwChart, lwEma100, lwEma200, lwEma50, lwLine, lwNdi, lwPdi, lwRsi, lwRsiBand, lwSma5, lwVol, refreshLWResize, setLWBarCount } from './lwChartInit.js';
 import { _bbArr, _emaArr, _normLW, _smaArr } from './seriesTransforms.js';
 import { adx, fractal, rsi } from '../../shared/lib/indicators.js';
 
@@ -62,6 +62,9 @@ function drawLWChart(prices,markers,tf){
   lastCandles=prices||[];  // sync ไว้ → ปุ่ม toggle indicator (#chartIndBar) redraw ได้ทันทีโดยไม่ต้องรอ refresh รอบหน้า
   const bars=_normLW(prices);
   if(!bars.length) return;
+  // C-16: บอก sync/clamp ว่าแท่งล่าสุดคือ index ไหน — ขอบขวาของมุมมองจำกัดตามข้อมูลจริง
+  // (ต้องตั้งก่อน setData/fitContent เพื่อกัน callback แรก clamp ด้วยค่าเก่า)
+  setLWBarCount(bars.length);
   initLWChart();
   const needInit=!lwCandle;
   const sym=document.getElementById('chartSymbol')?.value||'';
@@ -104,21 +107,29 @@ function drawLWChart(prices,markers,tf){
   // ถ้า setData([]) ตอนซ่อน sync ข้าม pane จะดึง range กราฟหลักให้หดเหลือไม่กี่แท่ง
   if(chartInd.rsi&&bars.length>=16&&lwRsi){
     const rv=rsi(closesArr,14);
-    const rdt=bars.map((b,i)=>({time:b.time,value:rv[i]})).filter(d=>d.value!=null);
-    lwRsi.setData(rdt); window.__lastRsi=ana&&rdt.length?rdt[rdt.length-1].value:null;
+    // C-16: ช่วง warm-up (14 แท่งแรก) เติม whitespace ({time} เปล่า ๆ) แทน filter ทิ้ง —
+    // ให้ logical index ของ pane เริ่มแท่ง 0 เหมือนกราฟหลัก → sync pan/zoom ข้าม pane ตรงกันเป๊ะ
+    const rdt=bars.map((b,i)=>rv[i]==null?{time:b.time}:({time:b.time,value:rv[i]}));
+    lwRsi.setData(rdt);
+    window.__lastRsi=(ana&&rdt.length&&rdt[rdt.length-1].value!=null)?rdt[rdt.length-1].value:null;
     // C-9 (mockup): band แรเงา 30-70 ลากตามช่วงเวลาเดียวกับ RSI (ค่าคงที่ 70)
     if(lwRsiBand) lwRsiBand.setData(bars.map(b=>({time:b.time,value:70})));
   } else { if(lwRsi) lwRsi.setData([]); if(lwRsiBand) lwRsiBand.setData([]); }
   // ── ADX (pane แยก #adxChart แถวนี้เป็นแถวล่างสุด → มีแกนเวลา) ──
   if(chartInd.adx&&bars.length>=28&&lwAdx){
     const aa=adx(bars.map(b=>b.high),bars.map(b=>b.low),closesArr,14);
-    const adt=bars.map((b,i)=>({time:b.time,value:aa.adx[i]})).filter(d=>d.value!=null);
-    const pdt=bars.map((b,i)=>({time:b.time,value:aa.pdi[i]})).filter(d=>d.value!=null);
-    const ndt=bars.map((b,i)=>({time:b.time,value:aa.ndi[i]})).filter(d=>d.value!=null);
+    // C-16: เติม whitespace ช่วง warm-up (~27 แท่งแรก) แทน filter ทิ้ง — ต้นเหตุจริงของ
+    // "ลาก/หุบที่แกนเวลาใต้ pane ADX แล้วกราฟหลักเด้งไปโซนข้อมูลเก่า แท่งล่าสุดฝั่งขวาหาย":
+    // เดิม pane นี้เริ่ม logical index 0 ที่จริงคือแท่งที่ ~27 ของกราฟหลัก → sync ส่ง range
+    // ผิดตำแหน่งข้าม pane ทุกครั้งที่ผู้ใช้แตะ pane ล่าง (จุดที่มีแกนเวลา — คนใช้เล่นบ่อยสุด)
+    const _ws=(b,i,v)=>v==null?{time:b.time}:({time:b.time,value:v});
+    const adt=bars.map((b,i)=>_ws(b,i,aa.adx[i]));
+    const pdt=bars.map((b,i)=>_ws(b,i,aa.pdi[i]));
+    const ndt=bars.map((b,i)=>_ws(b,i,aa.ndi[i]));
     lwAdx.setData(adt); lwPdi.setData(pdt); lwNdi.setData(ndt);
-    window.__lastAdx=ana&&adt.length?adt[adt.length-1].value:null;
-    window.__lastPdi=pdt.length?pdt[pdt.length-1].value:null;
-    window.__lastNdi=ndt.length?ndt[ndt.length-1].value:null;
+    window.__lastAdx=(ana&&adt.length&&adt[adt.length-1].value!=null)?adt[adt.length-1].value:null;
+    window.__lastPdi=(pdt.length&&pdt[pdt.length-1].value!=null)?pdt[pdt.length-1].value:null;
+    window.__lastNdi=(ndt.length&&ndt[ndt.length-1].value!=null)?ndt[ndt.length-1].value:null;
   } else { if(lwAdx){ lwAdx.setData([]); lwPdi.setData([]); lwNdi.setData([]); } }
   _renderLWDefaultLegend();   // ← เรียกซ้ำหลังได้ค่า RSI/ADX ล่าสุด → legend แสดงทันที
 

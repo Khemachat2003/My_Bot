@@ -36,6 +36,11 @@ function initLWChart(){
     rightPriceScale:{borderColor:'#2A2E39',minimumWidth:64,scaleMargins:{top:0.06,bottom:0.28}},
     timeScale:{borderColor:'#2A2E39',timeVisible:true,secondsVisible:false,rightOffset:1,barSpacing:7},
     localization:{locale:'th-TH'},
+    // C-16 TradingView-like มือถือ: ปัดแนวนอน = เลื่อนเวลา (มีแรงเฉื่อน kinetic)
+    // ปัดแนวตั้ง = ไม่แตะแกนราคา (เดิม default vertTouchDrag:true → ลากขึ้น-ลงบนมือถือ
+    // แล้วแกนราคาเลื่อนจนกราฟเพี้ยน ไม่ใช่แค่สกรอลล์หน้าเว็บตามที่ผู้ใช้คาด)
+    handleScroll:{mouseWheel:true,pressedMouseMove:true,horizTouchDrag:true,vertTouchDrag:false,kineticScroll:{touch:true,mouse:false}},
+    handleScale:{mouseWheel:true,pinch:true,axisPressedMouseMove:true,axisDoubleClickReset:true},
   };
   // ── pane ราคาหลัก (ซ่อนแกนเวลา — แกนเวลาจะอยู่ที่แถบ ADX ล่างสุด) ──
   const el=document.getElementById('candleChart'); if(!el) return;
@@ -109,17 +114,51 @@ function initLWChart(){
 }
 
 // ── sync pan/zoom ข้ามทุกแถบ (ตามแพทเทิร์นใน multi-pane-chart-demo.html) ──
+// C-16: + จำกัดขอบขวา (แท่งล่าสุดหลุดจอไม่ได้ — จำกัดตามจำนวนแท่งที่ระบบดึงมาจริง)
+//       + ปุ่มลอย "กลับแท่งล่าสุด" แบบ TradingView (โผล่เมื่อเลื่อนดูประวัติ)
+//   เดิม: timeScale ปล่อยให้มุมมองเลื่อน/หุบเลยแท่งล่าสุดได้ไม่จำกัด → หุบกราฟแล้ว
+//   แท่งล่าสุดฝั่งขวาหลุดออกนอกจอ ทั้งที่ข้อมูลมีแค่ N แท่ง (ตามที่ผู้ใช้รายงาน)
+//   หมายเหตุ: ปัญหาที่รุนแรงกว่า (ลากแกนเวลาใต้ pane ADX แล้วกราฟหลักเด้งไปโซนเก่า)
+//   แก้ที่ต้นเหตุใน drawLwChart.js — เติม whitespace ให้ทุก pane เริ่ม logical index 0 เหมือนกัน
+const LW_RIGHT_PAD=10;   // เผื่อที่ว่างหลังแท่งล่าสุด (หน่วย: แท่ง)
+let _lwLastIdx=-1;       // logical index ของแท่งล่าสุด — drawLWChart ตั้งค่าก่อน setData ทุกครั้ง
+function setLWBarCount(n){ _lwLastIdx=Number(n)>0?Number(n)-1:-1; }
+function _lwGoBtn(show){
+  let b=document.getElementById('lwGoLatest');
+  if(!b){
+    const wrap=document.getElementById('lwWrap'); if(!wrap) return;
+    b=document.createElement('button');
+    b.id='lwGoLatest'; b.type='button'; b.title='กลับไปที่แท่งล่าสุด';
+    b.innerHTML='<i class="ti ti-chevrons-right"></i>';
+    b.addEventListener('click',()=>{
+      try{ _lwCharts.forEach(c=>c.timeScale().scrollToRealTime()); }catch(e){}
+      b.classList.remove('show');
+    });
+    wrap.appendChild(b);
+  }
+  b.classList.toggle('show',!!show);
+}
 function _lwSyncPanes(){
   _lwCharts=[lwChart,lwRsiC,lwAdxC].filter(Boolean);
   let syncing=false;
   _lwCharts.forEach(c=>{
     c.timeScale().subscribeVisibleLogicalRangeChange(range=>{
       if(syncing||!range) return;
+      // จำกัดขอบขวา: ขอบขวาของมุมมองเกิน "แท่งล่าสุด + เผื่อ 10 แท่ง" ไม่ได้ —
+      // shift ทั้งหน้าต่างกลับ (คง barSpacing เดิม → รู้สึกเหมือน anchor ติดขอบขวาตลอด)
+      let target=range;
+      if(_lwLastIdx>50){
+        const maxTo=_lwLastIdx+LW_RIGHT_PAD;
+        if(range.to>maxTo) target={from:range.from-(range.to-maxTo),to:maxTo};
+      }
       syncing=true;
-      _lwCharts.forEach(o=>{ if(o!==c) o.timeScale().setVisibleLogicalRange(range); });
+      if(target!==range) c.timeScale().setVisibleLogicalRange(target);
+      _lwCharts.forEach(o=>{ if(o!==c) o.timeScale().setVisibleLogicalRange(target); });
       syncing=false;
       // C-9: ขยับ position pills ตาม price scale ที่เปลี่ยน (hook จาก drawLwChart)
       if(window.__lwRepill) window.__lwRepill();
+      // C-16: ปุ่มลอยโผล่เมื่อขอบขวาของมุมมองอยู่ห่างแท่งล่าสุด (ผู้ใช้กำลังดูประวัติ)
+      _lwGoBtn(_lwLastIdx>50 && range.to<_lwLastIdx-6);
     });
   });
 }
@@ -144,5 +183,5 @@ function refreshLWResize(){
 }
 
 
-export { _candleTime, initLWChart, lwAdx, lwBbL, lwBbM, lwBbU, lwCandle, lwChart, lwEma100, lwEma200, lwEma50, lwLine, lwNdi, lwPdi, lwRsi, lwRsiBand, lwSma5, lwVol, refreshLWResize };
+export { _candleTime, initLWChart, lwAdx, lwBbL, lwBbM, lwBbU, lwCandle, lwChart, lwEma100, lwEma200, lwEma50, lwLine, lwNdi, lwPdi, lwRsi, lwRsiBand, lwSma5, lwVol, refreshLWResize, setLWBarCount };
 // lwVolC ถูกแทนด้วย volume overlay ใน pane ราคา (C-9)

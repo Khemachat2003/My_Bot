@@ -326,3 +326,21 @@
     #btnTf{min-width:54px;}
     #typeGroup .tf-btn{padding:0 6px;}
   }
+
+  /* ═══ C-16 (TradingView-like): ปุ่มลอย "กลับแท่งล่าสุด" — โผล่เมื่อมุมมองเลื่อนไปดูประวัติ ═══
+     สร้าง/ซ่อน-โชว์ โดย lwChartInit.js (_lwGoBtn) — กดแล้ว scrollToRealTime ทุก pane */
+  #lwGoLatest{
+    position:absolute; right:76px; bottom:26px; z-index:12;
+    display:none; align-items:center; justify-content:center;
+    width:36px; height:36px; border-radius:50%;
+    background:var(--surface); border:1px solid var(--border2); color:var(--text);
+    cursor:pointer; box-shadow:0 4px 16px rgba(0,0,0,.45);
+    transition:border-color .15s, color .15s, opacity .15s;
+  }
+  #lwGoLatest.show{display:inline-flex;}
+  #lwGoLatest:hover{color:var(--accent); border-color:var(--accent);}
+  #lwGoLatest .ti{font-size:18px; line-height:1;}
+  @media(max-width:768px){
+    #lwGoLatest{right:70px; bottom:22px; width:40px; height:40px;}
+    #lwGoLatest .ti{font-size:20px;}
+  }
