@@ -3,9 +3,11 @@
 // Phase C-3 (design_system 5.1): เส้นเดียวสี --accent + fill เหนือฐาน --bull-dim / ใต้ฐาน --bear-dim
 // C-18: baseline = ทุน "ตอนเริ่มวัน" (carry-in เมื่อวาน) → fill เขียว/แดง = บวก/ลบของวันนี้
 // C-18: เลิก fitContent ทุกรอบ refresh — fit เฉพาะตอนข้อมูลวันนี้มาถึงครั้งแรก (0→n)
-//       แล้วรักษา zoom/pan ที่ผู้ใช้ตั้งไว้ (เดิมเด้งกลับทุก 5 วิ — "การย่อกราฟเพี้ยน" ตามที่ผู้ใช้เจอ)
+// C-19 (pro premium): clamp มุมมองรอบข้อมูลจริง (เหมือนกราฟราคาหลัก — เลื่อนแล้วไม่หลุดเข้าช่องว่าง)
+//   + crosshair แบบ TradingView (เส้นประฟ้า + ป้ายแกน) + lastValueVisible ป้ายมูลค่าล่าสุดบนแกนขวา
+//   + hover อ่านค่า (#eqHoverOv) + ปัดมือถือแนวตั้ง = สกรอลล์หน้า ไม่ขยับแกนราคา
 
-import { _buildEqData, _eqRangeStart, _eqSlice } from '../../shared/lib/equityData.js';
+import { _buildEqData, _eqBindClamp, _eqRangeStart, _eqSetLast, _eqSlice } from '../../shared/lib/equityData.js';
 
 const ACCENT='#4C8DFF', DIM='#4C5566';
 const BULL_FILL1='rgba(22,199,132,0.22)', BULL_FILL2='rgba(22,199,132,0.03)';
@@ -29,7 +31,17 @@ function drawEquity(payload){
       rightPriceScale:{borderColor:'#232732'},
       // C-18: มุมมอง "วันนี้" ต้องเห็นเวลาในแกน (ไม่ใช่แค่วันที่ซ้ำกันทั้งแกน)
       timeScale:{borderColor:'#232732',rightOffset:2,timeVisible:true,secondsVisible:false},
+      // C-19: crosshair พรีเมียมแบบ TradingView — เส้นประฟ้าจาง + ป้ายแกนสี accent
+      crosshair:{
+        mode:LightweightCharts.CrosshairMode.Normal,
+        vertLine:{color:'rgba(76,141,255,.55)',width:1,style:LightweightCharts.LineStyle.Dashed,labelBackgroundColor:'#2962FF'},
+        horzLine:{color:'rgba(76,141,255,.55)',width:1,style:LightweightCharts.LineStyle.Dashed,labelBackgroundColor:'#2962FF'},
+      },
+      // C-19: มือถือ — ปัดแนวตั้ง = สกรอลล์หน้าเว็บ (ไม่ขยับแกนราคา) · ปัดแนวนอนมีแรงเฉื่อน
+      handleScroll:{mouseWheel:true,pressedMouseMove:true,horizTouchDrag:true,vertTouchDrag:false,kineticScroll:{touch:true,mouse:false}},
+      handleScale:{mouseWheel:true,pinch:true,axisPressedMouseMove:true,axisDoubleClickReset:true},
     });
+    _eqBindClamp(lwEqChart);   // C-19: เลื่อน/ซูม อยู่กับข้อมูลจริงเสมอ ไม่มีช่องว่าง
     window.addEventListener('resize',()=>{ if(lwEqChart&&el.clientWidth>0) lwEqChart.applyOptions({width:el.clientWidth}); });
   }
   const fmt=p=>Number(p).toLocaleString('th-TH',{maximumFractionDigits:0});
@@ -39,6 +51,11 @@ function drawEquity(payload){
   const hasToday=oS.n+cS.n>0;
   const optDayBase=oS.carry!=null?oS.carry:b.optCapitalBase;
   const cfdDayBase=cS.carry!=null?cS.carry:b.cfdBase;
+  // C-19: จำนวนจุดรวม (union เวลา CFD+Option) → ขอบเขตข้อมูลจริงของ clamp
+  const unionTs=new Set();
+  cS.pts.forEach(p=>unionTs.add(p.time));
+  oS.pts.forEach(p=>unionTs.add(p.time));
+  _eqSetLast(lwEqChart, unionTs.size);
   // สร้าง baseline series ใหม่เมื่อยังไม่มี หรือ base เปลี่ยน (เช่นข้ามวัน → carry เปลี่ยน)
   const mkSeries=(existing,curBase,prevBase,priceFmt)=>{
     if(existing&&prevBase===(curBase||0)) return existing;
@@ -50,7 +67,8 @@ function drawEquity(payload){
       topFillColor1:BULL_FILL1, topFillColor2:BULL_FILL2,
       bottomLineColor:DIM, bottomLineColor1:DIM,
       bottomFillColor1:BEAR_FILL1, bottomFillColor2:BEAR_FILL2,
-      priceLineVisible:false, lastValueVisible:false, priceFormat:priceFmt,
+      // C-19: ป้ายมูลค่าล่าสุดบนแกนขวา (เดิมปิด) — pro investor เห็นตัวเลขเด้งตลอด
+      priceLineVisible:false, lastValueVisible:true, priceFormat:priceFmt,
     });
   };
   if(cS.n){
@@ -67,6 +85,27 @@ function drawEquity(payload){
   // C-18: fit เฉพาะตอนข้อมูลวันนี้มาถึงครั้งแรก (0→n) — รอบถัดไปรักษา zoom/pan ผู้ใช้
   if(hasToday&&_eqOvPrevN===0) lwEqChart.timeScale().fitContent();
   _eqOvPrevN=oS.n+cS.n;
+  // ── C-19: hover อ่านค่าตามเส้น (ผูกครั้งเดียว) — วันที่ · มูลค่า · ±จากทุนต้นวัน ──
+  if(!lwEqChart.__eqHoverBound){
+    lwEqChart.__eqHoverBound=true;
+    lwEqChart.subscribeCrosshairMove(param=>{
+      const hEl=document.getElementById('eqHoverOv'); if(!hEl) return;
+      if(!param||param.time==null){ hEl.innerHTML=''; return; }
+      const dTxt=new Date(param.time*1000).toLocaleString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+      const parts=[];
+      const read=(ser,base,unit)=>{
+        const pt=ser?param.seriesData.get(ser):null;
+        if(!pt||pt.value==null) return;
+        const pnl=pt.value-base;
+        const cls=pnl>0?'eq-up':(pnl<0?'eq-dn':'');
+        const val=unit==='cfd'?('$'+fmt(pt.value)):(fmt(pt.value)+' '+cur);
+        parts.push(`<span class="${cls}">${unit==='cfd'?'CFD':'Option'} <b>${val}</b> (${pnl>=0?'+':''}${fmt(pnl)})</span>`);
+      };
+      read(lwEqSeries,lwEqBase||0,'cfd');
+      read(lwEqSeries2,lwEqBase2||0,'opt');
+      hEl.innerHTML=parts.length?`<span class="eq-h-time">${dTxt}</span>${parts.join('<span style="color:var(--border)"> · </span>')}`:'';
+    });
+  }
   if(emptyEl) emptyEl.style.display=hasToday?'none':'block';
   if(statsEl){
     // chips ขอบเขต "วันนี้" — P&L นับจากทุนตอนเริ่มวัน (carry-in) ไม่ใช่ทุนตั้งต้นตอนเปิดพอร์ต

@@ -15,7 +15,7 @@
 <script src="/static/vendor/lightweight-charts.standalone.production.js"></script>
 <link rel="stylesheet" href="/static/vendor/tabler/tabler-icons.min.css">
 <!-- CSS + JS ทั้งหมดอยู่ใน src/ (แยกตาม feature) — แผนที่ไฟล์: frontend/AGENTS.md / docs/code_map.md -->
-  <script type="module" crossorigin src="/static/dist/assets/index-BT1yfKq1.js"></script>
+  <script type="module" crossorigin src="/static/dist/assets/index-Ctd8Fcsl.js"></script>
   <link rel="stylesheet" crossorigin href="/static/dist/assets/index-C9mC_Qmm.css">
 </head>
 <body>
@@ -262,6 +262,8 @@
         <div style="position:relative;">
           <div style="height:260px;"><div id="equityChart"></div></div>
           <div class="eq-empty" id="eqEmptyOv" style="display:none;">ยังไม่มีเทรดที่จบในวันนี้ — รอสัญญาณ &amp; ปิดตำแหน่งก่อน<br><small>ประวัติทั้งหมด + เลือกช่วงย้อนหลังอยู่ที่แท็บ ผลงาน&บันทึก</small></div>
+          <!-- C-19: hover อ่านค่าตามเส้น — วันที่ · มูลค่า · ±จากทุนต้นวัน -->
+          <div class="eq-hover" id="eqHoverOv"></div>
         </div>
       </div>
       <div class="panel ov-feed-panel">

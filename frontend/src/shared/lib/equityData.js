@@ -64,5 +64,41 @@ function _eqRangeStart(range){
   return null; // 'all'
 }
 
+// ═══ C-19: clamp มุมมองรอบข้อมูลจริง — สำหรับกราฟ equity ทั้งสอง (ภาพรวม + journal) ═══
+// เหมือนกราฟราคาหลัก (lwChartInit C-16/C-17): ขวาไม่เกินแท่งล่าสุด+pad · ซ้ายไม่ต่ำกว่าจุดแรก-pad
+// · ซูมออกเกินข้อมูลทั้งก้อน → บีบให้พอดี — "เลื่อนแล้วแสดงตามข้อมูลที่มี ไม่มีช่วงขาด/ช่องว่าง" ตามผู้ใช้กำหนด
+// ลำดับกัน oscillate: บีบ width ก่อน (กรณีเดียวที่ขอบสองฝั่งผิดพร้อมกัน) แล้วค่อย shift ขอบเดี่ยว
+// หมายเหตุ: logical index ของกราฟ = union เวลาของทุก series (CFD+Option อยู่คนละเวลา) —
+// ตัวเรียกต้องส่งจำนวนจุดรวมผ่าน _eqSetLast ทุกครั้งที่ setData
+const EQ_CLAMP_PAD=10;
+const _eqClampState=new WeakMap();
+function _eqBindClamp(chart){
+  if(!chart||_eqClampState.has(chart)) return;
+  const st={last:-1, syncing:false};
+  _eqClampState.set(chart, st);
+  chart.timeScale().subscribeVisibleLogicalRangeChange(range=>{
+    if(st.syncing||!range||st.last<0) return;
+    let target=range;
+    const maxTo=st.last+EQ_CLAMP_PAD, minFrom=-EQ_CLAMP_PAD, span=maxTo-minFrom;
+    if(range.to-range.from>span){
+      const c=(range.from+range.to)/2;
+      target={from:c-span/2,to:c+span/2};
+    } else if(range.to>maxTo){
+      target={from:range.from-(range.to-maxTo),to:maxTo};
+    } else if(range.from<minFrom){
+      target={from:minFrom,to:range.to-(range.from-minFrom)};
+    }
+    if(target!==range){
+      st.syncing=true;
+      try{ chart.timeScale().setVisibleLogicalRange(target); }catch(e){}
+      st.syncing=false;
+    }
+  });
+}
+function _eqSetLast(chart, n){
+  const st=chart?_eqClampState.get(chart):null;
+  if(st) st.last=Number(n)>0?Number(n)-1:-1;
+}
 
-export { _buildEqData, _eqRangeStart, _eqSlice };
+
+export { _buildEqData, _eqBindClamp, _eqRangeStart, _eqSetLast, _eqSlice };

@@ -10,7 +10,7 @@
 //   · เลิก fitContent ทุกรอบ refresh (เดิมเด้งกลับทุก 5 วิ และ "การย่อกราฟเพี้ยน" ตามที่ผู้ใช้เจอ)
 //     → fit เฉพาะ: ข้อมูลมาครั้งแรก (0→n) หรือผู้ใช้กดเปลี่ยนช่วงเอง (refit) — รอบ refresh รักษา zoom/pan
 
-import { _buildEqData, _eqRangeStart, _eqSlice } from '../../shared/lib/equityData.js';
+import { _buildEqData, _eqBindClamp, _eqRangeStart, _eqSetLast, _eqSlice } from '../../shared/lib/equityData.js';
 import { pnlText } from '../../shared/lib/pnlText.js';
 
 const ACCENT='#4C8DFF', DIM='#4C5566';
@@ -61,9 +61,25 @@ function drawEquityFull(payload, refit){
       rightPriceScale:{borderColor:'#232732'},
       // C-18: ช่วงสั้น (วันนี้/7 วัน) ต้องเห็นเวลาในแกน ไม่ใช่วันที่เดียวกันทั้งแกน
       timeScale:{borderColor:'#232732',rightOffset:2,timeVisible:true,secondsVisible:false},
+      // C-19: crosshair พรีเมียมแบบ TradingView — เส้นประฟ้าจาง + ป้ายแกนสี accent
+      crosshair:{
+        mode:LightweightCharts.CrosshairMode.Normal,
+        vertLine:{color:'rgba(76,141,255,.55)',width:1,style:LightweightCharts.LineStyle.Dashed,labelBackgroundColor:'#2962FF'},
+        horzLine:{color:'rgba(76,141,255,.55)',width:1,style:LightweightCharts.LineStyle.Dashed,labelBackgroundColor:'#2962FF'},
+      },
+      // C-19: มือถือ — ปัดแนวตั้ง = สกรอลล์หน้าเว็บ (ไม่ขยับแกนราคา) · ปัดแนวนอนมีแรงเฉื่อน
+      handleScroll:{mouseWheel:true,pressedMouseMove:true,horizTouchDrag:true,vertTouchDrag:false,kineticScroll:{touch:true,mouse:false}},
+      handleScale:{mouseWheel:true,pinch:true,axisPressedMouseMove:true,axisDoubleClickReset:true},
     });
+    _eqBindClamp(lwEqFullChart);   // C-19: เลื่อน/ซูม อยู่กับข้อมูลจริงเสมอ ไม่มีช่องว่าง
     window.addEventListener('resize',()=>{ if(lwEqFullChart&&el.clientWidth>0) lwEqFullChart.applyOptions({width:el.clientWidth}); });
   }
+  // C-19: จำนวนจุดรวม (union เวลา CFD+Option) → ขอบเขตข้อมูลจริงของ clamp
+  // (ต้องหลัง createChart + _eqBindClamp — state ของ clamp สร้างตอน bind)
+  const unionTs=new Set();
+  cS.pts.forEach(p=>unionTs.add(p.time));
+  oS.pts.forEach(p=>unionTs.add(p.time));
+  _eqSetLast(lwEqFullChart, unionTs.size);
   // สร้าง baseline series ใหม่เมื่อยังไม่มี หรือ base (ต้นช่วง) เปลี่ยน — baseline series วาดเส้นฐานเอง
   const mkSeries=(existing,curBase,prevBase,priceFmt)=>{
     if(existing&&prevBase===(curBase||0)) return existing;
@@ -75,7 +91,8 @@ function drawEquityFull(payload, refit){
       topFillColor1:BULL_FILL1, topFillColor2:BULL_FILL2,
       bottomLineColor:DIM, bottomLineColor1:DIM,
       bottomFillColor1:BEAR_FILL1, bottomFillColor2:BEAR_FILL2,
-      priceLineVisible:false, lastValueVisible:false, priceFormat:priceFmt,
+      // C-19: ป้ายมูลค่าล่าสุดบนแกนขวา (เดิมปิด) — pro investor เห็นตัวเลขเด้งตลอด
+      priceLineVisible:false, lastValueVisible:true, priceFormat:priceFmt,
     });
   };
   if(cS.n){
