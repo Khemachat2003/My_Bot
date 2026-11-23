@@ -1,7 +1,7 @@
 // ดึงแท่งเทียน + markers แล้ววาดกราฟ — /api/candles, /api/signals/markers, /api/symbol
 // ย้ายจาก index.html เดิม (_archive/index.legacy.html) บรรทัด 2612–2659 แบบ move-only
 
-import { drawLWChart } from './drawLwChart.js';
+import { drawLWChart, syncLWHistView } from './drawLwChart.js';
 import { lwChart } from './lwChartInit.js';
 import { fetchJSON } from '../../shared/api/client.js';
 import { setMarkersCache } from '../../shared/lib/markersCache.js';
@@ -23,7 +23,9 @@ async function refreshPrice(showLoading=false){
     const [[prices,markers]]=await Promise.all([
       Promise.all([
         (async()=>{
-          let p=await fetchJSON('/api/candles?tf='+tf+'&count=300&symbol='+encodeURIComponent(sym));
+          // C-17: count ตามประวัติที่ผู้ใช้ขยาย (load-more ฝั่งซ้าย) — เปลี่ยน TF/symbol
+          // แล้ว syncLWHistView รีเซ็ตกลับ 300 เอง (คีย์รูปแบบเดียวกับ _lwFitKey)
+          let p=await fetchJSON('/api/candles?tf='+tf+'&count='+syncLWHistView(tf+'|'+sym)+'&symbol='+encodeURIComponent(sym));
           // กรณี Deriv ตอบข้อมูลไม่ครบ → ลองยิง count ใหญ่ขึ้นอีกครั้งกันกราฟเหลือ 1-2 แท่ง
           if(Array.isArray(p)&&p.length<30) p=await fetchJSON('/api/candles?tf='+tf+'&count=1000&symbol='+encodeURIComponent(sym));
           return p;

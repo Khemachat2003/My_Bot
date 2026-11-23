@@ -3,9 +3,10 @@
 
 import { _clearPriceLines, _renderLWMarkers, _selLines } from './chartControls.js';
 import { _renderLWDefaultLegend } from './chartLegend.js';
-import { _candleTime, initLWChart, lwAdx, lwBbL, lwBbM, lwBbU, lwCandle, lwChart, lwEma100, lwEma200, lwEma50, lwLine, lwNdi, lwPdi, lwRsi, lwRsiBand, lwSma5, lwVol, refreshLWResize, setLWBarCount } from './lwChartInit.js';
+import { _candleTime, getLWLastIdx, initLWChart, lwAdx, lwBbL, lwBbM, lwBbU, lwCandle, lwChart, lwEma100, lwEma200, lwEma50, lwLine, lwNdi, lwPdi, lwRsi, lwRsiBand, lwSma5, lwVol, refreshLWResize, setLWBarCount } from './lwChartInit.js';
 import { _bbArr, _emaArr, _normLW, _smaArr } from './seriesTransforms.js';
 import { adx, fractal, rsi } from '../../shared/lib/indicators.js';
+import { fetchJSON } from '../../shared/api/client.js';
 
 let lastCandles=[];
 let chartInd={bb:true,ema:true,sma5:true,rsi:true,adx:true,fractal:true,vol:true,grip:false}; // C-9: vol overlay เปิด default
@@ -54,11 +55,53 @@ let _lwFitKey='';   // จำ TF+symbol → fitContent เฉพาะตอน�
 let _lwLastSig=null; // จำแท่งท้ายสุด+สัญญาณ → ข้าม redraw ซ้ำตอน refresh
 let _lwPrevCount=0;  // จำจำนวนแท่งก่อนหน้า → กันข้อมูลหายชั่วคราวทำให้กราฟหดเหลือ 1-2 แท่ง
 
+// ═══ C-17: Load more ประวัติฝั่งซ้าย — เลื่อนชนขอบซ้ายแล้วดึงเพิ่ม "เท่าที่ระบบดึงได้จริง" ═══
+// เมื่อหมด (API cap 1000 แท่ง หรือ Deriv ไม่มีประวัติเพิ่มให้) → ล็อกขอบซ้ายแบบแข็ง
+// แสดงเท่าที่มี ไม่ให้เลื่อนต่อไปเห็นช่องว่างก่อนแท่งแรก ("กราฟขาดๆ" ตามที่ผู้ใช้กำหนด)
+const LW_HIST_MAX=1000;   // ขีดสูงสุดที่ /api/candles รับ (le=1000 — routes/market.py)
+let _lwHistCount=300;      // จำนวนแท่งที่โหลดอยู่ — refreshPrice ใช้ค่านี้ทุกรอบ (กันรอบ 5 วิยิง 300 ทับประวัติที่ขยายแล้ว)
+let _lwHistMaxed=false;    // ดึงหมดแล้ว → clamp ซ้ายแข็ง (ฝั่ง lwChartInit ทำงานเสมอ ไม่ต้องแตะ flag นี้)
+let _lwLoadingMore=false;
+// refreshPrice เรียกก่อน fetch ทุกรอบ: เปลี่ยน TF/symbol → รีเซ็ตกลับ 300 (คีย์รูปแบบเดียวกับ _lwFitKey ใน drawLWChart)
+function syncLWHistView(fitKey){
+  if(fitKey!==_lwFitKey){ _lwHistCount=300; _lwHistMaxed=false; }
+  return _lwHistCount;
+}
+async function loadMoreHistory(){
+  if(_lwLoadingMore||_lwHistMaxed||!lastCandles.length) return;
+  if(_lwHistCount>=LW_HIST_MAX){ _lwHistMaxed=true; return; }
+  _lwLoadingMore=true;
+  try{
+    const tf=document.querySelector('#tfGroup .tf-btn.active')?.dataset.tf||'1m';
+    const sym=document.getElementById('chartSymbol')?.value||'frxXAUUSD';
+    const next=LW_HIST_MAX;   // ขอสูงสุดทีเดียว (API cap 1000 — เดิมโหลด 300)
+    const p=await fetchJSON('/api/candles?tf='+tf+'&count='+next+'&symbol='+encodeURIComponent(sym));
+    // มีประวัติเพิ่มจริง = แท่งแรกเก่ากว่า + จำนวนมากกว่าเดิม → วาดใหม่ + คงมุมมองเดิม
+    // (anchor เทียบแท่งล่าสุด — index ฝั่งซ้ายเลื่อน 700 แท่ง แต่จอต้องยังโชว์แท่งเดิม ไม่เด้ง)
+    if(Array.isArray(p)&&p.length>lastCandles.length&&_candleTime(p[0])<_candleTime(lastCandles[0])){
+      const ts=lwChart&&lwChart.timeScale();
+      const vr=ts?ts.getVisibleLogicalRange():null;
+      const relTo=vr?(vr.to-getLWLastIdx()):null;      // ขอบขวาเทียบแท่งล่าสุด (ตำแหน่งไม่เปลี่ยน)
+      const width=vr?(vr.to-vr.from):0;                 // ความกว้างมุมมองเดิม (barSpacing คงเดิม)
+      _lwHistCount=next;
+      drawLWChart(p,window._signalMarkers||[],tf,{force:true});   // force → ข้าม guard "ข้อมูลไม่เปลี่ยน"
+      if(ts&&vr&&relTo!=null) ts.setVisibleLogicalRange({from:(getLWLastIdx()+relTo-width),to:(getLWLastIdx()+relTo)});
+    } else {
+      // ไม่มีประวัติเพิ่ม (สัญลักษณ์นี้มีแค่ที่มี) → แสดงเท่าที่มี ห้ามเลื่อนซ้ายเกินอีก
+      _lwHistMaxed=true;
+    }
+  }catch(e){}
+  _lwLoadingMore=false;
+}
+// hook ให้ lwChartInit เรียกตอนมุมมองใกล้ชนขอบซ้าย — ใช้ window แบบ __lwRepill กัน import วน (lwChartInit ← drawLwChart อยู่แล้ว)
+window.__lwLoadMore=loadMoreHistory;
+
 // TF → วินาทีต่อแท่ง (สำหรับ snap marker ให้ตรงกับเวลาเปิดแท่งเทียน)
 const _TF_SECONDS={'1m':60,'5m':300,'15m':900,'30m':1800,'1h':3600,'4h':14400};
 
-function drawLWChart(prices,markers,tf){
+function drawLWChart(prices,markers,tf,opts){
   if(!window.LightweightCharts){ return; }
+  const force=!!(opts&&opts.force);   // C-17: load-more วาดข้อมูลชุดใหม่ (แท่งเดิม+ประวัติเพิ่ม) แม้แท่งล่าสุดยังเหมือนเดิม
   lastCandles=prices||[];  // sync ไว้ → ปุ่ม toggle indicator (#chartIndBar) redraw ได้ทันทีโดยไม่ต้องรอ refresh รอบหน้า
   const bars=_normLW(prices);
   if(!bars.length) return;
@@ -75,11 +118,11 @@ function drawLWChart(prices,markers,tf){
   const last=bars[bars.length-1];
   const ana=chartMode==='analysis';
   const indKey=chartMode+chartType+[chartInd.vol,chartInd.ema,chartInd.bb,chartInd.sma5,chartInd.rsi,chartInd.adx,chartInd.fractal].join('');
-  if(!needInit&&!isNewView&&_lwLastSig&&_lwLastSig.t===last.time&&_lwLastSig.c===last.close&&_lwLastSig.sig===JSON.stringify(markers||[])&&_lwLastSig.ind===indKey){
+  if(!force&&!needInit&&!isNewView&&_lwLastSig&&_lwLastSig.t===last.time&&_lwLastSig.c===last.close&&_lwLastSig.sig===JSON.stringify(markers||[])&&_lwLastSig.ind===indKey){
     return;
   }
   // กัน "ข้อมูลหายชั่วคราว" (Deriv ตอบไม่ครบ) ทำให้กราฟที่วาดดีแล้วหดเหลือ 1-2 แท่ง
-  if(!needInit&&!isNewView&&_lwPrevCount>100&&bars.length<30&&bars.length<_lwPrevCount/3){
+  if(!force&&!needInit&&!isNewView&&_lwPrevCount>100&&bars.length<30&&bars.length<_lwPrevCount/3){
     const vEl=document.getElementById('lbValues');
     if(vEl) vEl.innerHTML='<span class="v-m">ข้อมูลแท่งไม่ครบ ('+bars.length+' แท่ง) — กรุณารอ refresh ถัดไป</span>';
     return;
@@ -306,4 +349,4 @@ function _autoSelectOpen(markers){
 }
 
 
-export { _lwLastBar, _lwLastPrev, chartInd, chartMode, chartType, setChartMode, setChartType, drawLWChart, lastCandles };
+export { _lwLastBar, _lwLastPrev, chartInd, chartMode, chartType, setChartMode, setChartType, drawLWChart, lastCandles, loadMoreHistory, syncLWHistView };

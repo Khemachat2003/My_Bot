@@ -120,9 +120,12 @@ function initLWChart(){
 //   แท่งล่าสุดฝั่งขวาหลุดออกนอกจอ ทั้งที่ข้อมูลมีแค่ N แท่ง (ตามที่ผู้ใช้รายงาน)
 //   หมายเหตุ: ปัญหาที่รุนแรงกว่า (ลากแกนเวลาใต้ pane ADX แล้วกราฟหลักเด้งไปโซนเก่า)
 //   แก้ที่ต้นเหตุใน drawLwChart.js — เติม whitespace ให้ทุก pane เริ่ม logical index 0 เหมือนกัน
-const LW_RIGHT_PAD=10;   // เผื่อที่ว่างหลังแท่งล่าสุด (หน่วย: แท่ง)
+const LW_RIGHT_PAD=10;    // เผื่อที่ว่างหลังแท่งล่าสุด (หน่วย: แท่ง)
+const LW_LEFT_PAD=10;      // C-17: เผื่อหน้าแท่งแรก — เลื่อนเลยซ้ายสุดไม่ได้ (กันเห็นช่องว่างก่อนข้อมูล)
+const LW_LOAD_TRIGGER=25;  // C-17: เหลือ <25 แท่งถึงขอบซ้าย → เริ่มดึงประวัติเพิ่มก่อนชนขอบจริง
 let _lwLastIdx=-1;       // logical index ของแท่งล่าสุด — drawLWChart ตั้งค่าก่อน setData ทุกครั้ง
 function setLWBarCount(n){ _lwLastIdx=Number(n)>0?Number(n)-1:-1; }
+function getLWLastIdx(){ return _lwLastIdx; }
 function _lwGoBtn(show){
   let b=document.getElementById('lwGoLatest');
   if(!b){
@@ -144,12 +147,22 @@ function _lwSyncPanes(){
   _lwCharts.forEach(c=>{
     c.timeScale().subscribeVisibleLogicalRangeChange(range=>{
       if(syncing||!range) return;
-      // จำกัดขอบขวา: ขอบขวาของมุมมองเกิน "แท่งล่าสุด + เผื่อ 10 แท่ง" ไม่ได้ —
-      // shift ทั้งหน้าต่างกลับ (คง barSpacing เดิม → รู้สึกเหมือน anchor ติดขอบขวาตลอด)
+      // C-16/C-17: จำกัดมุมมองรอบข้อมูลจริง — ขวาไม่เกินแท่งล่าสุด+pad · ซ้ายไม่ต่ำกว่าแท่งแรก-pad
+      // · ซูมออกเกินข้อมูลทั้งก้อน → บีบมุมมองให้พอดีข้อมูล (ไม่มีช่องว่าง/กราฟขาดรอบกราฟเด็ดขาด)
+      // ลำดับกัน oscillate: บีบความกว้างก่อน (กรณีเดียวที่ขอบสองฝั่งผิดพร้อมกัน) แล้วค่อย shift ขอบเดี่ยว
       let target=range;
       if(_lwLastIdx>50){
         const maxTo=_lwLastIdx+LW_RIGHT_PAD;
-        if(range.to>maxTo) target={from:range.from-(range.to-maxTo),to:maxTo};
+        const minFrom=-LW_LEFT_PAD;
+        const span=maxTo-minFrom;
+        if(range.to-range.from>span){
+          const center=(range.from+range.to)/2;
+          target={from:center-span/2,to:center+span/2};
+        } else if(range.to>maxTo){
+          target={from:range.from-(range.to-maxTo),to:maxTo};
+        } else if(range.from<minFrom){
+          target={from:minFrom,to:range.to-(range.from-minFrom)};
+        }
       }
       syncing=true;
       if(target!==range) c.timeScale().setVisibleLogicalRange(target);
@@ -157,6 +170,9 @@ function _lwSyncPanes(){
       syncing=false;
       // C-9: ขยับ position pills ตาม price scale ที่เปลี่ยน (hook จาก drawLwChart)
       if(window.__lwRepill) window.__lwRepill();
+      // C-17: มุมมองใกล้ชนขอบซ้าย → ขอโหลดประวัติเพิ่ม (loadMoreHistory ใน drawLwChart
+      // ผ่าน window hook — ดึงสูงสุดได้แค่ API cap 1000 แท่ง หมดแล้วจะ no-op เอง)
+      if(range.from<LW_LOAD_TRIGGER&&window.__lwLoadMore) window.__lwLoadMore();
       // C-16: ปุ่มลอยโผล่เมื่อขอบขวาของมุมมองอยู่ห่างแท่งล่าสุด (ผู้ใช้กำลังดูประวัติ)
       _lwGoBtn(_lwLastIdx>50 && range.to<_lwLastIdx-6);
     });
@@ -183,5 +199,5 @@ function refreshLWResize(){
 }
 
 
-export { _candleTime, initLWChart, lwAdx, lwBbL, lwBbM, lwBbU, lwCandle, lwChart, lwEma100, lwEma200, lwEma50, lwLine, lwNdi, lwPdi, lwRsi, lwRsiBand, lwSma5, lwVol, refreshLWResize, setLWBarCount };
+export { _candleTime, getLWLastIdx, initLWChart, lwAdx, lwBbL, lwBbM, lwBbU, lwCandle, lwChart, lwEma100, lwEma200, lwEma50, lwLine, lwNdi, lwPdi, lwRsi, lwRsiBand, lwSma5, lwVol, refreshLWResize, setLWBarCount };
 // lwVolC ถูกแทนด้วย volume overlay ใน pane ราคา (C-9)
