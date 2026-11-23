@@ -15,8 +15,8 @@
 <script src="/static/vendor/lightweight-charts.standalone.production.js"></script>
 <link rel="stylesheet" href="/static/vendor/tabler/tabler-icons.min.css">
 <!-- CSS + JS ทั้งหมดอยู่ใน src/ (แยกตาม feature) — แผนที่ไฟล์: frontend/AGENTS.md / docs/code_map.md -->
-  <script type="module" crossorigin src="/static/dist/assets/index-DeOGYPsx.js"></script>
-  <link rel="stylesheet" crossorigin href="/static/dist/assets/index-DxnvVmja.css">
+  <script type="module" crossorigin src="/static/dist/assets/index-BT1yfKq1.js"></script>
+  <link rel="stylesheet" crossorigin href="/static/dist/assets/index-C9mC_Qmm.css">
 </head>
 <body>
 
@@ -258,10 +258,10 @@
     </div>
     <div class="ov-bottom">
       <div class="panel ov-equity-panel">
-        <h3><span class="ph purple"></span>Equity Curve <span class="eq-stats" id="eqStatsOv"></span></h3>
+        <h3><span class="ph purple"></span>Equity Curve <span class="eq-scope-tag">วันนี้</span><span class="eq-stats" id="eqStatsOv"></span></h3>
         <div style="position:relative;">
           <div style="height:260px;"><div id="equityChart"></div></div>
-          <div class="eq-empty" id="eqEmptyOv" style="display:none;">ยังไม่มีข้อมูลเทรดที่จบแล้ว — รอสัญญาณ &amp; ปิดตำแหน่งก่อน</div>
+          <div class="eq-empty" id="eqEmptyOv" style="display:none;">ยังไม่มีเทรดที่จบในวันนี้ — รอสัญญาณ &amp; ปิดตำแหน่งก่อน<br><small>ประวัติทั้งหมด + เลือกช่วงย้อนหลังอยู่ที่แท็บ ผลงาน&บันทึก</small></div>
         </div>
       </div>
       <div class="panel ov-feed-panel">
@@ -549,10 +549,22 @@
     </div>
 
     <div class="j-equity">
-      <h3>Equity Curve <span class="eq-stats" id="eqStatsFull"></span></h3>
+      <div class="j-eq-head">
+        <h3>Equity Curve <span class="eq-stats" id="eqStatsFull"></span></h3>
+        <!-- C-18: เลือกช่วงย้อนหลังแบบ pro investor — default ทั้งหมด, กดแล้ว fit ช่วงใหม่ทันที -->
+        <div class="eq-range-btns" id="eqRangeBtns">
+          <button class="eq-rbtn" data-eqrange="today" type="button">วันนี้</button>
+          <button class="eq-rbtn" data-eqrange="7d" type="button">7 วัน</button>
+          <button class="eq-rbtn" data-eqrange="30d" type="button">1 เดือน</button>
+          <button class="eq-rbtn" data-eqrange="90d" type="button">3 เดือน</button>
+          <button class="eq-rbtn active" data-eqrange="all" type="button">ทั้งหมด</button>
+        </div>
+      </div>
       <div style="position:relative;">
         <div style="height:260px;"><div id="equityFullChart"></div></div>
         <div class="eq-empty" id="eqEmptyFull" style="display:none;">ยังไม่มีข้อมูลเทรดที่จบแล้ว — รอสัญญาณ &amp; ปิดตำแหน่งก่อน</div>
+        <!-- C-18: hover อ่านค่าตามเส้น — วันที่ · มูลค่า · ±จากต้นช่วง -->
+        <div class="eq-hover" id="eqHoverFull"></div>
       </div>
     </div>
 

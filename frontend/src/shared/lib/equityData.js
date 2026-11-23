@@ -34,5 +34,35 @@ function _buildEqData(opt, cfd){
   return {optPts, cfdPts, optN, cfdN, optPnl, cfdPnl, optCapitalBase, cfdBase};
 }
 
+// ═══ C-18: ตัดจุด equity ตามช่วงเวลา (วันนี้ / 7d / 30d / 90d / ทั้งหมด) ═══
+// คืน {pts, carry, n} —
+//   pts   = จุดในช่วง + จุดสังเคราะห์ 1 จุดที่ fromTs ยกค่าทุน "ตอนเริ่มช่วง" (carry-in)
+//           → เส้นเริ่มวิ่งจากฐานจริง ไม่ลอย ๆ กลางอากาศ (และ baseline series ตั้ง base ที่ carry
+//           → fill เขียว/แดง = บวก/ลบ "ตั้งแต่ต้นช่วง" ตาม pro investor ดู)
+//   carry = ทุนยกเข้า (null ถ้าไม่มีข้อมูลก่อนช่วง — ใช้ base เดิมแทน)
+//   n     = จำนวนเทรดจริงในช่วง (ไม่นับจุดสังเคราะห์)
+// กัน time ซ้ำ: จุดสังเคราะห์ใส่เฉพาะเมื่อจุดแรกในช่วงเริ่มหลัง fromTs จริง ๆ
+function _eqSlice(pts, fromTs){
+  if(!pts||!pts.length) return {pts:[], carry:null, n:0};
+  if(fromTs==null) return {pts, carry:null, n:pts.length};
+  let i=pts.findIndex(p=>p.time>=fromTs);
+  if(i===-1) return {pts:[], carry:pts[pts.length-1].value, n:0};
+  const carry=i>0?pts[i-1].value:null;
+  const sliced=pts.slice(i);
+  const prepend=carry!=null&&sliced.length>0&&sliced[0].time>fromTs;
+  return {pts:prepend?[{time:fromTs,value:carry},...sliced]:sliced, carry, n:sliced.length};
+}
+// ขอบเขตเวลาของแต่ละช่วง (unix วินาที) — 'today' = เที่ยงคืนท้องถิ่นของวันนี้
+function _eqRangeStart(range){
+  if(range==='today'){
+    const d=new Date(); d.setHours(0,0,0,0);
+    return Math.floor(d.getTime()/1000);
+  }
+  if(range==='7d') return Math.floor(Date.now()/1000)-7*86400;
+  if(range==='30d') return Math.floor(Date.now()/1000)-30*86400;
+  if(range==='90d') return Math.floor(Date.now()/1000)-90*86400;
+  return null; // 'all'
+}
 
-export { _buildEqData };
+
+export { _buildEqData, _eqRangeStart, _eqSlice };
