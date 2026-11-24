@@ -66,20 +66,29 @@
 
     <div class="j-equity">
       <div class="j-eq-head">
-        <h3>Equity Curve <span class="eq-stats" id="eqStatsFull"></span></h3>
-        <!-- C-18: เลือกช่วงย้อนหลังแบบ pro investor — default ทั้งหมด, กดแล้ว fit ช่วงใหม่ทันที -->
-        <div class="eq-range-btns" id="eqRangeBtns">
-          <button class="eq-rbtn" data-eqrange="today" type="button">วันนี้</button>
-          <button class="eq-rbtn" data-eqrange="7d" type="button">7 วัน</button>
-          <button class="eq-rbtn" data-eqrange="30d" type="button">1 เดือน</button>
-          <button class="eq-rbtn" data-eqrange="90d" type="button">3 เดือน</button>
-          <button class="eq-rbtn active" data-eqrange="all" type="button">ทั้งหมด</button>
+        <h3>Equity Curve</h3>
+        <div class="j-eq-ctrl">
+          <!-- C-20: สลับโหมดแสดงผล — % (เทียบข้ามหน่วยได้จริง) / มูลค่า (CFD $ แกนขวา · Option THB แกนซ้าย) -->
+          <div class="eq-mode-btns" id="eqModeBtns" title="โหมดแสดงกราฟ">
+            <button class="eq-mbtn active" data-eqmode="pct" type="button">%</button>
+            <button class="eq-mbtn" data-eqmode="value" type="button">มูลค่า</button>
+          </div>
+          <!-- C-18: เลือกช่วงย้อนหลังแบบ pro investor — default ทั้งหมด, กดแล้ว fit ช่วงใหม่ทันที -->
+          <div class="eq-range-btns" id="eqRangeBtns">
+            <button class="eq-rbtn" data-eqrange="today" type="button">วันนี้</button>
+            <button class="eq-rbtn" data-eqrange="7d" type="button">7 วัน</button>
+            <button class="eq-rbtn" data-eqrange="30d" type="button">1 เดือน</button>
+            <button class="eq-rbtn" data-eqrange="90d" type="button">3 เดือน</button>
+            <button class="eq-rbtn active" data-eqrange="all" type="button">ทั้งหมด</button>
+          </div>
         </div>
       </div>
+      <!-- C-20: ชิปสถิติแถวของตัวเอง — ไม่เบียดหัวกราฟ/ไม่หักบรรทัดบนมือถือ -->
+      <div class="eq-stats-row eq-stats" id="eqStatsFull"></div>
       <div style="position:relative;">
         <div style="height:260px;"><div id="equityFullChart"></div></div>
         <div class="eq-empty" id="eqEmptyFull" style="display:none;">ยังไม่มีข้อมูลเทรดที่จบแล้ว — รอสัญญาณ &amp; ปิดตำแหน่งก่อน</div>
-        <!-- C-18: hover อ่านค่าตามเส้น — วันที่ · มูลค่า · ±จากต้นช่วง -->
+        <!-- C-18: hover อ่านค่าตามเส้น — วันที่ · มูลค่า/% · ±จากต้นช่วง -->
         <div class="eq-hover" id="eqHoverFull"></div>
       </div>
     </div>

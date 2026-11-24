@@ -142,3 +142,32 @@
   .eq-rbtn{flex:1 1 auto; text-align:center; padding:4px 6px; font-size:10px;}
   .eq-hover{font-size:9px; top:4px; right:6px; padding:2px 7px;}
 }
+
+/* ═══ C-20: Equity layout ใหม่ — หัวกราฟ 2 ชั้น (ชื่อ+ปุ่ม / ชิปสถิติแถวของตัวเอง) + กันป้ายหักตัวอักษร ═══ */
+/* หมายเหตุ: บล็อกนี้อยู่ท้ายสุดของ journal.css (import สุดท้ายของ index.css) → override บล็อก C-18 ด้านบน */
+.j-eq-head{display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:6px;}
+.j-eq-head h3{margin:0; white-space:nowrap;}
+.j-eq-ctrl{display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0;}
+/* ปุ่มสลับโหมด %/มูลค่า — segmented pill */
+.eq-mode-btns{display:inline-flex; gap:2px; background:var(--surface-alt); border:1px solid var(--border);
+  border-radius:99px; padding:2px; flex-shrink:0;}
+.eq-mbtn{background:none; border:none; color:var(--muted); font:600 10px var(--font-body);
+  padding:3px 10px; border-radius:99px; cursor:pointer; white-space:nowrap; transition:.15s;}
+.eq-mbtn:hover{color:var(--text);}
+.eq-mbtn.active{background:var(--accent-dim); color:var(--accent); font-weight:800;}
+/* ชิปสถิติ = แถวของตัวเอง (เดิมอยู่ใน h3 → เบียด/หักบรรทัดบนมือถือ) */
+.eq-stats-row{display:flex; flex-wrap:wrap; align-items:center; gap:5px 10px; margin:0 0 8px; line-height:1.7;}
+.eq-stats-row:empty{display:none;}
+.eq-stats-row .eq-sep{color:var(--border); font-size:10px;}
+/* กันป้าย scope หักเป็นตัวอักษรแนวตั้ง (ไทยไม่มีช่องว่างคำ — ต้อง nowrap) */
+.eq-scope,.eq-scope-tag{white-space:nowrap;}
+.eq-hover .h-abs{color:var(--dim);}
+@media(max-width:768px){
+  .j-eq-head{flex-direction:column; align-items:stretch; gap:6px;}
+  .j-eq-ctrl{justify-content:space-between;}
+  /* มือถือ: ปุ่มโหมดอยู่ซ้าย · ปุ่มช่วงเต็มแถวถัดไป (เลื่อนได้ถ้าจอแคบมาก) */
+  .eq-range-btns{flex:1 1 100%; justify-content:space-between; overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none;}
+  .eq-range-btns::-webkit-scrollbar{display:none;}
+  .eq-rbtn{padding:4px 8px; font-size:10px; flex:1 1 auto; text-align:center;}
+  .eq-stats-row{font-size:9.5px; gap:4px 8px;}
+}

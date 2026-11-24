@@ -1,21 +1,51 @@
 // กราฟ Equity Curve ในแท็บภาพรวม — C-18: เจาะจง "วันนี้" (เที่ยงคืนท้องถิ่น)
 // ประวัติทั้งหมด + เลือกช่วงย้อนหลังอยู่ที่แท็บผลงาน&บันทึก (#equityFullChart)
-// Phase C-3 (design_system 5.1): เส้นเดียวสี --accent + fill เหนือฐาน --bull-dim / ใต้ฐาน --bear-dim
-// C-18: baseline = ทุน "ตอนเริ่มวัน" (carry-in เมื่อวาน) → fill เขียว/แดง = บวก/ลบของวันนี้
-// C-18: เลิก fitContent ทุกรอบ refresh — fit เฉพาะตอนข้อมูลวันนี้มาถึงครั้งแรก (0→n)
-// C-19 (pro premium): clamp มุมมองรอบข้อมูลจริง (เหมือนกราฟราคาหลัก — เลื่อนแล้วไม่หลุดเข้าช่องว่าง)
-//   + crosshair แบบ TradingView (เส้นประฟ้า + ป้ายแกน) + lastValueVisible ป้ายมูลค่าล่าสุดบนแกนขวา
-//   + hover อ่านค่า (#eqHoverOv) + ปัดมือถือแนวตั้ง = สกรอลล์หน้า ไม่ขยับแกนราคา
+// C-20: ใช้โหมดเดียวกับแท็บผลงาน (จำใน localStorage — เลือกที่ไหนก็มีผลทั้งสองกราฟ):
+//   'pct'   = ผลตอบแทน % จากทุนต้นวัน (เส้นฐาน 0%) — เทียบ CFD (USD) กับ Option (THB) ได้จริง
+//   'value' = มูลค่าจริง: CFD แกนขวา ($) / Option แกนซ้าย (THB) — แยกสเกล+หน่วย
+// C-19: clamp มุมมองรอบข้อมูลจริง + crosshair TradingView + ป้ายมูลค่าล่าสุด + hover + resize observer
 
-import { _buildEqData, _eqBindClamp, _eqRangeStart, _eqSetLast, _eqSlice } from '../../shared/lib/equityData.js';
+import { _buildEqData, _eqBindClamp, _eqBindResize, _eqGetMode, _eqPctFmt, _eqPctOf, _eqPctPts, _eqRangeStart, _eqSetLast, _eqSlice } from '../../shared/lib/equityData.js';
 
-const ACCENT='#4C8DFF', DIM='#4C5566';
+const CFD_COLOR='#4C8DFF', OPT_COLOR='#9C6FE0', DIM='#4C5566';
 const BULL_FILL1='rgba(22,199,132,0.22)', BULL_FILL2='rgba(22,199,132,0.03)';
 const BEAR_FILL1='rgba(240,70,92,0.03)',  BEAR_FILL2='rgba(240,70,92,0.22)';
 
 let lwEqChart=null, lwEqSeries=null, lwEqSeries2=null;
-let lwEqBase=null, lwEqBase2=null; // base ปัจจุบันของแต่ละ series (เปลี่ยน → สร้างใหม่)
-let _eqOvPrevN=0;                  // จำจำนวนเทรดวันนี้รอบก่อน → fit เฉพาะ 0→n
+let _eqOvCfgKey='';   // mode+base ที่สร้าง series อยู่ (เปลี่ยน → rebuild series)
+let _eqOvPrevN=0;     // จำจำนวนจุดรอบก่อน → fit เฉพาะ 0→n
+function _eqOvMkSeries(mode,cfdBase,optBase,cur,fmt){
+  if(lwEqSeries){ try{ lwEqChart.removeSeries(lwEqSeries); }catch(e){} lwEqSeries=null; }
+  if(lwEqSeries2){ try{ lwEqChart.removeSeries(lwEqSeries2); }catch(e){} lwEqSeries2=null; }
+  const baseFmt={type:'custom',formatter:_eqPctFmt};
+  if(mode==='pct'){
+    lwEqSeries=lwEqChart.addBaselineSeries({
+      baseValue:{type:'price',price:0},
+      lineColor:CFD_COLOR, lineWidth:2,
+      topLineColor:DIM, topLineColor1:DIM, topFillColor1:BULL_FILL1, topFillColor2:BULL_FILL2,
+      bottomLineColor:DIM, bottomLineColor1:DIM, bottomFillColor1:BEAR_FILL1, bottomFillColor2:BEAR_FILL2,
+      priceLineVisible:false, lastValueVisible:true, priceFormat:baseFmt,
+    });
+    lwEqSeries2=lwEqChart.addLineSeries({
+      color:OPT_COLOR, lineWidth:2, priceLineVisible:false, lastValueVisible:true, priceFormat:baseFmt,
+    });
+  } else {
+    lwEqSeries=lwEqChart.addBaselineSeries({
+      baseValue:{type:'price',price:cfdBase||0}, priceScaleId:'right',
+      lineColor:CFD_COLOR, lineWidth:2,
+      topLineColor:DIM, topLineColor1:DIM, topFillColor1:BULL_FILL1, topFillColor2:BULL_FILL2,
+      bottomLineColor:DIM, bottomLineColor1:DIM, bottomFillColor1:BEAR_FILL1, bottomFillColor2:BEAR_FILL2,
+      priceLineVisible:false, lastValueVisible:true, priceFormat:{type:'custom',formatter:p=>'$'+fmt(p)},
+    });
+    lwEqSeries2=lwEqChart.addBaselineSeries({
+      baseValue:{type:'price',price:optBase||0}, priceScaleId:'left',
+      lineColor:OPT_COLOR, lineWidth:2,
+      topLineColor:DIM, topLineColor1:DIM, topFillColor1:'rgba(156,111,224,.18)', topFillColor2:'rgba(156,111,224,.03)',
+      bottomLineColor:DIM, bottomLineColor1:DIM, bottomFillColor1:'rgba(0,0,0,0)', bottomFillColor2:'rgba(156,111,224,.16)',
+      priceLineVisible:false, lastValueVisible:true, priceFormat:{type:'custom',formatter:p=>fmt(p)+' '+cur},
+    });
+  }
+}
 function drawEquity(payload){
   const el=document.getElementById('equityChart'); if(!el) return;
   const b=_buildEqData(payload&&payload.opt, payload&&payload.cfd);
@@ -28,103 +58,100 @@ function drawEquity(payload){
       height:el.clientHeight||260, width:el.clientWidth||300,
       layout:{background:{color:'transparent'},textColor:'#838B9C',fontFamily:'IBM Plex Mono, monospace'},
       grid:{vertLines:{color:'#1A1D27'},horzLines:{color:'#1A1D27'}},
-      rightPriceScale:{borderColor:'#232732'},
-      // C-18: มุมมอง "วันนี้" ต้องเห็นเวลาในแกน (ไม่ใช่แค่วันที่ซ้ำกันทั้งแกน)
-      timeScale:{borderColor:'#232732',rightOffset:2,timeVisible:true,secondsVisible:false},
-      // C-19: crosshair พรีเมียมแบบ TradingView — เส้นประฟ้าจาง + ป้ายแกนสี accent
+      rightPriceScale:{borderColor:'#232732',minimumWidth:64},
+      leftPriceScale:{visible:false,borderColor:'#232732',minimumWidth:64},
+      timeScale:{borderColor:'#232732',rightOffset:6,timeVisible:true,secondsVisible:false},
       crosshair:{
         mode:LightweightCharts.CrosshairMode.Normal,
         vertLine:{color:'rgba(76,141,255,.55)',width:1,style:LightweightCharts.LineStyle.Dashed,labelBackgroundColor:'#2962FF'},
         horzLine:{color:'rgba(76,141,255,.55)',width:1,style:LightweightCharts.LineStyle.Dashed,labelBackgroundColor:'#2962FF'},
       },
-      // C-19: มือถือ — ปัดแนวตั้ง = สกรอลล์หน้าเว็บ (ไม่ขยับแกนราคา) · ปัดแนวนอนมีแรงเฉื่อน
       handleScroll:{mouseWheel:true,pressedMouseMove:true,horizTouchDrag:true,vertTouchDrag:false,kineticScroll:{touch:true,mouse:false}},
       handleScale:{mouseWheel:true,pinch:true,axisPressedMouseMove:true,axisDoubleClickReset:true},
     });
-    _eqBindClamp(lwEqChart);   // C-19: เลื่อน/ซูม อยู่กับข้อมูลจริงเสมอ ไม่มีช่องว่าง
-    window.addEventListener('resize',()=>{ if(lwEqChart&&el.clientWidth>0) lwEqChart.applyOptions({width:el.clientWidth}); });
+    _eqBindClamp(lwEqChart);
+    _eqBindResize(lwEqChart, el);
   }
   const fmt=p=>Number(p).toLocaleString('th-TH',{maximumFractionDigits:0});
   // ── C-18: ตัดเฉพาะวันนี้ + carry-in เป็นฐาน (บวก/ลบของวันนี้) ──
   const fromTs=_eqRangeStart('today');
   const oS=_eqSlice(b.optPts,fromTs), cS=_eqSlice(b.cfdPts,fromTs);
-  const hasToday=oS.n+cS.n>0;
+  const mode=_eqGetMode();
+  const isPct=mode==='pct';
   const optDayBase=oS.carry!=null?oS.carry:b.optCapitalBase;
   const cfdDayBase=cS.carry!=null?cS.carry:b.cfdBase;
-  // C-19: จำนวนจุดรวม (union เวลา CFD+Option) → ขอบเขตข้อมูลจริงของ clamp
+  const cData=isPct?_eqPctPts(cS.pts,cfdDayBase):cS.pts;
+  const oData=isPct?_eqPctPts(oS.pts,optDayBase):oS.pts;
+  const hasToday=cData.length+oData.length>0;
+  // C-19: จำนวนจุดรวม → ขอบเขตข้อมูลจริงของ clamp
   const unionTs=new Set();
-  cS.pts.forEach(p=>unionTs.add(p.time));
-  oS.pts.forEach(p=>unionTs.add(p.time));
+  cData.forEach(p=>unionTs.add(p.time));
+  oData.forEach(p=>unionTs.add(p.time));
   _eqSetLast(lwEqChart, unionTs.size);
-  // สร้าง baseline series ใหม่เมื่อยังไม่มี หรือ base เปลี่ยน (เช่นข้ามวัน → carry เปลี่ยน)
-  const mkSeries=(existing,curBase,prevBase,priceFmt)=>{
-    if(existing&&prevBase===(curBase||0)) return existing;
-    if(existing) lwEqChart.removeSeries(existing);
-    return lwEqChart.addBaselineSeries({
-      baseValue:{type:'price',price:curBase||0},
-      lineColor:ACCENT, lineWidth:2,
-      topLineColor:DIM, topLineColor1:DIM,
-      topFillColor1:BULL_FILL1, topFillColor2:BULL_FILL2,
-      bottomLineColor:DIM, bottomLineColor1:DIM,
-      bottomFillColor1:BEAR_FILL1, bottomFillColor2:BEAR_FILL2,
-      // C-19: ป้ายมูลค่าล่าสุดบนแกนขวา (เดิมปิด) — pro investor เห็นตัวเลขเด้งตลอด
-      priceLineVisible:false, lastValueVisible:true, priceFormat:priceFmt,
-    });
-  };
-  if(cS.n){
-    lwEqSeries=mkSeries(lwEqSeries,cfdDayBase,lwEqBase,{type:'custom',formatter:p=>'$'+fmt(p)});
-    lwEqBase=cfdDayBase||0;
-  }
-  if(oS.n){
-    lwEqSeries2=mkSeries(lwEqSeries2,optDayBase,lwEqBase2,{type:'custom',formatter:p=>fmt(p)+' '+cur});
-    lwEqBase2=optDayBase||0;
-  }
-  if(lwEqSeries) lwEqSeries.setData(cS.n?cS.pts:[]);
-  if(lwEqSeries2) lwEqSeries2.setData(oS.n?oS.pts:[]);
+  // C-20: series ตามโหมด (สร้างใหม่เมื่อโหมด/ฐานเปลี่ยน)
+  const cfgKey=mode+'|'+cfdDayBase+'|'+optDayBase+'|'+cur;
+  if(cfgKey!==_eqOvCfgKey){ _eqOvMkSeries(mode,cfdDayBase,optDayBase,cur,fmt); _eqOvCfgKey=cfgKey; }
+  lwEqChart.applyOptions({leftPriceScale:{visible:mode==='value'}});
+  lwEqSeries&&lwEqSeries.setData(cData);
+  lwEqSeries2&&lwEqSeries2.setData(oData);
   lwEqChart.applyOptions({width:el.clientWidth||300,height:el.clientHeight||260});
   // C-18: fit เฉพาะตอนข้อมูลวันนี้มาถึงครั้งแรก (0→n) — รอบถัดไปรักษา zoom/pan ผู้ใช้
   if(hasToday&&_eqOvPrevN===0) lwEqChart.timeScale().fitContent();
-  _eqOvPrevN=oS.n+cS.n;
-  // ── C-19: hover อ่านค่าตามเส้น (ผูกครั้งเดียว) — วันที่ · มูลค่า · ±จากทุนต้นวัน ──
+  _eqOvPrevN=cData.length+oData.length;
+  // ── C-19/C-20: hover อ่านค่า — pct: %+มูลค่าจริง · value: มูลค่าจริง ──
   if(!lwEqChart.__eqHoverBound){
     lwEqChart.__eqHoverBound=true;
     lwEqChart.subscribeCrosshairMove(param=>{
       const hEl=document.getElementById('eqHoverOv'); if(!hEl) return;
       if(!param||param.time==null){ hEl.innerHTML=''; return; }
       const dTxt=new Date(param.time*1000).toLocaleString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
-      const parts=[];
-      const read=(ser,base,unit)=>{
+      const modeNow=_eqGetMode();
+      const rows=[];
+      const read=(ser,map,absBase,unit)=>{
         const pt=ser?param.seriesData.get(ser):null;
         if(!pt||pt.value==null) return;
-        const pnl=pt.value-base;
-        const cls=pnl>0?'eq-up':(pnl<0?'eq-dn':'');
-        const val=unit==='cfd'?('$'+fmt(pt.value)):(fmt(pt.value)+' '+cur);
-        parts.push(`<span class="${cls}">${unit==='cfd'?'CFD':'Option'} <b>${val}</b> (${pnl>=0?'+':''}${fmt(pnl)})</span>`);
+        const label=unit==='cfd'?`<b style="color:${CFD_COLOR}">CFD</b>`:`<b style="color:${OPT_COLOR}">Option</b>`;
+        if(modeNow==='pct'){
+          const cls=pt.value>0?'eq-up':(pt.value<0?'eq-dn':'');
+          let absTxt='';
+          const abs=map.get(param.time);
+          if(abs!=null){
+            const pnl=abs-absBase;
+            absTxt=` <span class="h-abs">(${unit==='cfd'?'$':''}${fmt(abs)}${unit==='cfd'?'':' '+cur} · ${pnl>=0?'+':''}${fmt(pnl)})</span>`;
+          }
+          rows.push(`${label} <span class="${cls}">${_eqPctFmt(pt.value)}</span>${absTxt}`);
+        } else {
+          const pnl=pt.value-absBase;
+          const cls=pnl>0?'eq-up':(pnl<0?'eq-dn':'');
+          rows.push(`${label} <span class="${cls}">${unit==='cfd'?'$':''}${fmt(pt.value)}${unit==='cfd'?'':' '+cur} (${pnl>=0?'+':''}${fmt(pnl)})</span>`);
+        }
       };
-      read(lwEqSeries,lwEqBase||0,'cfd');
-      read(lwEqSeries2,lwEqBase2||0,'opt');
-      hEl.innerHTML=parts.length?`<span class="eq-h-time">${dTxt}</span>${parts.join('<span style="color:var(--border)"> · </span>')}`:'';
+      read(lwEqSeries,new Map(cS.pts.map(p=>[p.time,p.value])),cfdDayBase,'cfd');
+      read(lwEqSeries2,new Map(oS.pts.map(p=>[p.time,p.value])),optDayBase,'opt');
+      hEl.innerHTML=rows.length?`<span class="eq-h-time">${dTxt}</span>${rows.join('<span style="color:var(--border)"> · </span>')}`:'';
     });
   }
   if(emptyEl) emptyEl.style.display=hasToday?'none':'block';
   if(statsEl){
-    // chips ขอบเขต "วันนี้" — P&L นับจากทุนตอนเริ่มวัน (carry-in) ไม่ใช่ทุนตั้งต้นตอนเปิดพอร์ต
+    // C-20: ชิป — ป้ายชื่อเส้นติดสีเส้นจริง · % ใช้ฐานต้นวัน + guard ฐานเล็ก/ติดลบ (ไม่โชว์ % เพี้ยน)
     const pnlChip=(pnl,base)=>{
-      if(pnl>0) return `<span class="eq-up">(+${fmt(pnl)} · +${(pnl/Math.max(base,1)*100).toFixed(1)}%)</span>`;
-      if(pnl<0) return `<span class="eq-dn">(${fmt(pnl)} · ${(pnl/Math.max(base,1)*100).toFixed(1)}%)</span>`;
+      const pc=_eqPctOf(pnl,base);
+      const pctTxt=pc!=null?` · ${pc>0?'+':''}${pc.toFixed(1)}%`:'';
+      if(pnl>0) return `<span class="eq-up">(+${fmt(pnl)}${pctTxt})</span>`;
+      if(pnl<0) return `<span class="eq-dn">(${fmt(pnl)}${pctTxt})</span>`;
       return `<span>(0)</span>`;
     };
     const chips=['<span class="eq-scope">วันนี้</span>'];
     if(cS.n){
       const lastV=cS.pts[cS.pts.length-1].value, pnl=lastV-cfdDayBase;
-      chips.push(`CFD <b>$${fmt(lastV)}</b> ${pnlChip(pnl,cfdDayBase)} · ${cS.n} เทรด`);
+      chips.push(`<b style="color:${CFD_COLOR}">CFD</b> $${fmt(lastV)} ${pnlChip(pnl,cfdDayBase)} · ${cS.n} เทรด`);
     }
     if(oS.n){
       const lastV=oS.pts[oS.pts.length-1].value, pnl=lastV-optDayBase;
-      chips.push(`Option <b>${fmt(lastV)} ${cur}</b> ${pnlChip(pnl,optDayBase)} · ${oS.n} เทรด`);
+      chips.push(`<b style="color:${OPT_COLOR}">Option</b> ${fmt(lastV)} ${cur} ${pnlChip(pnl,optDayBase)} · ${oS.n} เทรด`);
     }
     if(chips.length===1) chips.push('ยังไม่มีเทรดที่จบวันนี้ — ดูประวัติทั้งหมดที่แท็บผลงาน&บันทึก');
-    statsEl.innerHTML=chips.join('<span style="color:var(--border)"> | </span>');
+    statsEl.innerHTML=chips.join('<span class="eq-sep">|</span>');
   }
 }
 

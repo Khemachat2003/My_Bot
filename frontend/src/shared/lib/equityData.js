@@ -100,5 +100,31 @@ function _eqSetLast(chart, n){
   if(st) st.last=Number(n)>0?Number(n)-1:-1;
 }
 
+// ═══ C-20: โหมดแสดงผลกราฟ equity ═══
+// 'pct' (default) = ผลตอบแทน % จากต้นช่วง — ใช้เทียบข้ามหน่วยได้ (CFD เป็น USD, Option เป็น THB
+//                   ของเดิมวาดบนสเกลเดียวกัน → สเกลปนหน่วยทั้งสองเส้นแบน อ่านไม่รู้เรื่อง ตามที่ผู้ใช้เจอ)
+// 'value'        = มูลค่าจริง — CFD แกนขวา ($) / Option แกนซ้าย (THB) แยกสเกล+หน่วยชัดเจน
+const EQ_MODE_KEY='eqViewMode';
+function _eqGetMode(){ try{ return localStorage.getItem(EQ_MODE_KEY)==='value'?'value':'pct'; }catch(e){ return 'pct'; } }
+function _eqSetMode(m){ try{ localStorage.setItem(EQ_MODE_KEY, m==='value'?'value':'pct'); }catch(e){} }
+// แปลงจุดเป็น % จาก base — ใช้ |base| เป็นตัวหาร (พอร์ตติดลบก็ได้ % ถูกเครื่องหมาย: v-base คูณทิศ)
+// คืน [] เมื่อ base ใกล้ศูนย์ (เช่น capital=1 THB) — % ไม่มีความหมาย ดีกว่าปล่อยให้ระเบิด (-30600% ตามที่ผู้ใช้เจอ)
+function _eqPctPts(pts, base){
+  if(!pts||!pts.length||base==null||Math.abs(base)<1) return [];
+  return pts.map(p=>({time:p.time, value:Math.round((p.value-base)/Math.abs(base)*10000)/100}));
+}
+function _eqPctFmt(v){ const n=Number(v)||0; return (n>0?'+':'')+n.toFixed(2)+'%'; }
+// กัน % ในชิปสถิติ/ข้อความ: ฐานเล็กเกินไป → null (ไม่โชว์ %)
+function _eqPctOf(pnl, base){ return (base!=null&&Math.abs(base)>=1)?(pnl/Math.abs(base)*100):null; }
+// ผูก resize ให้ canvas พอดี container ทุกกรณี (แท็บสลับ/drawer/หมุนจอ) — แก้ป้ายแกนขวา/เวลาโดนตัด
+function _eqBindResize(chart, el){
+  if(!chart||!el||chart.__eqResizeBound) return;
+  chart.__eqResizeBound=true;
+  const ap=()=>{ const w=el.clientWidth; if(w>0) chart.applyOptions({width:w}); };
+  if(window.ResizeObserver){ const ro=new ResizeObserver(()=>ap()); ro.observe(el); }
+  window.addEventListener('resize',ap);
+  if(window.visualViewport) window.visualViewport.addEventListener('resize',ap);
+}
 
-export { _buildEqData, _eqBindClamp, _eqRangeStart, _eqSetLast, _eqSlice };
+
+export { _buildEqData, _eqBindClamp, _eqBindResize, _eqGetMode, _eqPctFmt, _eqPctOf, _eqPctPts, _eqRangeStart, _eqSetLast, _eqSetMode, _eqSlice };
