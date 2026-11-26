@@ -24,12 +24,12 @@ Importance 2 (WAITING):
   10. Multi-timeframe trend: EMA50>100>200 alignment (M1/M15/M30/H1/H4, 3/5)
   11. EMA Slope: Linear Regression + Normalize (Upward/Downward/Horizontal)
 """
+
 from __future__ import annotations
 
 import json
 import math
 import os
-import statistics
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -45,7 +45,7 @@ def load_config() -> dict:
         mtime = os.stat(CONFIG_PATH).st_mtime
         if _config_cache["data"] is not None and _config_cache["mtime"] == mtime:
             return _config_cache["data"]
-        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        with open(CONFIG_PATH, encoding="utf-8") as f:
             cfg = json.load(f)
         _config_cache.update(mtime=mtime, data=cfg)
         return cfg
@@ -74,11 +74,11 @@ class SetupResult:
     touched_ema200: bool = False
     crossed_ema100: bool = False
     # V8: Two-tier system
-    importance: int = 0          # 1 = EMA200 touch (emergency), 2 = EMA100 cross (waiting)
-    conditions_passed: int = 0   # How many of 10 conditions passed
+    importance: int = 0  # 1 = EMA200 touch (emergency), 2 = EMA100 cross (waiting)
+    conditions_passed: int = 0  # How many of 10 conditions passed
     conditions_total: int = 10
     conditions_log: dict = field(default_factory=dict)  # Full log of all 10 conditions
-    touch_case: str = ""         # TICK_TOUCH / WICK_TOUCH / CLOSE_TOUCH / ""
+    touch_case: str = ""  # TICK_TOUCH / WICK_TOUCH / CLOSE_TOUCH / ""
 
 
 # ── Indicators ────────────────────────────────────────────────────────────────
@@ -105,23 +105,35 @@ def _calc_bollinger_bands(series: pd.Series, period: int = 20, std_dev: float = 
 
 def _calc_atr(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.Series:
     prev_close = close.shift(1)
-    tr = pd.concat([
-        high - low,
-        (high - prev_close).abs(),
-        (low - prev_close).abs(),
-    ], axis=1).max(axis=1)
+    tr = pd.concat(
+        [
+            high - low,
+            (high - prev_close).abs(),
+            (low - prev_close).abs(),
+        ],
+        axis=1,
+    ).max(axis=1)
     return tr.ewm(alpha=1 / period, adjust=False).mean()
 
 
 def _calc_adx(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.Series:
     up_move = high.diff()
     down_move = -low.diff()
-    plus_dm = pd.Series(np.where((up_move > down_move) & (up_move > 0), up_move, 0.0), index=high.index)
-    minus_dm = pd.Series(np.where((down_move > up_move) & (down_move > 0), down_move, 0.0), index=high.index)
+    plus_dm = pd.Series(
+        np.where((up_move > down_move) & (up_move > 0), up_move, 0.0), index=high.index
+    )
+    minus_dm = pd.Series(
+        np.where((down_move > up_move) & (down_move > 0), down_move, 0.0), index=high.index
+    )
     prev_close = close.shift(1)
-    tr = pd.concat([
-        high - low, (high - prev_close).abs(), (low - prev_close).abs(),
-    ], axis=1).max(axis=1)
+    tr = pd.concat(
+        [
+            high - low,
+            (high - prev_close).abs(),
+            (low - prev_close).abs(),
+        ],
+        axis=1,
+    ).max(axis=1)
     atr = tr.ewm(alpha=1 / period, adjust=False).mean()
     plus_di = 100 * plus_dm.ewm(alpha=1 / period, adjust=False).mean() / atr.replace(0, np.nan)
     minus_di = 100 * minus_dm.ewm(alpha=1 / period, adjust=False).mean() / atr.replace(0, np.nan)
@@ -137,13 +149,13 @@ def _find_fractals(high: pd.Series, low: pd.Series, left: int = 7, right: int = 
     piv_highs: list[tuple[int, float]] = []
     piv_lows: list[tuple[int, float]] = []
     for i in range(left, n - right):
-        h, l = H[i], L[i]
-        is_h = h > max(H[i - left:i]) and h > max(H[i + 1:i + right + 1])
-        is_l = l < min(L[i - left:i]) and l < min(L[i + 1:i + right + 1])
+        h, lo = H[i], L[i]
+        is_h = h > max(H[i - left : i]) and h > max(H[i + 1 : i + right + 1])
+        is_l = lo < min(L[i - left : i]) and lo < min(L[i + 1 : i + right + 1])
         if is_h:
             piv_highs.append((i, h))
         elif is_l:
-            piv_lows.append((i, l))
+            piv_lows.append((i, lo))
     return piv_highs, piv_lows
 
 
@@ -171,12 +183,14 @@ def _fractal_structure(piv_highs, piv_lows) -> str:
 # 10 CONDITIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _build_fractal_zones(piv_highs, piv_lows, atr_val: float, atr_multiplier: float = 0.5):
     """สร้างโซน S/R รอบ fractal ทุกตัว โดยใช้ Tolerance_Range = ATR * ATR_Multiplier
     แล้ว merge โซนที่ซ้อนทับกัน (เก็บเฉพาะ fractal ตัวใหม่สุดในกลุ่มที่ overlap)"""
     tolerance = atr_val * atr_multiplier
-    raw = [(idx, price, "H") for idx, price in piv_highs] + \
-          [(idx, price, "L") for idx, price in piv_lows]
+    raw = [(idx, price, "H") for idx, price in piv_highs] + [
+        (idx, price, "L") for idx, price in piv_lows
+    ]
     raw.sort(key=lambda x: x[0])  # เรียงตามเวลา เก่า→ใหม่
 
     zones = []  # each: {"idx","price","kind","lo","hi"}
@@ -194,8 +208,14 @@ def _build_fractal_zones(piv_highs, piv_lows, atr_val: float, atr_multiplier: fl
     return zones
 
 
-def _cond1_fractal_sr(df: pd.DataFrame, piv_highs, piv_lows, direction: str,
-                       atr_val: float, atr_multiplier: float = 0.5) -> dict:
+def _cond1_fractal_sr(
+    df: pd.DataFrame,
+    piv_highs,
+    piv_lows,
+    direction: str,
+    atr_val: float,
+    atr_multiplier: float = 0.5,
+) -> dict:
     """Fractal S/R zone — Tolerance_Range = ATR(14) * ATR_Multiplier(0.5) รอบ fractal
     โซนที่ซ้อนทับกันจะถูก merge (เก็บ fractal ใหม่สุด) ก่อนเช็คว่าราคาปัจจุบันอยู่ในโซนไหน"""
     last_close = float(df["close"].iloc[-1])
@@ -204,9 +224,12 @@ def _cond1_fractal_sr(df: pd.DataFrame, piv_highs, piv_lows, direction: str,
     for z in reversed(zones):  # เช็คโซนใหม่สุดก่อน
         if z["lo"] <= last_close <= z["hi"]:
             label = "แนวต้าน" if z["kind"] == "H" else "แนวรับ"
-            return {"pass": True, "zone": z,
-                    "note": f"ราคาอยู่ในโซน{label} fractal ({z['lo']:.2f}–{z['hi']:.2f}) "
-                            f"ATR-tol=±{atr_val * atr_multiplier:.2f}"}
+            return {
+                "pass": True,
+                "zone": z,
+                "note": f"ราคาอยู่ในโซน{label} fractal ({z['lo']:.2f}–{z['hi']:.2f}) "
+                f"ATR-tol=±{atr_val * atr_multiplier:.2f}",
+            }
 
     return {"pass": False, "zone": None, "note": "ราคาไม่ได้อยู่ในโซน S/R จาก fractal (ATR-based)"}
 
@@ -216,13 +239,16 @@ def _cond2_bb_break(df: pd.DataFrame, bb_up, bb_lo, direction: str) -> dict:
     last_close = float(df["close"].iloc[-1])
     last_up = float(bb_up.iloc[-1]) if not np.isnan(bb_up.iloc[-1]) else 0
     last_lo = float(bb_lo.iloc[-1]) if not np.isnan(bb_lo.iloc[-1]) else 0
-    
+
     if direction == "CALL" and last_close <= last_lo:
         return {"pass": True, "note": f"ราคา {last_close:.2f} ทะลุ BB ล่าง {last_lo:.2f}"}
     elif direction == "PUT" and last_close >= last_up:
         return {"pass": True, "note": f"ราคา {last_close:.2f} ทะลุ BB บน {last_up:.2f}"}
-    
-    return {"pass": False, "note": f"ราคา {last_close:.2f} ไม่ได้ทะลุ BB ({last_lo:.2f}-{last_up:.2f})"}
+
+    return {
+        "pass": False,
+        "note": f"ราคา {last_close:.2f} ไม่ได้ทะลุ BB ({last_lo:.2f}-{last_up:.2f})",
+    }
 
 
 def _cond3_rsi_ob_os(rsi_val: float, direction: str) -> dict:
@@ -234,10 +260,18 @@ def _cond3_rsi_ob_os(rsi_val: float, direction: str) -> dict:
     return {"pass": False, "note": f"RSI={rsi_val:.1f} ไม่ใช่ OVB/OVS"}
 
 
-def _cond4_rsi_divergence(rsi: pd.Series, piv_highs_sig, piv_lows_sig,
-                           above_ema200: bool, last_close: float,
-                           cur_idx: int, rsi_ob: float = 70.0, rsi_os: float = 30.0,
-                           diff_threshold: float = 3.0, lookback: int = 100) -> dict:
+def _cond4_rsi_divergence(
+    rsi: pd.Series,
+    piv_highs_sig,
+    piv_lows_sig,
+    above_ema200: bool,
+    last_close: float,
+    cur_idx: int,
+    rsi_ob: float = 70.0,
+    rsi_os: float = 30.0,
+    diff_threshold: float = 3.0,
+    lookback: int = 100,
+) -> dict:
     """RSI Divergence ตามสเปก:
     CASE A (ราคาเหนือ EMA200): หา Fractal Low นัยสำคัญ (period=15) ที่ใกล้ที่สุด
         ภายใน lookback แท่ง ซึ่ง ณ แท่งนั้น RSI เคย <= OS มาก่อน แล้วเช็ค
@@ -256,11 +290,18 @@ def _cond4_rsi_divergence(rsi: pd.Series, piv_highs_sig, piv_lows_sig,
                 continue  # ต้องเคย oversold มาก่อนตามสเปก
             diff = last_rsi - r_frac
             if last_close <= p_frac and diff >= diff_threshold:
-                return {"pass": True,
-                        "note": (f"Bullish Divergence: ราคา {p_frac:.2f}→{last_close:.2f} (≤) "
-                                 f"RSI {r_frac:.1f}(OS)→{last_rsi:.1f} (Δ{diff:+.1f} ≥{diff_threshold})")}
+                return {
+                    "pass": True,
+                    "note": (
+                        f"Bullish Divergence: ราคา {p_frac:.2f}→{last_close:.2f} (≤) "
+                        f"RSI {r_frac:.1f}(OS)→{last_rsi:.1f} (Δ{diff:+.1f} ≥{diff_threshold})"
+                    ),
+                }
             break  # ใช้เฉพาะ fractal ที่นัยสำคัญและใกล้สุดตัวเดียว ตามสเปก
-        return {"pass": False, "note": "ไม่พบ Bullish Divergence (fractal low นัยสำคัญ+OS ในระยะ lookback)"}
+        return {
+            "pass": False,
+            "note": "ไม่พบ Bullish Divergence (fractal low นัยสำคัญ+OS ในระยะ lookback)",
+        }
 
     else:
         for i_frac, p_frac in reversed(piv_highs_sig):
@@ -271,11 +312,18 @@ def _cond4_rsi_divergence(rsi: pd.Series, piv_highs_sig, piv_lows_sig,
                 continue  # ต้องเคย overbought มาก่อนตามสเปก
             diff = r_frac - last_rsi
             if last_close >= p_frac and diff >= diff_threshold:
-                return {"pass": True,
-                        "note": (f"Bearish Divergence: ราคา {p_frac:.2f}→{last_close:.2f} (≥) "
-                                 f"RSI {r_frac:.1f}(OB)→{last_rsi:.1f} (Δ{diff:+.1f} ≥{diff_threshold})")}
+                return {
+                    "pass": True,
+                    "note": (
+                        f"Bearish Divergence: ราคา {p_frac:.2f}→{last_close:.2f} (≥) "
+                        f"RSI {r_frac:.1f}(OB)→{last_rsi:.1f} (Δ{diff:+.1f} ≥{diff_threshold})"
+                    ),
+                }
             break
-        return {"pass": False, "note": "ไม่พบ Bearish Divergence (fractal high นัยสำคัญ+OB ในระยะ lookback)"}
+        return {
+            "pass": False,
+            "note": "ไม่พบ Bearish Divergence (fractal high นัยสำคัญ+OB ในระยะ lookback)",
+        }
 
 
 def _cond5_adx(adx_val: float) -> dict:
@@ -285,10 +333,15 @@ def _cond5_adx(adx_val: float) -> dict:
     return {"pass": False, "note": f"ADX={adx_val:.1f} (<20) เทรนอ่อน"}
 
 
-def _classify_candle_pa(o: float, h: float, lo: float, c: float,
-                         hammer_body_ratio: float = 30.0,
-                         doji_body_ratio: float = 10.0,
-                         doji_shadow_diff: float = 15.0):
+def _classify_candle_pa(
+    o: float,
+    h: float,
+    lo: float,
+    c: float,
+    hammer_body_ratio: float = 30.0,
+    doji_body_ratio: float = 10.0,
+    doji_shadow_diff: float = 15.0,
+):
     """คืน pa_type ('Hammer'/'Inverted_Hammer'/'Doji'/None) ตามสูตรสเปกเป๊ะ:
     Body_Range=|C-O|, Total_Range=H-L, Upper=H-max(O,C), Lower=min(O,C)-L"""
     total_range = h - lo
@@ -313,9 +366,13 @@ def _classify_candle_pa(o: float, h: float, lo: float, c: float,
     return None
 
 
-def _cond6_pa_confirmation(df: pd.DataFrame, direction: str,
-                            zone: dict | None, divergence_confirmed: bool,
-                            frac_zones_all=None) -> dict:
+def _cond6_pa_confirmation(
+    df: pd.DataFrame,
+    direction: str,
+    zone: dict | None,
+    divergence_confirmed: bool,
+    frac_zones_all=None,
+) -> dict:
     """PA confirmation — ตรวจ **เฉพาะแท่งปิดล่าสุด** ว่าเป็น Hammer/Inverted-Hammer/Doji
     ตามสูตรสเปก (body/shadow ratio) และเช็คว่าอยู่ในระนาบราคาของ 'โซน Fractal S/R'
     (จาก c1) ไหม — special case: ถ้าตรงกับตัว fractal price เป๊ะ ระบุ 'PA point'
@@ -324,8 +381,10 @@ def _cond6_pa_confirmation(df: pd.DataFrame, direction: str,
     AND divergence_confirmed (c4) เป็น True มาก่อนแล้วเท่านั้น — ฟังก์ชันนี้คืน
     pass=True เฉพาะกรณีครบเงื่อนไข cascade เท่านั้น"""
     if zone is None or not divergence_confirmed:
-        return {"pass": False,
-                "note": "รอ: ยังไม่มีโซน Fractal S/R (c1) และ/หรือ RSI Divergence (c4) ยืนยันก่อนหน้า"}
+        return {
+            "pass": False,
+            "note": "รอ: ยังไม่มีโซน Fractal S/R (c1) และ/หรือ RSI Divergence (c4) ยืนยันก่อนหน้า",
+        }
 
     row = df.iloc[-1]
     o, h, lo, c = float(row["open"]), float(row["high"]), float(row["low"]), float(row["close"])
@@ -340,7 +399,10 @@ def _cond6_pa_confirmation(df: pd.DataFrame, direction: str,
     if direction == "CALL" and pa_type == "Inverted_Hammer":
         return {"pass": False, "note": "เจอ Inverted Hammer แต่ทิศทาง CALL ต้องการ Hammer"}
     if direction == "PUT" and pa_type == "Hammer":
-        return {"pass": False, "note": "เจอ Hammer แต่ทิศทาง PUT ต้องการ Inverted Hammer/Shooting Star"}
+        return {
+            "pass": False,
+            "note": "เจอ Hammer แต่ทิศทาง PUT ต้องการ Inverted Hammer/Shooting Star",
+        }
 
     is_frac_point = frac_zones_all and any(
         abs(round(mid, 2) - round(fz[0], 2)) / max(fz[0], 0.001) < 0.001 for fz in frac_zones_all
@@ -365,9 +427,9 @@ def _cond8_grip(ema200_price: float, cfg: dict, symbol: str = "") -> dict:
     # กำหนด step + tolerance ตามประเภทราคา
     sym = symbol.upper()
     if "XAU" in sym:
-        step, tol = 1.0, 0.5      # ทอง: round ทุก 1.0, ±0.5
+        step, tol = 1.0, 0.5  # ทอง: round ทุก 1.0, ±0.5
     elif "JPY" in sym:
-        step, tol = 0.1, 0.05     # JPY: round ทุก 0.1, ±0.05
+        step, tol = 0.1, 0.05  # JPY: round ทุก 0.1, ±0.05
     elif sym in ("GBPUSD", "GBPJPY", "GBPAUD", "GBPNZD", "GBPCAD", "GBPCHF"):
         step, tol = 0.01, 0.005
     elif sym in ("EURJPY", "AUDJPY", "NZDJPY", "CADJPY", "CHFJPY"):
@@ -389,37 +451,42 @@ def _cond8_grip(ema200_price: float, cfg: dict, symbol: str = "") -> dict:
     dist = abs(ema200_price - line)
 
     if dist <= tol:
-        return {"pass": True,
-                "note": f"EMA200 ({ema200_price:.2f}) ใกล้เลขกลม {line:.2f} "
-                        f"(±{dist:.3f} ≤ {tol})"}
-    return {"pass": False,
-            "note": f"EMA200 ({ema200_price:.2f}) ห่างจากเลขกลม {line:.2f} "
-                    f"(±{dist:.3f} > {tol})"}
+        return {
+            "pass": True,
+            "note": f"EMA200 ({ema200_price:.2f}) ใกล้เลขกลม {line:.2f} (±{dist:.3f} ≤ {tol})",
+        }
+    return {
+        "pass": False,
+        "note": f"EMA200 ({ema200_price:.2f}) ห่างจากเลขกลม {line:.2f} (±{dist:.3f} > {tol})",
+    }
 
 
 def _nice_step(v: float) -> float:
     if v <= 0:
         return 1.0
     exp = math.floor(math.log10(v))
-    base = v / 10 ** exp
+    base = v / 10**exp
     if base < 1.5:
-        return 1 * 10 ** exp
+        return 1 * 10**exp
     if base < 3.5:
-        return 2 * 10 ** exp
+        return 2 * 10**exp
     if base < 7.5:
-        return 5 * 10 ** exp
-    return 10 * 10 ** exp
+        return 5 * 10**exp
+    return 10 * 10**exp
 
 
 def _cond9_bb_width(bb_width: pd.Series) -> dict:
     """BB squeeze or expansion — เปรียบเทียบตรงๆ ไม่มี buffer"""
     cur_w = float(bb_width.iloc[-1]) if not np.isnan(bb_width.iloc[-1]) else 0
     avg_w = float(bb_width.rolling(20).mean().iloc[-1]) if len(bb_width) >= 20 else cur_w
-    
+
     if cur_w > avg_w:
         return {"pass": True, "note": f"BB ขยาย (width {cur_w:.2f}% > avg {avg_w:.2f}%) — มีวอลุ่ม"}
     elif cur_w < avg_w:
-        return {"pass": True, "note": f"BB บีบ (width {cur_w:.2f}% < avg {avg_w:.2f}%) — เตรียม breakout"}
+        return {
+            "pass": True,
+            "note": f"BB บีบ (width {cur_w:.2f}% < avg {avg_w:.2f}%) — เตรียม breakout",
+        }
     return {"pass": False, "note": f"BB ทรงตัว ({cur_w:.2f}% = avg {avg_w:.2f}%)"}
 
 
@@ -429,7 +496,11 @@ def _cond10_mtf_trend(df: pd.DataFrame, direction: str) -> dict:
     ต้อง ≥ 3/5 TFs ตรงทิศ"""
     close = df["close"]
     tf_configs = [
-        ("M1", 1), ("M15", 15), ("M30", 30), ("H1", 60), ("H4", 240),
+        ("M1", 1),
+        ("M15", 15),
+        ("M30", 30),
+        ("H1", 60),
+        ("H4", 240),
     ]
 
     aligned_count = 0
@@ -437,9 +508,9 @@ def _cond10_mtf_trend(df: pd.DataFrame, direction: str) -> dict:
 
     for tf_name, tf_minutes in tf_configs:
         try:
-            resampled = close.resample(
-                f"{tf_minutes}min", closed="left", label="left"
-            ).last().dropna()
+            resampled = (
+                close.resample(f"{tf_minutes}min", closed="left", label="left").last().dropna()
+            )
             if len(resampled) < 200:
                 tf_results.append(f"{tf_name}: ข้อมูลไม่พอ")
                 continue
@@ -463,15 +534,16 @@ def _cond10_mtf_trend(df: pd.DataFrame, direction: str) -> dict:
             tf_results.append(f"{tf_name}: error")
 
     passed = aligned_count >= 3
-    return {"pass": passed,
-            "note": f"MTF {aligned_count}/5 TFs ตรงทิศ ({', '.join(tf_results)})"}
+    return {"pass": passed, "note": f"MTF {aligned_count}/5 TFs ตรงทิศ ({', '.join(tf_results)})"}
 
 
-def _cond11_ema_slope(ema50: pd.Series, ema100: pd.Series, ema200: pd.Series,
-                      threshold: float = 0.005) -> dict:
+def _cond11_ema_slope(
+    ema50: pd.Series, ema100: pd.Series, ema200: pd.Series, threshold: float = 0.005
+) -> dict:
     """EMA Slope Classification — Linear Regression + Normalize
     EMA50 lookback=5, EMA100=10, EMA200=15, threshold T=0.005%
     Returns: Upward / Downward / Horizontal"""
+
     def _slope_status(series: pd.Series, lookback: int, label: str):
         vals = series.dropna().values
         if len(vals) < lookback:
@@ -514,15 +586,15 @@ def _cond11_ema_slope(ema50: pd.Series, ema100: pd.Series, ema200: pd.Series,
         else:
             result_status = "Mixed"
 
-    return {"pass": passed,
-            "note": f"EMA Slope [{result_status}]: {' | '.join(notes)}"}
+    return {"pass": passed, "note": f"EMA Slope [{result_status}]: {' | '.join(notes)}"}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # EMA200 TOUCH Detection
 # ══════════════════════════════════════════════════════════════════════════════
-def classify_ema200_touch(c_open: float, c_high: float, c_low: float,
-                          c_close: float, e200: float) -> tuple[bool, str, str, str]:
+def classify_ema200_touch(
+    c_open: float, c_high: float, c_low: float, c_close: float, e200: float
+) -> tuple[bool, str, str, str]:
     """Classifier กลาง 3 เคสการแตะ EMA200 — ใช้ร่วมกันทั้ง real-time checker
     (setup_feed._check_tick_touch) และ rulebase checklist (_ema200_touch检测)
     เพื่อให้ทั้ง 2 ระบบส่งสัญญาณด้วยหลักการเดียวกัน
@@ -547,23 +619,36 @@ def classify_ema200_touch(c_open: float, c_high: float, c_low: float,
 
     # เคส 3: BREAKOUT — เปิด-ปิดคนละฝั่งเส้น + dist(เส้น→close) ≥ ½ body
     if crossed and body > 0 and abs(c_close - e200) >= 0.5 * body:
-        return True, "BREAKOUT", (
-            f"ปิดทะลุ EMA200 ({e200:.5f}) dist(เส้น→close)={abs(c_close-e200):.5f} "
-            f"≥ ½body({0.5*body:.5f})"), direction
+        return (
+            True,
+            "BREAKOUT",
+            (
+                f"ปิดทะลุ EMA200 ({e200:.5f}) dist(เส้น→close)={abs(c_close - e200):.5f} "
+                f"≥ ½body({0.5 * body:.5f})"
+            ),
+            direction,
+        )
 
     # เคส 2: WICK_BOUNCE — wick แตะเส้น ปิดกลับ dist(wick→close) ≥ ½ body
     wick_to_close = (c_close - c_low) if c_close >= e200 else (c_high - c_close)
     if body > 0 and wick_to_close >= 0.5 * body:
-        return True, "WICK_BOUNCE", (
-            f"wick แตะ EMA200 ({e200:.5f}) เด้ง dist(wick→close)={wick_to_close:.5f} "
-            f"≥ ½body({0.5*body:.5f})"), direction
+        return (
+            True,
+            "WICK_BOUNCE",
+            (
+                f"wick แตะ EMA200 ({e200:.5f}) เด้ง dist(wick→close)={wick_to_close:.5f} "
+                f"≥ ½body({0.5 * body:.5f})"
+            ),
+            direction,
+        )
 
     # เคส 1: TICK_TOUCH — แตะแล้วส่งเลย
     return True, "TICK_TOUCH", f"ราคาแตะ EMA200 ({e200:.5f}) real-time", direction
 
 
-def _ema200_touch检测(df: pd.DataFrame, ema200: pd.Series,
-                       lookback: int = 20) -> tuple[bool, str, str]:
+def _ema200_touch检测(
+    df: pd.DataFrame, ema200: pd.Series, lookback: int = 20
+) -> tuple[bool, str, str]:
     """ตรวจว่าแท่งล่าสุด (k=0) แตะ EMA200 หรือไม่ — ใช้ classify_ema200_touch กลาง
     Returns: (touched, note, touch_case)
     touch_case: BREAKOUT / WICK_BOUNCE / TICK_TOUCH / ""
@@ -576,8 +661,11 @@ def _ema200_touch检测(df: pd.DataFrame, ema200: pd.Series,
     row = df.iloc[idx]
     e_at_bar = float(ema200.iloc[idx]) if idx < len(ema200) else float(ema200.iloc[-1])
     touched, case, note, _dir = classify_ema200_touch(
-        float(row["open"]), float(row["high"]),
-        float(row["low"]), float(row["close"]), e_at_bar,
+        float(row["open"]),
+        float(row["high"]),
+        float(row["low"]),
+        float(row["close"]),
+        e_at_bar,
     )
     return touched, note, case
 
@@ -585,23 +673,76 @@ def _ema200_touch检测(df: pd.DataFrame, ema200: pd.Series,
 # ══════════════════════════════════════════════════════════════════════════════
 # MAIN SCORING FUNCTION
 # ══════════════════════════════════════════════════════════════════════════════
+def _eval_v2_gates(
+    cfg: dict,
+    symbol: str,
+    direction: str,
+    h1_trend: str | None,
+    adx_val: float,
+    touch_case: str,
+    cond: dict,
+) -> tuple[bool, list[str], bool]:
+    """เกต V2 สำหรับ Importance-1 (แตะ EMA200) — ตามแผน docs/plan_setup_v2_gates.md
+
+    หลักฐานจากงานวิจัย 6,758 เคส: แตะ EMA200 เปล่า ๆ ไม่มีสัญญาณ (WR 49%) —
+    ตัวแยกกำไรคือ ทิศตรงเทรน H1-EMA200 (gap 0.23R) + ADX≥20 + เคส WICK_BOUNCE
+    คืน (ผ่านทุกเกต?, เหตุผลที่ไม่ผ่าน, โหมด shadow?) —
+    enabled=false → (True, [], False) = พฤติกรรมเดิมสมบูรณ์
+    shadow = เก็บสถิติอย่างเดียว (ไม่บล็อก FIRE) ใช้เมื่อ cfg shadow=true
+    หรือ symbol ไม่อยู่ใน live_symbols (P2 เปิด enforce ทีละ symbol)
+    """
+    g = cfg.get("v2_gates") or {}
+    if not g.get("enabled"):
+        return True, [], False
+
+    reasons: list[str] = []
+
+    if g.get("h1_trend_required", True):
+        want = "UP" if direction == "CALL" else "DOWN"
+        if h1_trend != want:
+            reasons.append(f"h1_trend={h1_trend or 'N/A'} (ต้องการ {want})")
+
+    if adx_val < float(g.get("min_adx", 20)):
+        reasons.append(f"adx={adx_val:.1f} (ต้องการ >={g.get('min_adx', 20)})")
+
+    allowed = g.get("allowed_touch_cases", ["WICK_BOUNCE"])
+    if touch_case not in allowed:
+        reasons.append(f"touch_case={touch_case or 'N/A'} (อนุญาต {', '.join(allowed)})")
+
+    for cname in g.get("avoid_conditions", ["c3_rsi_ob_os"]):
+        if cond.get(cname, {}).get("pass"):
+            reasons.append(f"{cname} pass (เกตกัน)")
+
+    live_symbols = g.get("live_symbols", ["frxXAUUSD"])
+    shadow = bool(g.get("shadow", True)) or (symbol not in live_symbols)
+    return (not reasons), reasons, shadow
+
+
 def score_setup(
     df: pd.DataFrame,
     timeframe: str = "M5",
     target_hold_minutes: int = 30,
     symbol: str = "",
+    h1_trend: str | None = None,
 ) -> SetupResult:
     cfg = load_config() or {}
     max_score = 11
-    
+
     if len(df) < 210:
         return SetupResult(
-            timeframe=timeframe, target_hold_minutes=target_hold_minutes,
+            timeframe=timeframe,
+            target_hold_minutes=target_hold_minutes,
             max_score=max_score,
-            details={"Data": {"ok": False, "frac": 0.0,
-                              "note": f"แท่งไม่พอ (ต้องการ >= 210 สำหรับ EMA200, ได้ {len(df)})", "weight": 0}},
+            details={
+                "Data": {
+                    "ok": False,
+                    "frac": 0.0,
+                    "note": f"แท่งไม่พอ (ต้องการ >= 210 สำหรับ EMA200, ได้ {len(df)})",
+                    "weight": 0,
+                }
+            },
         )
-    
+
     close, high, low = df["close"], df["high"], df["low"]
     ema50 = _calc_ema(close, 50)
     ema100 = _calc_ema(close, 100)
@@ -629,7 +770,7 @@ def score_setup(
     atr_val = float(atr.iloc[-1]) if not np.isnan(atr.iloc[-1]) else 0.0
     rsi_val = float(rsi.iloc[-1])
     cur_idx = len(df) - 1
-    
+
     # ── CHECK EMA200 TOUCH FIRST (Importance 1 ต้องทำงานแม้ EMA ไม่เรียง) ──
     dist200 = abs(last_close - e200) / e200 * 100.0
     touched, touch_note, touch_case = _ema200_touch检测(df, ema200)
@@ -639,45 +780,50 @@ def score_setup(
     # ── Determine trend direction from EMA order ──
     trend_align_up = e50 > e100 > e200
     trend_align_down = e50 < e100 < e200
-    
+
     if trend_align_up:
         direction, bias = "CALL", "BULLISH_TREND"
     elif trend_align_down:
         direction, bias = "PUT", "BEARISH_TREND"
     else:
         direction, bias = "", ""
-    
+
     # Importance 1 แตะ EMA200 → infer direction จากตำแหน่งราคา vs EMA200
     if importance1 and not direction:
         if last_close >= e200:
             direction, bias = "CALL", "EMA200_BOUNCE_UP"
         else:
             direction, bias = "PUT", "EMA200_BOUNCE_DOWN"
-    
+
     # No clear trend and no EMA200 touch → NONE
     if not direction:
         return SetupResult(
             timeframe=timeframe,
             target_hold_minutes=target_hold_minutes,
-            score=0.0, max_score=max_score, tier="NONE",
-            direction="", bias="", entry_trigger=False,
+            score=0.0,
+            max_score=max_score,
+            tier="NONE",
+            direction="",
+            bias="",
+            entry_trigger=False,
             ema200_price=e200,
             dist200_pct=round(dist200, 4),
-            near_ema200=False, touched_ema200=False,
+            near_ema200=False,
+            touched_ema200=False,
             entry_trigger_note="EMA ไม่เรียงตามเทรน — รอเทรนชัดเจน",
             details={"ema_trend": {"ok": False, "frac": 0.0, "weight": 1, "note": "EMA ไม่เรียง"}},
         )
-    
+
     # ════════════════════════════════════════════════════════════════════════
     # CHECK EMA100 CROSS
     # ════════════════════════════════════════════════════════════════════════
     _ema100_tol = float(cfg.get("ema100_tol_pct", 0.02))
     if direction == "CALL":
-        crossed_ema100 = (e200 * 0.999 <= last_close <= e100 * (1 + _ema100_tol / 100))
+        crossed_ema100 = e200 * 0.999 <= last_close <= e100 * (1 + _ema100_tol / 100)
     else:
         # ต้องอยู่ระหว่าง EMA200 (ล่าง) กับ EMA100 (บน) = pullback จริง
-        crossed_ema100 = (e100 * (1 - _ema100_tol / 100) <= last_close <= e200 * 1.001)
-    
+        crossed_ema100 = e100 * (1 - _ema100_tol / 100) <= last_close <= e200 * 1.001
+
     # ════════════════════════════════════════════════════════════════════════
     # EVALUATE ALL 10 CONDITIONS
     # ════════════════════════════════════════════════════════════════════════
@@ -686,21 +832,32 @@ def score_setup(
 
     cond = {}
     cond["c1_fractal_sr"] = _cond1_fractal_sr(
-        df, piv_h5, piv_l5, direction,
-        atr_val=atr_val, atr_multiplier=float(cfg.get("fractal_zone", {}).get("atr_multiplier", 0.5)),
+        df,
+        piv_h5,
+        piv_l5,
+        direction,
+        atr_val=atr_val,
+        atr_multiplier=float(cfg.get("fractal_zone", {}).get("atr_multiplier", 0.5)),
     )
     cond["c2_bb_break"] = _cond2_bb_break(df, bb_up, bb_lo, direction)
     cond["c3_rsi_ob_os"] = _cond3_rsi_ob_os(rsi_val, direction)
     cond["c4_rsi_div"] = _cond4_rsi_divergence(
-        rsi, piv_h, piv_l, above_ema200, last_close, cur_idx,
-        rsi_ob=float(cfg_div.get("ob", 70.0)), rsi_os=float(cfg_div.get("os", 30.0)),
+        rsi,
+        piv_h,
+        piv_l,
+        above_ema200,
+        last_close,
+        cur_idx,
+        rsi_ob=float(cfg_div.get("ob", 70.0)),
+        rsi_os=float(cfg_div.get("os", 30.0)),
         diff_threshold=float(cfg_div.get("diff_threshold", 3.0)),
         lookback=int(cfg_div.get("lookback", 100)),
     )
     cond["c5_adx"] = _cond5_adx(adx_val)
     _frac_zones_all = [(p, "H") for _, p in piv_h5] + [(p, "L") for _, p in piv_l5]
     cond["c6_pa"] = _cond6_pa_confirmation(
-        df, direction,
+        df,
+        direction,
         zone=cond["c1_fractal_sr"].get("zone"),
         divergence_confirmed=cond["c4_rsi_div"]["pass"],
         frac_zones_all=_frac_zones_all,
@@ -710,13 +867,16 @@ def score_setup(
     cond["c9_bb_width"] = _cond9_bb_width(bb_width)
     cond["c10_mtf"] = _cond10_mtf_trend(df, direction)
     cond["c11_ema_slope"] = _cond11_ema_slope(ema50, ema100, ema200)
-    
+
     passed_count = sum(1 for c in cond.values() if c["pass"])
-    
+
+    # V2 gates (docs/plan_setup_v2_gates.md) — ค่าเริ่ม = พฤติกรรมเดิม (เกตไม่เปิด)
+    v2_pass, v2_reasons, v2_shadow = True, [], False
+
     # ════════════════════════════════════════════════════════════════════════
     # TIER DETERMINATION
     # ════════════════════════════════════════════════════════════════════════
-    
+
     if importance1:
         # ═══ IMPORTANCE 1: แตะ EMA200 → FIRE ทันที (เก็บ log ทุก checklist ไว้วิเคราะห์น้ำหนัก) ═══
         importance = 1
@@ -738,6 +898,26 @@ def score_setup(
             f"เข้า {direction} | กรุณาสังเกตว่าเข้าจุดไหน winrate ดีสุด",
         ]
 
+        # ── V2 GATES — เกต Importance-1 ตามหลักฐานงานวิจัย (แผน setup v2) ──
+        v2_pass, v2_reasons, v2_shadow = _eval_v2_gates(
+            cfg,
+            symbol,
+            direction,
+            h1_trend,
+            adx_val,
+            touch_case,
+            cond,
+        )
+        if v2_shadow:
+            v2_state = "PASS" if v2_pass else f"FAIL ({', '.join(v2_reasons)})"
+            note_parts.append(f"[v2 SHADOW: {v2_state}]")
+        elif not v2_pass:
+            # enforce (P2) — ไม่ผ่านเกต → ไม่ FIRE (ใช้ tier WATCH ที่มีอยู่แล้ว
+            # เพื่อไม่เพิ่ม enum ใหม่ในระบบ/API)
+            tier = "WATCH"
+            entry_trigger = False
+            note_parts.insert(0, f"⏸ V2 GATE ไม่ผ่าน: {', '.join(v2_reasons)}")
+
     elif crossed_ema100:
         # ═══ IMPORTANCE 2: EMA100 CROSSED → WAIT FOR 7/10 ═══
         importance = 2
@@ -754,7 +934,7 @@ def score_setup(
             entry_trigger = False
             note_parts = [
                 f"⏳ IMPORTANCE 2 — ทะลุ EMA100 แล้ว แต่ผ่านแค่ {passed_count}/11 (ต้อง >=7)",
-                f"รอ confirm เพิ่ม",
+                "รอ confirm เพิ่ม",
             ]
     else:
         # ห่าง EMA200 + ยังไม่ทะลุ EMA100 → NONE
@@ -763,9 +943,9 @@ def score_setup(
         entry_trigger = False
         note_parts = [
             f"❌ ราคา {last_close:.2f} ห่าง EMA200 {e200:.2f} ({dist200:.2f}%)",
-            f"และยังไม่ทะลุ EMA100 — ยังไม่เข้าเงื่อนไขใด",
+            "และยังไม่ทะลุ EMA100 — ยังไม่เข้าเงื่อนไขใด",
         ]
-    
+
     # Build details for DB storage
     details = {}
     for name, c in cond.items():
@@ -775,9 +955,20 @@ def score_setup(
             "weight": 1,
             "note": c["note"],
         }
-    
+
     score_breakdown = {name: (1.0 if c["pass"] else 0.0) for name, c in cond.items()}
-    
+
+    # V2 research log (additive) — แนบท้ายหลัง details/score_breakdown คำนวณแล้ว
+    # คีย์ขึ้นต้น "_" จึงไม่เพิ่ม passed_count/score — ไหลไป setup_scores
+    # และ tick_touch_log (research) อัตโนมัติผ่าน conditions_log เฉพาะเมื่อเปิดเกต
+    if importance1 and (cfg.get("v2_gates") or {}).get("enabled"):
+        cond["_v2_gate"] = {
+            "pass": v2_pass,
+            "reasons": v2_reasons,
+            "shadow": v2_shadow,
+        }
+        cond["_h1_trend"] = h1_trend or ""
+
     return SetupResult(
         timeframe=timeframe,
         target_hold_minutes=target_hold_minutes,

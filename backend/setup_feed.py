@@ -125,6 +125,9 @@ class SetupFeedEngine:
         self.buffer = pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
         self._last_processed_ts: pd.Timestamp | None = None
         self._last_seed_try: float = 0.0
+        # V2 gates (docs/plan_setup_v2_gates.md) — เทรน H1-EMA200 จากชั่วโมงที่ปิดแล้ว
+        self._h1_closes = pd.Series(dtype=float)
+        self._h1_trend: str | None = None
 
         self._seed_buffer()
         print(f"[SetupFeed:{self.symbol}] poll={POLL_SECONDS}s | buffer={len(self.buffer)} แท่ง")
@@ -148,9 +151,72 @@ class SetupFeedEngine:
                 n = db.backfill_prices(self.buffer, symbol=self.symbol)
                 print(f"[SetupFeed:{self.symbol}] Backfill ราคาย้อนหลัง {n} แท่งลง prices")
             print(f"[SetupFeed:{self.symbol}] Buffer พร้อมใช้งาน: {len(self.buffer)} แท่ง")
+            self._seed_h1()
         except Exception as e:
             print(f"[SetupFeed:{self.symbol}] WARNING: ดึง History ไม่สำเร็จ ({e}) — รอรอบถัดไป")
             self.buffer = pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
+
+    def _seed_h1(self):
+        """ดึง history ชั่วโมง (granularity 3600) เพื่อคำนวณเทรน H1-EMA200
+
+        buffer M1 (~17 ชม.) ไม่พอสำหรับ EMA200(H1) — นี่คือรากที่ทำให้ c10_mtf
+        ไม่เคย pass ในข้อมูล 6,758 เคส (ดู docs/plan_setup_v2_gates.md ข้อ 2.1)
+        """
+        try:
+            df_h1 = fetch_candles_history(symbol=self.symbol, granularity=3600, count=1000)
+            if df_h1.index.tz is None:
+                df_h1.index = df_h1.index.tz_localize("UTC")
+            now = pd.Timestamp.now(tz="UTC")
+            # แท่งสุดท้ายคือชั่วโมงที่กำลังก่อตัว → ตัดออก (ไม่ lookahead)
+            self._h1_closes = df_h1[df_h1.index < now.floor("h")]["close"].copy()
+            self._update_h1_from_buffer()
+            self._update_h1_trend()
+            print(
+                f"[SetupFeed:{self.symbol}] H1 trend: {len(self._h1_closes)} ชม. → "
+                f"{self._h1_trend or 'N/A (ยังไม่พอ 300 ชม.)'}"
+            )
+        except Exception as e:
+            print(
+                f"[SetupFeed:{self.symbol}] WARNING: seed H1 ไม่สำเร็จ ({e}) — "
+                f"v2 gate h1_trend จะเป็น None (fail-closed)"
+            )
+
+    def _update_h1_from_buffer(self):
+        """เติมชั่วโมงที่ปิดแล้วจากแท่ง M1 ที่มีอยู่ (ไม่ต้องยิง API ทุกชั่วโมง)
+
+        ชั่วโมงนึงจะถูกนับเฉพาะมีแท่ง M1 ปิดแล้ว ≥ 30 แท่ง (กันชั่วโมงขาดข้อมูล
+        กลางคัน/ช่วงตลาดปิด) — และไม่รวมชั่วโมงที่กำลังก่อตัว (ไม่ lookahead)
+        """
+        if self.buffer.empty or len(self.buffer) < 60:
+            return
+        closed_m1 = self.buffer.iloc[:-1]  # ตัดแท่ง M1 ที่กำลังก่อตัว
+        rule = dict(closed="left", label="left", origin="epoch")
+        closes = closed_m1["close"].resample("1h", **rule).last()
+        sizes = closed_m1["close"].resample("1h", **rule).size()
+        good = closes[sizes >= 30]
+        if good.empty:
+            return
+        # ทับชั่วโมงที่ seed ไว้ด้วยค่า close สมบูรณ์จากแท่ง M1 (ถ้ามีใหม่กว่า)
+        if self._h1_closes.empty:
+            self._h1_closes = good.copy()
+        else:
+            self._h1_closes = pd.concat([self._h1_closes, good])
+        self._h1_closes = (
+            self._h1_closes[~self._h1_closes.index.duplicated(keep="last")].sort_index().tail(3000)
+        )
+
+    def _update_h1_trend(self):
+        """trend = close ชั่วโมงปิดล่าสุด เทียบ EMA200(H1) — ต้องมีประวัติ ≥ 300 ชม.
+
+        (เกณฑ์ 300 ชม. เดียวกับ backtest งานวิจัย — ต่ำกว่านั้นให้ None =
+        เกต h1 ไม่ผ่านแบบ fail-closed)
+        """
+        if len(self._h1_closes) < 300:
+            self._h1_trend = None
+            return
+        e200 = self._h1_closes.ewm(span=200, adjust=False).mean().iloc[-1]
+        last = float(self._h1_closes.iloc[-1])
+        self._h1_trend = "UP" if last > float(e200) else "DOWN"
 
     def _merge_candles(self, df: pd.DataFrame):
         """รวมแท่งใหม่จาก poll เข้ากับ buffer (อัปเดตแท่งที่กำลังก่อตัว, เพิ่มแท่งใหม่)
@@ -230,6 +296,8 @@ class SetupFeedEngine:
         db.insert_tick(now.isoformat(), self.last_price)
 
         # 4.5 🚨 TICK_TOUCH: ตรวจ real-time ว่าราคาแตะ EMA200 ณ ขณะนี้ (ไม่ต้องรอจบแท่ง)
+        self._update_h1_from_buffer()
+        self._update_h1_trend()
         self._check_tick_touch(now)
 
         # 4. ถ้ามีแท่งใหม่จริงๆ (timestamp เปลี่ยน) → ประเมิน checklist + สรุปผลสัญญาณ
@@ -276,7 +344,11 @@ class SetupFeedEngine:
             from backend.setup_scorer import score_setup
 
             result = score_setup(
-                self.buffer, timeframe="TICK", target_hold_minutes=hold_min, symbol=self.symbol
+                self.buffer,
+                timeframe="TICK",
+                target_hold_minutes=hold_min,
+                symbol=self.symbol,
+                h1_trend=self._h1_trend,
             )
             # RESEARCH MODE: เก็บข้อมูลลง tick_touch_log — ไม่ส่งสัญญาณจริง
             # ไม่ลง setup_signals/trade_journal ไม่เข้า CFD
@@ -475,13 +547,19 @@ class SetupFeedEngine:
             return
 
         for tf_label, hold_min, minutes in SETUP_TIMEFRAMES:
-            df_tf = self._resample(minutes)
+            # closed_only=True → ประเมินจากแท่งที่ปิดแล้วเท่านั้น (แก้ repaint แผน C2
+            # — ทิศ/เงื่อนไขตัดสินจากข้อมูลที่เปลี่ยนไม่ได้แล้ว)
+            df_tf = self._resample(minutes, closed_only=True)
             if len(df_tf) < SETUP_MIN_BARS:
                 continue
 
             try:
                 result = score_setup(
-                    df_tf, timeframe=tf_label, target_hold_minutes=hold_min, symbol=self.symbol
+                    df_tf,
+                    timeframe=tf_label,
+                    target_hold_minutes=hold_min,
+                    symbol=self.symbol,
+                    h1_trend=self._h1_trend,
                 )
                 setup_db.insert_setup_score(now.isoformat(), result, symbol=self.symbol)
             except Exception:
@@ -652,19 +730,31 @@ class SetupFeedEngine:
 
             self._last_entry_trigger[tf_label] = result.entry_trigger
 
-    def _resample(self, minutes: int) -> pd.DataFrame:
+    def _resample(self, minutes: int, closed_only: bool = False) -> pd.DataFrame:
+        """รวมแท่ง M1 → TF ที่สูงกว่า
+
+        closed_only=True: ตัดแท่ง M1 ที่กำลังก่อตัวออกก่อน resample และตัดแท่ง TF
+        ท้ายสุดที่ยังไม่ครบ period (แก้ repaint แผน C2 — docs/plan_setup_v2_gates.md)
+        """
+        base = self.buffer.iloc[:-1] if closed_only else self.buffer
         if minutes == 1:
-            return self.buffer
+            return base
 
         rule = f"{minutes}min"
-        o = self.buffer["open"].resample(rule, closed="left", label="left", origin="epoch").first()
-        h = self.buffer["high"].resample(rule, closed="left", label="left", origin="epoch").max()
-        lo = self.buffer["low"].resample(rule, closed="left", label="left", origin="epoch").min()
-        c = self.buffer["close"].resample(rule, closed="left", label="left", origin="epoch").last()
-        v = self.buffer["volume"].resample(rule, closed="left", label="left", origin="epoch").sum()
+        resample_kwargs = dict(closed="left", label="left", origin="epoch")
+        o = base["open"].resample(rule, **resample_kwargs).first()
+        h = base["high"].resample(rule, **resample_kwargs).max()
+        lo = base["low"].resample(rule, **resample_kwargs).min()
+        c = base["close"].resample(rule, **resample_kwargs).last()
+        v = base["volume"].resample(rule, **resample_kwargs).sum()
 
         out = pd.concat([o, h, lo, c, v], axis=1)
         out.columns = ["open", "high", "low", "close", "volume"]
+        if closed_only and len(out) and len(base):
+            # แท่ง TF สุดท้ายครบ period เมื่อจบที่แท่ง M1 ปิดล่าสุด → ตัดถ้ายังไม่ครบ
+            last_closed_end = base.index[-1] + pd.Timedelta(minutes=1)
+            if out.index[-1] + pd.Timedelta(minutes=minutes) > last_closed_end:
+                out = out.iloc[:-1]
         return out.dropna()
 
     def run(self):

@@ -47,5 +47,15 @@
     "rejection": 1,
     "grip": 1,
     "rsi_div": 1
+  },
+  "v2_gates": {
+    "comment": "Setup V2 (docs/plan_setup_v2_gates.md) — enabled:false = พฤติกรรมเดิม 100%",
+    "enabled": false,
+    "shadow": true,
+    "h1_trend_required": true,
+    "min_adx": 20,
+    "allowed_touch_cases": ["WICK_BOUNCE"],
+    "avoid_conditions": ["c3_rsi_ob_os"],
+    "live_symbols": ["frxXAUUSD"]
   }
 }
