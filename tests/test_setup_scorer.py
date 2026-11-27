@@ -377,3 +377,42 @@ def test_eval_v2_gates_unit_matrix():
         cond={"c3_rsi_ob_os": {"pass": False}},
     )
     assert ok is True and reasons == []
+
+
+# ── c8/c9 audit fixes (2026-11-26 — แก้ก่อน deploy ตามคำสั่งผู้ใช้) ──────────
+def test_cond8_grip_no_longer_tautology():
+    """เดิม tol=½step → ผ่านเสมอ · ใหม่ tol=0.1×step → แยกได้จริง"""
+    from backend.setup_scorer import _cond8_grip
+
+    # ทอง step=1.0 tol=0.1: EMA ห่างเลขกลม 0.05 → ผ่าน / ห่าง 0.45 → ไม่ผ่าน
+    assert _cond8_grip(3650.05, {}, "frxXAUUSD")["pass"] is True
+    assert _cond8_grip(3650.45, {}, "frxXAUUSD")["pass"] is False
+    # FX step=0.01 tol=0.001: EMA ตรง 1.0900 → ผ่าน / 1.0855 (ห่าง 0.0045) → ไม่ผ่าน
+    assert _cond8_grip(1.09, {}, "frxEURUSD")["pass"] is True
+    assert _cond8_grip(1.0855, {}, "frxEURUSD")["pass"] is False
+
+
+def test_cond8_grip_tolerance_frac_configurable():
+    from backend.setup_scorer import _cond8_grip
+
+    # ปรับ frac ผ่าน config: 0.05 → EMA ห่าง 0.08 ไม่ผ่าน, default 0.1 → ผ่าน
+    cfg = {"grip": {"tolerance_frac": 0.05}}
+    assert _cond8_grip(3650.08, cfg, "frxXAUUSD")["pass"] is False
+    assert _cond8_grip(3650.08, {}, "frxXAUUSD")["pass"] is True
+
+
+def test_cond9_bb_width_expansion_only():
+    """เดิมบีบก็ผ่านขยายก็ผ่าน · ใหม่ pass เฉพาะขยาย (สเปกเจ้าของ)"""
+    import pandas as pd
+
+    from backend.setup_scorer import _cond9_bb_width
+
+    idx = pd.RangeIndex(30)
+    expanding = pd.Series([1.0] * 29 + [2.0], index=idx)  # แท่งสุดท้ายขยาย
+    squeezing = pd.Series([2.0] * 29 + [1.0], index=idx)  # แท่งสุดท้ายบีบ
+    flat = pd.Series([1.0] * 30, index=idx)  # ทรงตัว
+
+    assert _cond9_bb_width(expanding)["pass"] is True
+    assert _cond9_bb_width(squeezing)["pass"] is False
+    assert "บีบ" in _cond9_bb_width(squeezing)["note"]  # ยังบันทึกสภาวะจริง
+    assert _cond9_bb_width(flat)["pass"] is False

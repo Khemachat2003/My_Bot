@@ -423,41 +423,48 @@ def _cond7_fractal_trend(structure: str, direction: str) -> dict:
 
 
 def _cond8_grip(ema200_price: float, cfg: dict, symbol: str = "") -> dict:
-    """Grip (round numbers) — absolute tolerance ±0.5 สำหรับทอง, scale สำหรับคู่อื่น"""
-    # กำหนด step + tolerance ตามประเภทราคา
+    """Grip (round numbers) — EMA200 ต้องแนบระดับจำนวนเต็มแบบชัดเจนจริง
+
+    แก้บั๊ก 2026-11-26 (audit ก่อน deploy V2): เดิม tol = ½ step เสมอ ทำให้
+    dist ≤ tol ทุกครั้ง = ผ่าน ~100% (tautology — 6,752/6,758 เคส, ที่เหลือคือ
+    floating-point) · ตอนนี้ tol = tolerance_frac × step ปรับได้ที่
+    setup_config.json → grip.tolerance_frac (default 0.1 → ผ่านราว 20% ตามเรขาคณิต)
+    """
+    # กำหนด step ตามประเภทราคา
     sym = symbol.upper()
     if "XAU" in sym:
-        step, tol = 1.0, 0.5  # ทอง: round ทุก 1.0, ±0.5
+        step = 1.0  # ทอง: grip ทุก $1
     elif "JPY" in sym:
-        step, tol = 0.1, 0.05  # JPY: round ทุก 0.1, ±0.05
+        step = 0.1
     elif sym in ("GBPUSD", "GBPJPY", "GBPAUD", "GBPNZD", "GBPCAD", "GBPCHF"):
-        step, tol = 0.01, 0.005
+        step = 0.01
     elif sym in ("EURJPY", "AUDJPY", "NZDJPY", "CADJPY", "CHFJPY"):
-        step, tol = 0.1, 0.05
+        step = 0.1
     elif sym in ("EURAUD", "EURNZD", "EURCAD", "EURCHF", "EURGBP"):
-        step, tol = 0.01, 0.005
+        step = 0.01
     elif sym in ("AUDCAD", "AUDCHF", "AUDNZD", "NZDCAD", "NZDCHF", "CADCHF"):
-        step, tol = 0.01, 0.005
+        step = 0.01
     else:
         # default: ใช้ price magnitude
         if ema200_price > 100:
-            step, tol = 1.0, 0.5
+            step = 1.0
         elif ema200_price > 10:
-            step, tol = 0.1, 0.05
+            step = 0.1
         else:
-            step, tol = 0.01, 0.005
+            step = 0.01
 
+    tol = step * float((cfg.get("grip") or {}).get("tolerance_frac", 0.1))
     line = round(ema200_price / step) * step
     dist = abs(ema200_price - line)
 
     if dist <= tol:
         return {
             "pass": True,
-            "note": f"EMA200 ({ema200_price:.2f}) ใกล้เลขกลม {line:.2f} (±{dist:.3f} ≤ {tol})",
+            "note": f"EMA200 ({ema200_price:.2f}) แนบเลขกลม {line:.2f} (±{dist:.3f} ≤ {tol:.3f})",
         }
     return {
         "pass": False,
-        "note": f"EMA200 ({ema200_price:.2f}) ห่างจากเลขกลม {line:.2f} (±{dist:.3f} > {tol})",
+        "note": f"EMA200 ({ema200_price:.2f}) ห่างเลขกลม {line:.2f} (±{dist:.3f} > {tol:.3f})",
     }
 
 
@@ -476,16 +483,23 @@ def _nice_step(v: float) -> float:
 
 
 def _cond9_bb_width(bb_width: pd.Series) -> dict:
-    """BB squeeze or expansion — เปรียบเทียบตรงๆ ไม่มี buffer"""
+    """BB ขยายเท่านั้นที่ pass — ตามสเปกเจ้าของ: "ถ้าบีบไปไม่หมาะ ถ้าขยายแปลว่ามีวอลุ่ม"
+
+    แก้บั๊ก 2026-11-26 (audit ก่อน deploy V2): เดิมบีบก็ pass ("เตรียม breakout")
+    ขยายก็ pass ("มีวอลุ่ม") สองสภาวะตรงข้ามกัน → ผ่าน 99.4% ไม่มีข้อมูลแยก
+    · ข้อมูล local 150 เคสชี้ทิศเดียวกัน (ขยาย 39.3% / บีบ 49.3% — ยังไม่ชี้ขาด
+    n เล็ก) จึงเลือกตามสเปกของเจ้าของ แล้วให้ shadow เก็บ n ใหญ่ตัดสินต่อ
+    — note ยังบันทึกสภาวะจริง (ขยาย/บีบ/ทรงตัว) ทุกครั้งเหมือนเดิม
+    """
     cur_w = float(bb_width.iloc[-1]) if not np.isnan(bb_width.iloc[-1]) else 0
     avg_w = float(bb_width.rolling(20).mean().iloc[-1]) if len(bb_width) >= 20 else cur_w
 
     if cur_w > avg_w:
         return {"pass": True, "note": f"BB ขยาย (width {cur_w:.2f}% > avg {avg_w:.2f}%) — มีวอลุ่ม"}
-    elif cur_w < avg_w:
+    if cur_w < avg_w:
         return {
-            "pass": True,
-            "note": f"BB บีบ (width {cur_w:.2f}% < avg {avg_w:.2f}%) — เตรียม breakout",
+            "pass": False,
+            "note": f"BB บีบ (width {cur_w:.2f}% < avg {avg_w:.2f}%) — ยังไม่เหมาะ (สเปกเจ้าของ)",
         }
     return {"pass": False, "note": f"BB ทรงตัว ({cur_w:.2f}% = avg {avg_w:.2f}%)"}
 

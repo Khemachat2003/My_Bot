@@ -36,7 +36,8 @@
   "grip": {
     "auto_scale": true,
     "scale_divisor": 800,
-    "tolerance_pct": 0.05
+    "tolerance_pct": 0.05,
+    "tolerance_frac": 0.1
   },
   "weights": {
     "ema200_touch": 1,
