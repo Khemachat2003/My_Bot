@@ -157,9 +157,12 @@ def test_score_setup_ema200_touch_fires_importance1():
     assert res.direction == "CALL"  # ปิดบนเส้น (>=) → CALL
     assert res.touch_case != ""
     assert res.conditions_total == 11
-    assert len(res.conditions_log) == 11
+    # v2_gates เปิด shadow (config 2026-11-26) → แนบคีย์วิจัย _v2_gate/_h1_trend
+    # ต่อท้าย additive — เงื่อนไขหลัก 11 ข้อต้องครบเหมือนเดิม คีย์ _ ไม่เข้า score
+    base = {k: c for k, c in res.conditions_log.items() if not k.startswith("_")}
+    assert len(base) == 11
     # score = จำนวนข้อที่ผ่าน
-    passed = sum(1 for c in res.conditions_log.values() if c["pass"])
+    passed = sum(1 for c in base.values() if c["pass"])
     assert res.conditions_passed == passed
     assert res.score == float(passed)
 

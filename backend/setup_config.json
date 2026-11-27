@@ -50,8 +50,8 @@
     "rsi_div": 1
   },
   "v2_gates": {
-    "comment": "Setup V2 (docs/plan_setup_v2_gates.md) — enabled:false = พฤติกรรมเดิม 100%",
-    "enabled": false,
+    "comment": "Setup V2 (docs/plan_setup_v2_gates.md) — P1 shadow: เก็บสถิติเงียบ พฤติกรรมเดิมทุกอย่าง (shadow จด _v2_gate/_h1_trend ในทุก evaluation) → วัด 4-6 สัปดาห์ก่อนเปิด enforce (shadow:false)",
+    "enabled": true,
     "shadow": true,
     "h1_trend_required": true,
     "min_adx": 20,
